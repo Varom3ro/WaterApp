@@ -192,7 +192,7 @@ export const Licencia = {
           Tu período de prueba de 7 días ha finalizado. Para continuar administrando tus recargas de agua con todas las funciones activadas, por favor contáctanos para adquirir una licencia completa.
         </p>
         
-        <a href="https://wa.me/584240000000?text=Hola,%20quiero%20adquirir%20la%20licencia%20de%20WaterApp" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; font-size: var(--font-size-md); font-weight: bold; text-decoration: none;">
+        <a href="https://wa.me/584166315114?text=Hola,%20quiero%20adquirir%20la%20licencia%20de%20WaterApp" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; font-size: var(--font-size-md); font-weight: bold; text-decoration: none;">
           💬 Solicitar Licencia Completa
         </a>
       </div>
