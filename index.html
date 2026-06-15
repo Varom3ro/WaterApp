@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="description" content="Tu Empresa - Sistema de Gestión para Recarga de Agua Potable" />
+  <meta name="theme-color" content="#1B4332" />
+  <title>Tu Empresa - Gestión de Agua Potable</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+  <div id="app"></div>
+  <script>
+    window.addEventListener('error', function(e) {
+      document.body.innerHTML += '<div style="color:red; background:white; padding:20px; z-index:9999; position:absolute; top:0; left:0;">' + e.message + '<br>' + e.filename + ':' + e.lineno + '</div>';
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      document.body.innerHTML += '<div style="color:red; background:white; padding:20px; z-index:9999; position:absolute; top:50px; left:0;">Promise Reject: ' + e.reason + '</div>';
+    });
+  </script>
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/html2pdf.bundle.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
