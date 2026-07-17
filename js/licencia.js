@@ -14,11 +14,19 @@ export const Licencia = {
     // Si ya hay licencia local, verificar expiración
     if (licenciaLocal) {
       const user = JSON.parse(licenciaLocal);
-      const expirado = this._checkExpirado(user.fecha_registro, user.dias_prueba);
+      const expiradoLocal = this._checkExpirado(user.fecha_registro, user.dias_prueba);
       
-      if (expirado) {
-        this.bloquearPantalla();
-        return false;
+      if (expiradoLocal) {
+        // Intentar re-validar online por si el administrador le amplió la licencia en Supabase
+        const revalidado = await this._revalidarOnline(user.email);
+        if (revalidado) {
+          // Si online es válido, se actualizó el localStorage y procedemos
+          return true;
+        } else {
+          // Si falló online (sigue expirado o no hay conexión), bloquear pantalla
+          this.bloquearPantalla();
+          return false;
+        }
       }
       
       // Intentar re-validar online en segundo plano por seguridad (si hay internet)
@@ -29,6 +37,33 @@ export const Licencia = {
     // Si no hay licencia local, solicitar registro
     this.mostrarRegistro();
     return false;
+  },
+
+  async _revalidarOnline(email) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const user = data[0];
+          localStorage.setItem('licencia_usuario', JSON.stringify(user));
+          // Verificar si sigue inactivo o expirado
+          if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
+            return false;
+          }
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      console.warn('[Licencia] Re-validación online en caliente falló:', e);
+      return false;
+    }
   },
 
   _checkExpirado(fechaRegistroStr, diasPrueba) {
@@ -174,6 +209,20 @@ export const Licencia = {
     const oldOverlay = document.getElementById('licencia-overlay');
     if (oldOverlay) document.body.removeChild(oldOverlay);
 
+    // Obtener información del correo registrado localmente si existe
+    const licenciaLocal = localStorage.getItem('licencia_usuario');
+    let emailInfo = '';
+    if (licenciaLocal) {
+      try {
+        const user = JSON.parse(licenciaLocal);
+        if (user && user.email) {
+          emailInfo = `<div style="background: rgba(0, 0, 0, 0.05); padding: 8px var(--space-md); border-radius: var(--radius-sm); font-family: monospace; font-size: var(--font-size-sm); margin-bottom: var(--space-md); color: var(--color-text-secondary); display: inline-block;">Cuenta activa: ${user.email}</div>`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     const overlay = document.createElement('div');
     overlay.id = 'licencia-overlay';
     overlay.style = `
@@ -188,16 +237,33 @@ export const Licencia = {
       <div class="card" style="max-width: 450px; width: 100%; padding: var(--space-xl); background: var(--color-surface); color: var(--color-text-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); border: 1px solid var(--color-border); text-align: center;">
         <div style="font-size: 50px; margin-bottom: var(--space-md);">🔒</div>
         <h2 style="color: var(--color-danger); font-size: 24px; margin-bottom: var(--space-sm);">Demostración Expirada</h2>
+        ${emailInfo}
         <p style="color: var(--color-text-secondary); font-size: var(--font-size-base); line-height: 1.5; margin-bottom: var(--space-lg);">
-          Tu período de prueba de 7 días ha finalizado. Para continuar administrando tus recargas de agua con todas las funciones activadas, por favor contáctanos para adquirir una licencia completa.
+          Tu período de prueba de 7 días ha finalizado o la cuenta está inactiva. Para continuar administrando tus recargas de agua con todas las funciones activadas, por favor contáctanos para adquirir una licencia completa.
         </p>
         
-        <a href="https://wa.me/584166315114?text=Hola,%20quiero%20adquirir%20la%20licencia%20de%20WaterApp" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; font-size: var(--font-size-md); font-weight: bold; text-decoration: none;">
+        <a href="https://wa.me/584166315114?text=Hola,%20quiero%20adquirir%20la%20licencia%20de%20WaterApp" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; font-size: var(--font-size-md); font-weight: bold; text-decoration: none; margin-bottom: var(--space-md);">
           💬 Solicitar Licencia Completa
         </a>
+
+        <div style="margin-top: var(--space-sm); border-top: 1px solid var(--color-border); padding-top: var(--space-md);">
+          <button id="btn-cambiar-licencia" class="btn btn-secondary" style="width: 100%; height: 40px; font-size: var(--font-size-sm); background: transparent; border: 1px solid var(--color-border); color: var(--color-text-secondary); cursor: pointer; border-radius: var(--radius-sm); font-weight: 500;">
+            🔑 Usar otra cuenta / Registrar otro correo
+          </button>
+        </div>
       </div>
     `;
 
     document.body.appendChild(overlay);
+
+    const btnCambiar = overlay.querySelector('#btn-cambiar-licencia');
+    if (btnCambiar) {
+      btnCambiar.addEventListener('click', () => {
+        if (confirm('¿Seguro que deseas usar otra cuenta? Esto eliminará la sesión local actual.')) {
+          localStorage.removeItem('licencia_usuario');
+          window.location.reload();
+        }
+      });
+    }
   }
-};
+}
