@@ -145,7 +145,7 @@ function filterClientes() {
   renderClientesTable(clientes);
 }
 
-function openClienteModal(id = null) {
+export function openClienteModal(id = null, onSuccess = null) {
   const isEdit = !!id;
   const cliente = isEdit ? store.getById('clientes', id) : {};
 
@@ -269,9 +269,14 @@ function openClienteModal(id = null) {
       }
 
       closeModal();
-      // Refresh
+      if (onSuccess && !isEdit) {
+        onSuccess(data);
+      }
+      // Refresh only if we are on the clients page
       const container = document.querySelector('.main-content');
-      if (container) renderClientes(container);
+      if (container && container.querySelector('.page-title')?.textContent === 'Clientes') {
+         renderClientes(container);
+      }
     }
   });
 }
@@ -310,6 +315,7 @@ function viewClienteDetail(id) {
         <p><strong>RIF:</strong> ${Utils.escapeHtml(cliente.rif || '-')}</p>
         <p><strong>Teléfono:</strong> ${Utils.escapeHtml(cliente.telefono || '-')}</p>
         <p><strong>Ubicación:</strong> ${Utils.escapeHtml(ubicacion || '-')}</p>
+        ${cliente.referencia ? `<p><strong>Punto de Referencia:</strong> ${Utils.escapeHtml(cliente.referencia)}</p>` : ''}
         <p><strong>Estatus:</strong> <span class="badge ${statusInfo.class}">${statusInfo.label}</span></p>
         <p><strong>Deuda:</strong> <span class="${deuda > 0 ? 'text-danger font-bold' : ''}">${Utils.formatCurrency(deuda)}</span></p>
       </div>

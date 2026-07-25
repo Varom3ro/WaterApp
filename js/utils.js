@@ -10,16 +10,21 @@ export const Utils = {
 
   // Formatear moneda (USD o Bs)
   formatCurrency(amount, currency = 'USD') {
-    return new Intl.NumberFormat('es-VE', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2
-    }).format(amount);
+    if (currency === 'Bs' || currency === 'VES') {
+      const formatted = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+      return `Bs ${formatted}`;
+    }
+    const formatted = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    if (currency === 'USD') return `$ ${formatted}`;
+    return `${currency} ${formatted}`;
   },
 
   // Formatear número
-  formatNumber(num) {
-    return new Intl.NumberFormat('es-VE').format(num);
+  formatNumber(num, isBs = false) {
+    if (isBs) {
+      return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+    }
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
   },
 
   // Formatear fecha

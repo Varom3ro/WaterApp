@@ -1,3 +1,4 @@
+import { openClienteModal } from './clientes.js';
 // ============================================
 // Tu Empresa - Ventas Module
 // ============================================
@@ -6,37 +7,27 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { getMatricialReportHTML } from './reportes.js';
 
 export function renderVentas(container) {
   container.innerHTML = `
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Ventas</h1>
-        <p class="page-subtitle">Registro de ventas y facturación</p>
-      </div>
-      <div class="page-actions">
-        <button class="btn btn-primary" id="btn-nueva-venta">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nueva Venta
-        </button>
-        <button class="btn btn-secondary" id="btn-registrar-abono">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          Registrar Abono
-        </button>
-      </div>
-    </div>
+    <h3 style="margin-top: 40px; margin-bottom: 20px; font-size: 20px; color: var(--color-text); border-bottom: 2px solid var(--color-border); padding-bottom: 10px;">
+      Historial de Ventas
+    </h3>
 
     <!-- Filters -->
-    <div class="card mb-lg">
-      <div class="flex items-center gap-md" style="flex-wrap:wrap">
-        <input type="date" class="form-control" id="filter-fecha" style="max-width:180px;height:40px" value="${Utils.todayISO()}"/>
-        <input type="text" class="form-control" id="search-ventas" placeholder="Buscar por cliente..."
-          style="max-width:250px;height:40px"/>
-        <select class="form-control" id="filter-tipo-venta" style="max-width:160px;height:40px">
-          <option value="">Todos</option>
-          <option value="contado">Contado</option>
-          <option value="credito">Crédito</option>
-        </select>
+    <div class="card mb-lg" style="overflow-x: auto;">
+      <div class="flex items-center gap-sm" style="flex-wrap:nowrap; justify-content: space-between; min-width: 650px;">
+        <div class="flex items-center gap-sm" style="flex-wrap:nowrap;">
+          <input type="date" class="form-control" id="filter-fecha" style="width:140px; height:38px; padding: 4px 8px;" value="${Utils.todayISO()}"/>
+          <input type="text" class="form-control" id="search-ventas" placeholder="Buscar por cliente..." style="width:200px; height:38px; padding: 4px 8px;"/>
+          <select class="form-control" id="filter-tipo-venta" style="width:130px; height:38px; padding: 4px 8px;">
+            <option value="">Todos</option>
+            <option value="contado">Contado</option>
+            <option value="credito">Crédito</option>
+            <option value="convenio">Convenio</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -48,7 +39,7 @@ export function renderVentas(container) {
             <tr>
               <th>Fecha/Hora</th>
               <th>Cliente</th>
-              <th>Botellones</th>
+              <th>Detalles</th>
               <th>Total</th>
               <th>Tipo</th>
               <th>Pago</th>
@@ -64,11 +55,13 @@ export function renderVentas(container) {
 
   renderVentasTable();
 
-  container.querySelector('#btn-nueva-venta').addEventListener('click', () => openVentaModal());
-  container.querySelector('#btn-registrar-abono').addEventListener('click', () => openAbonoModal());
+  
+  
   container.querySelector('#filter-fecha').addEventListener('change', renderVentasTable);
   container.querySelector('#search-ventas').addEventListener('input', Utils.debounce(renderVentasTable, 200));
   container.querySelector('#filter-tipo-venta').addEventListener('change', renderVentasTable);
+  
+
 }
 
 function renderVentasTable() {
@@ -115,18 +108,55 @@ function renderVentasTable() {
   tbody.innerHTML = ventas.map(v => {
     const cliente = store.getById('clientes', v.clienteId);
     const nombre = cliente ? cliente.nombre : 'Cliente General';
-    const pagosStr = v.pagos ? v.pagos.map(p => {
-      const method = Utils.paymentMethods.find(m => m.id === p.metodo);
-      return method ? method.icon : p.metodo;
-    }).join(' ') : '-';
+    let pagosStr = '-';
+    if (v.tipo === 'credito') {
+      pagosStr = '<span class="badge badge-warning" style="font-size: 0.75em;">A Crédito</span>';
+    } else if (v.tipo === 'convenio') {
+      pagosStr = '<span class="badge badge-info" style="font-size: 0.75em;">Convenio</span>';
+    } else if (v.pagos && v.pagos.length > 0) {
+      pagosStr = v.pagos.map(p => {
+        const method = Utils.paymentMethods.find(m => m.id === p.metodo);
+        const icon = method ? method.icon : '';
+        const name = method ? method.label : p.metodo;
+        const title = p.referencia ? ` title="Ref: ${p.referencia}" style="cursor:help;"` : '';
+        return `<div${title} style="font-size: 0.8em; white-space: nowrap; line-height: 1.2;">${icon} ${name}: <b>${Utils.formatCurrency(p.monto)}</b></div>`;
+      }).join('');
+    }
+
+    // Generar detalles del producto
+    let detallesHTML = '';
+    const tipos = store.getConfig('tiposBotellon') || [];
+    if (v.detalles && v.detalles.length > 0) {
+      detallesHTML = v.detalles.map(d => {
+        const prod = tipos.find(t => t.id === d.tipoBotellonId);
+        const prodName = d.nombre || (prod ? prod.nombre : 'Prod.');
+        return `<div style="font-size: 0.9em; margin-bottom: 2px;">${d.cantidad}x ${Utils.formatCurrency(d.precioUnitario)} ${prodName}</div>`;
+      }).join('');
+    } else {
+      detallesHTML = `<div style="font-size: 0.9em;">${v.botellones || 0} botellones</div>`;
+    }
+
+    // Calcular/mostrar delivery
+    const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
+    const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
+    
+    if (delivery > 0) {
+      detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}</div>`;
+    }
 
     return `
       <tr>
         <td>${Utils.formatDateTime(v.fecha)}</td>
         <td class="font-semibold">${Utils.escapeHtml(nombre)}</td>
-        <td>${v.botellones}</td>
-        <td class="font-semibold">${Utils.formatCurrency(v.total)}</td>
-        <td><span class="badge ${v.tipo === 'credito' ? 'badge-warning' : 'badge-success'}">${v.tipo === 'credito' ? 'Crédito' : 'Contado'}</span></td>
+        <td style="line-height: 1.2;">${detallesHTML}</td>
+        <td class="font-semibold" style="line-height: 1.2;">${Utils.formatCurrency(v.total)}
+          ${v.tasa ? `<br><small style="font-size: 0.8em; color: var(--color-text-secondary);">Bs ${Utils.formatNumber(v.total * v.tasa, true)}</small>` : ''}
+        </td>
+        <td>
+          <span class="badge ${v.tipo === 'credito' ? 'badge-warning' : (v.tipo === 'convenio' ? 'badge-info' : 'badge-success')}">
+            ${v.tipo === 'credito' ? 'Crédito' : (v.tipo === 'convenio' ? 'Convenio' : 'Contado')}
+          </span>
+        </td>
         <td>${pagosStr}</td>
         <td>
           <button class="btn btn-sm btn-secondary btn-delete-venta" data-id="${v.id}" title="Eliminar">🗑️</button>
@@ -140,19 +170,23 @@ function renderVentasTable() {
   });
 }
 
-function openVentaModal() {
+export function renderNuevaVentaForm(container) {
   const clientes = store.getAll('clientes');
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
   const inventario = store.getInventarioActual();
 
+  let carrito = [];
+
   const content = `
     <form id="form-venta">
-      <div class="alert-panel info mb-md">
-        💧 Inventario disponible: <strong>${Utils.formatNumber(inventario.litros)} L</strong>
-      </div>
 
-      <!-- Fila 1: Fecha y Cliente -->
+
+      <!-- Fila 1: Tasa, Fecha y Cliente -->
       <div class="form-row">
+        <div class="form-group" style="flex: 0.8;">
+          <label class="form-label">Tasa (Bs/$)</label>
+          <input type="number" step="0.01" class="form-control" id="input-tasa" value="${store.getConfig('tasaCambio') || 40.00}" required/>
+        </div>
         <div class="form-group" style="flex: 1;">
           <label class="form-label">Fecha de Venta</label>
           <input type="date" class="form-control" name="fecha" id="input-fecha" value="${Utils.todayISO()}" required/>
@@ -167,28 +201,64 @@ function openVentaModal() {
         </div>
       </div>
 
-      <!-- Fila 2: Detalles del Producto -->
-      <div class="form-row">
-        <div class="form-group" style="flex: 2;">
-          <label class="form-label">Producto / Botellón</label>
-          <select class="form-control" name="tipoBotellonId" id="select-tipo-botellon">
-            ${tipos.map(t => `<option value="${t.id}" data-precio="${t.precio}" data-litros="${t.litros}">${Utils.escapeHtml(t.nombre)}</option>`).join('')}
-          </select>
+      <!-- Fila 2: Formulario Añadir Ítem -->
+      <div style="border: 1px solid var(--color-border); padding: var(--space-md); border-radius: 8px; margin-bottom: var(--space-md); background: #f8fafc;">
+        <h4 style="margin-bottom: var(--space-sm); font-size: 14px; color: var(--color-text-secondary);">Añadir Producto</h4>
+        <div style="display: grid; grid-template-columns: minmax(120px, 2fr) 70px 80px auto auto; gap: 12px; align-items: center; margin-bottom: 0;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <select class="form-control" id="select-tipo-botellon">
+              ${tipos.map(t => `<option value="${t.id}" data-precio="${t.precio}" data-litros="${t.litros}" data-nombre="${Utils.escapeHtml(t.nombre)}">${Utils.escapeHtml(t.nombre)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <input type="number" class="form-control" min="1" value="1" id="input-botellones" placeholder="Cant."/>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <input type="number" class="form-control" step="0.01" min="0" value="${tipos[0].precio}" id="input-precio" placeholder="Precio $"/>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <button type="button" class="btn btn-secondary" id="btn-add-item">+ Añadir</button>
+          </div>
+          <!-- Delivery Inline -->
+          <div style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--color-border); padding-left: 12px; height: 100%;">
+            <label class="form-check" style="margin: 0; font-size: 13px;">
+              <input type="checkbox" id="check-delivery"/> Delivery
+            </label>
+            <div id="container-monto-delivery" style="display: none; width: 80px;">
+              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00"/>
+            </div>
+          </div>
         </div>
-        <div class="form-group" style="flex: 1;">
-          <label class="form-label">Cantidad</label>
-          <input type="number" class="form-control" name="botellones" min="1" value="1" required id="input-botellones"/>
-        </div>
-        <div class="form-group" style="flex: 1;">
-          <label class="form-label">Precio ($)</label>
-          <input type="number" class="form-control" name="precio" step="0.01" min="0" value="${tipos[0].precio}" id="input-precio"/>
-        </div>
+        
       </div>
 
-      <!-- Total -->
-      <div class="alert-panel success mb-md" style="font-size: var(--font-size-lg); justify-content: space-between; padding: var(--space-md);">
-        <span>Total a Cobrar:</span>
-        <strong id="total-venta" style="font-size: 24px;">${Utils.formatCurrency(tipos[0].precio)}</strong>
+      <!-- Carrito de Compras -->
+      <div class="table-container mb-md" id="carrito-container" style="display: none;">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th style="text-align:center">Cant.</th>
+              <th style="text-align:right">Precio</th>
+              <th style="text-align:right">Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="carrito-tbody"></tbody>
+        </table>
+      </div>
+
+
+      <!-- Inventario, Total y Botón -->
+      <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 250px; gap: 15px; margin-bottom: 20px; align-items: stretch;">
+        <div class="alert-panel info" style="margin-bottom: 0; font-size: var(--font-size-lg); justify-content: flex-start; padding: var(--space-md); border-radius: 8px;">
+          💧 Disp: <strong style="margin-left: 8px; font-size: 24px;">${Utils.formatNumber(inventario.litros)} L</strong>
+        </div>
+        <div class="alert-panel success" style="margin-bottom: 0; font-size: var(--font-size-lg); justify-content: space-between; padding: var(--space-sm) var(--space-md); border-radius: 8px; align-items: center;">
+          <span>Total a Cobrar:</span>
+          <strong id="total-venta" style="font-size: 24px; text-align: right; line-height: 1.1;">$0.00</strong>
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="padding: 12px 24px; font-size: 16px; width:100%; height: 100%;">Registrar Venta</button>
       </div>
 
       <!-- Fila 3: Condición y Pagos -->
@@ -204,23 +274,33 @@ function openVentaModal() {
               <input type="radio" name="tipo" value="credito"/>
               <span>A Crédito</span>
             </label>
+            <label class="form-check">
+              <input type="radio" name="tipo" value="convenio"/>
+              <span>Convenio</span>
+            </label>
           </div>
         </div>
         
         <div class="form-group" style="flex: 2; border-left: 1px solid var(--color-border); padding-left: var(--space-md);" id="seccion-pagos">
-          <div class="flex items-center justify-between mb-sm">
+          <div class="flex items-center justify-between mb-sm" style="margin-bottom: 15px;">
             <label class="form-label" style="margin:0">Métodos de Pago</label>
             <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta">+ Añadir</button>
           </div>
           <div id="pagos-list">
-            <div class="form-row pago-row" style="margin-bottom: var(--space-xs);">
-              <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <div class="pago-row" style="display: grid; grid-template-columns: 1.5fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: var(--space-xs);">
+              <div class="form-group" style="margin-bottom: 0;">
                 <select class="form-control pago-metodo">
                   ${Utils.paymentMethods.map(m => `<option value="${m.id}">${m.icon} ${m.label}</option>`).join('')}
                 </select>
               </div>
-              <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${tipos[0].precio}"/>
+              <div class="form-group" style="margin-bottom: 0;">
+                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00"/>
+              </div>
+              <!-- Div invisible para mantener el grid alineado con los botones de borrar -->
+              <div style="width: 40px;"></div>
+              
+              <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
+                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
               </div>
             </div>
           </div>
@@ -233,34 +313,54 @@ function openVentaModal() {
     </form>
   `;
 
-  const modal = openModal({
-    title: 'Nueva Venta',
-    content,
-    size: 'lg',
-    saveLabel: 'Registrar',
-    onSave: (overlay) => {
+  const formHtml = `
+    <div style="padding: 20px 0;">
+      <h2 style="margin-bottom:20px; color:var(--color-primary); display:flex; justify-content:space-between; align-items:center;">
+        Punto de Venta
+        <button type="button" class="btn btn-secondary" id="btn-quick-new-cliente">+ Nuevo Cliente</button>
+      </h2>
+      ${content}
+    </div>
+  `;
+  container.innerHTML = formHtml;
+  const modal = container;
+  
+  modal.querySelector('#btn-save-venta-home').addEventListener('click', () => {
+    const overlay = modal;
+      if (carrito.length === 0) {
+        showToast('Debe añadir al menos un producto a la venta', 'error');
+        return;
+      }
+
       const form = overlay.querySelector('#form-venta');
       const fd = new FormData(form);
-      const botellones = parseInt(fd.get('botellones'));
-      const precio = parseFloat(fd.get('precio'));
-      const tipoBotellonId = fd.get('tipoBotellonId');
-      const tipoBotellon = tipos.find(t => t.id === tipoBotellonId);
       const clienteId = fd.get('clienteId') || null;
       const tipo = fd.get('tipo');
 
-      if (!botellones || botellones < 1) return;
+      let totalVenta = 0;
+      let totalBotellones = 0;
+      let totalLitros = 0;
 
-      const totalVenta = botellones * precio;
-      const litrosTotales = botellones * (tipoBotellon?.litros || 20);
+      carrito.forEach(item => {
+        totalVenta += item.subtotal;
+        totalBotellones += item.cantidad;
+        totalLitros += item.litros;
+      });
 
       const pagos = [];
       let totalPagado = 0;
       if (tipo === 'contado') {
+        const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
         overlay.querySelectorAll('.pago-row').forEach(row => {
           const metodo = row.querySelector('.pago-metodo').value;
-          const monto = parseFloat(row.querySelector('.pago-monto').value) || 0;
+          const inputMonto = parseFloat(row.querySelector('.pago-monto').value) || 0;
+          const monto = (metodo === 'efectivo_usd') ? inputMonto : (inputMonto / tasaActual);
+          
+          const refEl = row.querySelector('.pago-referencia');
+          const referencia = refEl && refEl.value ? refEl.value.trim() : null;
+          
           if (monto > 0) {
-            pagos.push({ metodo, monto });
+            pagos.push({ metodo, monto, referencia });
             totalPagado += monto;
           }
         });
@@ -276,14 +376,25 @@ function openVentaModal() {
       if (inputFecha !== Utils.todayISO()) {
           fechaRegistro = new Date(inputFecha + 'T12:00:00').toISOString();
       }
+      
+      const checkDeliv = modal.querySelector('#check-delivery');
+      const inputDeliv = modal.querySelector('#monto-delivery');
+      const montoDelivery = (checkDeliv && checkDeliv.checked) ? (parseFloat(inputDeliv.value) || 0) : 0;
+      if (montoDelivery > 0) {
+        totalVenta += montoDelivery;
+      }
+      
+      const tasaCambio = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+      store.setConfig('tasaCambio', tasaCambio); // memorizar
 
       const venta = {
         id: Utils.generateId(),
+        tasa: tasaCambio,
         clienteId,
-        tipoBotellonId,
-        botellones,
-        litrosTotales,
-        precioUnitario: precio,
+        detalles: [...carrito],
+        botellones: totalBotellones,
+        litrosTotales: totalLitros,
+        delivery: montoDelivery,
         total: totalVenta,
         tipo,
         pagos,
@@ -291,9 +402,11 @@ function openVentaModal() {
       };
 
       store.save('ventas', venta);
-      store.descontarVenta(botellones, tipoBotellon?.litros || 20);
+      
+      const inv = store.getInventarioActual();
+      inv.litros = Math.max(0, inv.litros - totalLitros);
+      store.setConfig('inventario', inv);
 
-      // Registrar abono si hay excedente y cliente seleccionado
       if (clienteId && totalPagado > totalVenta) {
         const excedente = totalPagado - totalVenta;
         const abono = {
@@ -310,12 +423,97 @@ function openVentaModal() {
         showToast('Venta registrada con éxito', 'success');
       }
 
-      closeModal();
-      renderVentasTable();
-    }
-  });
+      // Reset form for continuous selling
+      carrito.length = 0;
+      renderCarrito();
+      modal.querySelector('#search-cliente-input').value = '';
+      modal.querySelector('#search-cliente-input').dataset.id = '';
+      modal.querySelector('input[name="tipo"][value="contado"]').checked = true;
+      modal.querySelector('#seccion-pagos').style.display = 'block';
+      const firstMetodo = modal.querySelector('.pago-metodo');
+      if (firstMetodo) firstMetodo.value = 'punto';
+      const firstMonto = modal.querySelector('.pago-monto');
+      if (firstMonto) firstMonto.value = '0.00';
+      const checkDelivery = modal.querySelector('#check-delivery');
+      if (checkDelivery) {
+         checkDelivery.checked = false;
+         modal.querySelector('#container-monto-delivery').style.display = 'none';
+         modal.querySelector('#monto-delivery').value = '0.00';
+      }
+      // Refrescar historial
+      if (typeof renderVentasTable === 'function') {
+        renderVentasTable();
+      }
+      
+      const extraPagos = modal.querySelectorAll('.pago-row:not(:first-child)');
+      extraPagos.forEach(r => r.remove());
+      actualizarPagosAutom(0);
+    });
 
-  // Client Search Logic
+  const carritoContainer = modal.querySelector('#carrito-container');
+  const carritoTbody = modal.querySelector('#carrito-tbody');
+  const totalDisplay = modal.querySelector('#total-venta');
+  
+  function renderCarrito() {
+    if (carrito.length === 0) {
+      carritoContainer.style.display = 'none';
+      totalDisplay.textContent = '$0.00';
+      actualizarPagosAutom(0);
+      return;
+    }
+    
+    carritoContainer.style.display = 'block';
+    
+    carritoTbody.innerHTML = carrito.map((item, index) => `
+      <tr>
+        <td>${item.nombre}</td>
+        <td style="text-align:center">${item.cantidad}</td>
+        <td style="text-align:right">${Utils.formatCurrency(item.precioUnitario)}</td>
+        <td style="text-align:right; font-weight:bold;">${Utils.formatCurrency(item.subtotal)}</td>
+        <td style="text-align:center">
+          <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:4px;" title="Eliminar">✕</button>
+        </td>
+      </tr>
+    `).join('');
+    
+    let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    
+    // Sumar delivery si está activo
+    const checkDeliv = modal.querySelector('#check-delivery');
+    const inputDeliv = modal.querySelector('#monto-delivery');
+    let delivery = 0;
+    if (checkDeliv && checkDeliv.checked) {
+      delivery = parseFloat(inputDeliv.value) || 0;
+    }
+    totalVenta += delivery;
+    
+    const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+    const totalBs = totalVenta * tasa;
+    totalDisplay.innerHTML = `${Utils.formatCurrency(totalVenta)} <br><small style="font-size: 0.6em; font-weight: normal; opacity: 0.8; color: var(--color-text-secondary); line-height:1;">Bs ${Utils.formatNumber(totalBs, true)}</small>`;
+    
+    carritoTbody.querySelectorAll('.btn-remove-cart').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.target.dataset.index);
+        carrito.splice(idx, 1);
+        renderCarrito();
+      });
+    });
+    
+    actualizarPagosAutom(totalVenta);
+  }
+  
+  const btnNewClient = modal.querySelector('#btn-quick-new-cliente');
+  if (btnNewClient) {
+    btnNewClient.addEventListener('click', () => {
+      openClienteModal(null, (nuevoCliente) => {
+        // Callback when client is saved
+        searchInput.value = nuevoCliente.nombre;
+        searchInput.dataset.id = nuevoCliente.id;
+      });
+    });
+  }
+  
+
   const searchInput = modal.querySelector('#search-cliente-input');
   const resultsDiv = modal.querySelector('#search-cliente-results');
   const hiddenId = modal.querySelector('#hidden-cliente-id');
@@ -350,14 +548,13 @@ function openVentaModal() {
           searchInput.value = nombre;
           hiddenId.value = id;
           resultsDiv.classList.remove('active');
-          update(); // Actualizar panel de abono si se selecciona cliente
+          actualizarInfoPagos();
         });
       });
     }
     resultsDiv.classList.add('active');
   });
 
-  // Close search results when clicking outside
   document.addEventListener('click', (e) => {
     if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
       resultsDiv.classList.remove('active');
@@ -367,29 +564,68 @@ function openVentaModal() {
   const selectTipo = modal.querySelector('#select-tipo-botellon');
   const inputBot = modal.querySelector('#input-botellones');
   const inputPrecio = modal.querySelector('#input-precio');
-  const totalDisplay = modal.querySelector('#total-venta');
   const diffPanel = modal.querySelector('#pago-diff-panel');
   const diffMonto = modal.querySelector('#pago-diff-monto');
 
-  function update(e) {
-    const b = parseInt(inputBot.value) || 0;
-    const p = parseFloat(inputPrecio.value) || 0;
-    const totalVenta = b * p;
-    totalDisplay.textContent = Utils.formatCurrency(totalVenta);
-
-    const pagosMontoInputs = modal.querySelectorAll('.pago-monto');
+  modal.querySelector('#btn-add-item').addEventListener('click', () => {
+    const cantidad = parseInt(inputBot.value);
+    const precioUnitario = parseFloat(inputPrecio.value);
     
-    // Si la actualización viene de cambiar botellones o precio, y solo hay 1 método de pago, autocompletamos el monto
-    if (e && (e.target === inputBot || e.target === inputPrecio || e.target === selectTipo)) {
-        if (pagosMontoInputs.length === 1) {
-            pagosMontoInputs[0].value = totalVenta.toFixed(2);
-        }
+    if (!cantidad || cantidad < 1 || isNaN(precioUnitario) || precioUnitario < 0) {
+      showToast('Cantidad o precio inválido', 'error');
+      return;
     }
+    
+    const opt = selectTipo.options[selectTipo.selectedIndex];
+    const tipoBotellonId = opt.value;
+    const nombre = opt.dataset.nombre;
+    const litrosPorUnidad = parseFloat(opt.dataset.litros) || 20;
+    
+    const existenteIdx = carrito.findIndex(item => item.tipoBotellonId === tipoBotellonId && item.precioUnitario === precioUnitario);
+    
+    if (existenteIdx !== -1) {
+      carrito[existenteIdx].cantidad += cantidad;
+      carrito[existenteIdx].subtotal = carrito[existenteIdx].cantidad * carrito[existenteIdx].precioUnitario;
+      carrito[existenteIdx].litros += (cantidad * litrosPorUnidad);
+    } else {
+      carrito.push({
+        tipoBotellonId,
+        nombre,
+        cantidad,
+        precioUnitario,
+        subtotal: cantidad * precioUnitario,
+        litros: cantidad * litrosPorUnidad
+      });
+    }
+    
+    inputBot.value = '1';
+    renderCarrito();
+  });
 
-    // Calcular total de pagos
+  function actualizarPagosAutom(totalVenta) {
+    const pagosMontoInputs = modal.querySelectorAll('.pago-monto');
+    if (pagosMontoInputs.length === 1) {
+        const isUsd = modal.querySelector('.pago-metodo').value === 'efectivo_usd';
+        const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+        const monto = isUsd ? totalVenta : (totalVenta * tasa);
+        pagosMontoInputs[0].value = monto.toFixed(2);
+    }
+    actualizarInfoPagos();
+  }
+
+  function actualizarInfoPagos() {
+    let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    const checkDelivery = modal.querySelector('#check-delivery');
+    if (checkDelivery && checkDelivery.checked) {
+      totalVenta += parseFloat(modal.querySelector('#monto-delivery').value) || 0;
+    }
+    
     let totalPagos = 0;
-    pagosMontoInputs.forEach(input => {
-      totalPagos += parseFloat(input.value) || 0;
+    const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+    modal.querySelectorAll('.pago-row').forEach(row => {
+      const isUsd = row.querySelector('.pago-metodo').value === 'efectivo_usd';
+      const val = parseFloat(row.querySelector('.pago-monto').value) || 0;
+      totalPagos += isUsd ? val : (val / tasa);
     });
 
     const clienteId = hiddenId.value;
@@ -402,46 +638,141 @@ function openVentaModal() {
   }
 
   modal.querySelector('#btn-add-pago-venta').addEventListener('click', () => {
+    let totalBotellones = 0;
+    let totalVenta = 0;
+    carrito.forEach(item => {
+      totalBotellones += item.cantidad;
+      totalVenta += item.subtotal;
+    });
+    const checkDelivery = modal.querySelector('#check-delivery');
+    if (checkDelivery && checkDelivery.checked) {
+      totalVenta += parseFloat(modal.querySelector('#monto-delivery').value) || 0;
+    }
+    
+    let totalPagosDolares = 0;
+    const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+    modal.querySelectorAll('.pago-row').forEach(row => {
+      const isUsd = row.querySelector('.pago-metodo').value === 'efectivo_usd';
+      const val = parseFloat(row.querySelector('.pago-monto').value) || 0;
+      totalPagosDolares += isUsd ? val : (val / tasaActual);
+    });
+    
+    const remanenteDolares = Math.max(0, totalVenta - totalPagosDolares);
+    const remanenteBs = remanenteDolares * tasaActual;
+    const defaultVal = remanenteBs > 0 ? remanenteBs.toFixed(2) : "0.00"; // Porque select por defecto añade "punto"
+
     const row = document.createElement('div');
-    row.className = 'form-row pago-row';
-    row.style.marginTop = 'var(--space-xs)';
+    row.className = 'pago-row';
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = '1.5fr 1fr 40px';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+    row.style.marginBottom = 'var(--space-xs)';
     row.innerHTML = `
-      <div class="form-group" style="flex:2">
+      <div class="form-group" style="margin-bottom: 0;">
         <select class="form-control pago-metodo">
           ${Utils.paymentMethods.map(m => `<option value="${m.id}">${m.icon} ${m.label}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group" style="flex:1">
-        <input type="number" class="form-control pago-monto" step="0.01" min="0" placeholder="0.00"/>
+      <div class="form-group" style="margin-bottom: 0;">
+        <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${defaultVal}" placeholder="0.00"/>
       </div>
-      <button type="button" class="btn btn-sm btn-danger btn-remove-pago" style="align-self:center">✕</button>
+      <button type="button" class="btn btn-danger btn-remove-pago" style="height: 38px; width: 40px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 16px;">✕</button>
+      
+      <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
+        <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+      </div>
     `;
     modal.querySelector('#pagos-list').appendChild(row);
     row.querySelector('.btn-remove-pago').addEventListener('click', () => {
       row.remove();
-      update();
+      actualizarInfoPagos();
     });
-    row.querySelector('.pago-monto').addEventListener('input', update);
+    row.querySelector('.pago-monto').addEventListener('input', actualizarInfoPagos);
   });
 
-  modal.querySelector('.pago-monto').addEventListener('input', update);
+  modal.querySelector('.pago-monto').addEventListener('input', actualizarInfoPagos);
+
+  modal.querySelector('#seccion-pagos').addEventListener('change', (e) => {
+    if (e.target.classList.contains('pago-metodo')) {
+      const row = e.target.closest('.pago-row');
+      if (!row) return;
+      const input = row.querySelector('.pago-monto');
+      
+      let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+      const checkDelivery = modal.querySelector('#check-delivery');
+      if (checkDelivery && checkDelivery.checked) {
+        totalVenta += parseFloat(modal.querySelector('#monto-delivery').value) || 0;
+      }
+
+      let totalPagosDolares = 0;
+      const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+      
+      modal.querySelectorAll('.pago-row').forEach(r => {
+        if (r === row) return;
+        const isUsd = r.querySelector('.pago-metodo').value === 'efectivo_usd';
+        const val = parseFloat(r.querySelector('.pago-monto').value) || 0;
+        totalPagosDolares += isUsd ? val : (val / tasaActual);
+      });
+
+      const remanenteDolares = Math.max(0, totalVenta - totalPagosDolares);
+      const remanenteBs = remanenteDolares * tasaActual;
+      
+      if (e.target.value === 'efectivo_usd') {
+        input.value = remanenteDolares > 0 ? remanenteDolares.toFixed(2) : "0.00";
+      } else {
+        input.value = remanenteBs > 0 ? remanenteBs.toFixed(2) : "0.00";
+      }
+      
+      actualizarInfoPagos();
+    }
+  });
 
   selectTipo.addEventListener('change', () => {
     const opt = selectTipo.options[selectTipo.selectedIndex];
     inputPrecio.value = opt.dataset.precio;
-    update();
   });
-
-  inputBot.addEventListener('input', update);
-  inputPrecio.addEventListener('input', update);
 
   const radiosTipo = modal.querySelectorAll('input[name="tipo"]');
   const seccionPagos = modal.querySelector('#seccion-pagos');
   radiosTipo.forEach(r => {
     r.addEventListener('change', () => {
-      seccionPagos.style.display = r.value === 'credito' ? 'none' : 'block';
+      seccionPagos.style.display = (r.value === 'credito' || r.value === 'convenio') ? 'none' : 'block';
     });
   });
+  
+  const checkDelivery = modal.querySelector('#check-delivery');
+  const containerDelivery = modal.querySelector('#container-monto-delivery');
+  const inputDelivery = modal.querySelector('#monto-delivery');
+  
+  if (checkDelivery && containerDelivery && inputDelivery) {
+    checkDelivery.addEventListener('change', (e) => {
+      containerDelivery.style.display = e.target.checked ? 'block' : 'none';
+      if (!e.target.checked) inputDelivery.value = '0.00';
+      renderCarrito();
+    });
+    inputDelivery.addEventListener('input', () => {
+      renderCarrito();
+    });
+  }
+  
+  // Listener para mostrar u ocultar referencia
+  modal.addEventListener('change', (e) => {
+    if (e.target.classList.contains('pago-metodo')) {
+      const row = e.target.closest('.pago-row');
+      const refContainer = row.querySelector('.pago-ref-container');
+      if (refContainer) {
+        if (e.target.value === 'pago_movil' || e.target.value === 'transferencia') {
+          refContainer.style.display = 'block';
+        } else {
+          refContainer.style.display = 'none';
+          refContainer.querySelector('.pago-referencia').value = '';
+        }
+      }
+    }
+  });
+
+  renderCarrito();
 }
 
 function openAbonoModal() {

@@ -378,28 +378,28 @@ function renderCierreContent(fecha) {
       <!-- Tarjeta 1: Ingreso Real -->
       <div class="metric-card accent" style="padding: 15px; border-radius: 8px;">
         <div class="metric-label">Ingreso Real en Caja</div>
-        <div class="metric-value" style="font-size: var(--font-size-xl); margin: 0;">${Utils.formatCurrency(cierre.real_ingresado)}</div>
+        <div class="metric-value" style="font-size: var(--font-size-xl); margin: 0;">${Utils.formatCurrency(cierre.real_ingresado)}<br><small style="font-size:0.5em; opacity:0.8; font-weight:normal; line-height:1; display:block;">Bs ${Utils.formatNumber(cierre.bs && cierre.bs.real_ingresado ? cierre.bs.real_ingresado : 0, true)}</small></div>
         <div class="text-muted" style="font-size: 10px; margin-top: 5px; color: rgba(255,255,255,0.85);">(Contado + Abonos de hoy)</div>
       </div>
 
       <!-- Tarjeta 2: Total Ventas -->
       <div class="metric-card" style="padding: 15px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface);">
         <div class="metric-label">Total Ventas (Valor)</div>
-        <div class="metric-value" style="font-size: var(--font-size-xl); margin: 0;">${Utils.formatCurrency(cierre.total)}</div>
+        <div class="metric-value" style="font-size: var(--font-size-xl); margin: 0;">${Utils.formatCurrency(cierre.total)}<br><small style="font-size:0.5em; opacity:0.8; font-weight:normal; line-height:1; display:block; color:var(--color-text-secondary);">Bs ${Utils.formatNumber(cierre.bs && cierre.bs.total ? cierre.bs.total : 0, true)}</small></div>
         <div class="text-muted" style="font-size: 10px; margin-top: 5px;">(Contado + Crédito de hoy)</div>
       </div>
 
       <!-- Tarjeta 3: Crédito Nuevo (Deuda hoy) -->
       <div class="metric-card" style="padding: 15px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface);">
         <div class="metric-label">Crédito Nuevo (Hoy)</div>
-        <div class="metric-value" style="font-size: var(--font-size-xl); color: var(--color-danger); margin: 0;">${Utils.formatCurrency(cierre.credito)}</div>
+        <div class="metric-value" style="font-size: var(--font-size-xl); color: var(--color-danger); margin: 0;">${Utils.formatCurrency(cierre.credito)}<br><small style="font-size:0.5em; opacity:0.8; font-weight:normal; line-height:1; display:block;">Bs ${Utils.formatNumber(cierre.bs && cierre.bs.credito ? cierre.bs.credito : 0, true)}</small></div>
         <div class="text-muted" style="font-size: 10px; margin-top: 5px;">(Por cobrar hoy)</div>
       </div>
 
       <!-- Tarjeta 4: Crédito Cobrado (Abonos hoy) -->
       <div class="metric-card" style="padding: 15px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface);">
         <div class="metric-label">Crédito Cobrado (Abonos)</div>
-        <div class="metric-value" style="font-size: var(--font-size-xl); color: var(--color-success); margin: 0;">${Utils.formatCurrency(cierre.cobros_credito)}</div>
+        <div class="metric-value" style="font-size: var(--font-size-xl); color: var(--color-success); margin: 0;">${Utils.formatCurrency(cierre.cobros_credito)}<br><small style="font-size:0.5em; opacity:0.8; font-weight:normal; line-height:1; display:block;">Bs ${Utils.formatNumber(cierre.bs && cierre.bs.cobros_credito ? cierre.bs.cobros_credito : 0, true)}</small></div>
         <div class="text-muted" style="font-size: 10px; margin-top: 5px;">(Recuperado hoy)</div>
       </div>
     </div>
@@ -424,7 +424,7 @@ function renderCierreContent(fecha) {
         ${methods.map(m => `
           <div style="padding:var(--space-lg);background:var(--color-bg);border-radius:var(--radius-md);text-align:center">
             <div style="font-size:1.5rem;margin-bottom:var(--space-sm)">${m.icon}</div>
-            <div class="font-bold" style="font-size:var(--font-size-lg);color:${m.color}">${Utils.formatCurrency(cierre[m.key] || 0)}</div>
+            <div class="font-bold" style="font-size:var(--font-size-lg);color:${m.color}; line-height:1.2;">${Utils.formatCurrency(cierre[m.key] || 0)}<br><small style="font-size:0.5em; opacity:0.7; font-weight:normal;">Bs ${Utils.formatNumber((cierre.bs && cierre.bs[m.key], true) || 0)}</small></div>
             <div class="text-muted" style="font-size:var(--font-size-xs)">${m.label}</div>
           </div>
         `).join('')}
@@ -483,7 +483,7 @@ function renderCierreContent(fecha) {
               <tr>
                 <th>Hora</th>
                 <th>Cliente</th>
-                <th>Botellones</th>
+                <th>Detalles</th>
                 <th>Total Venta</th>
                 <th>Tipo</th>
                 <th>Métodos de Pago / Detalle</th>
@@ -498,23 +498,46 @@ function renderCierreContent(fecha) {
                 let pagoStr = '-';
                 if (v.tipo === 'credito') {
                   pagoStr = `<span class="badge badge-danger">A Crédito</span>`;
+                } else if (v.tipo === 'convenio') {
+                  pagoStr = `<span class="badge badge-info">Convenio</span>`;
                 } else if (v.pagos && v.pagos.length > 0) {
                   pagoStr = v.pagos.map(p => {
                     const foundMethod = methods.find(m => m.key === p.metodo);
+                    const refText = p.referencia ? ` (Ref: ${p.referencia})` : '';
                     const metodoStr = foundMethod ? `${foundMethod.icon} ${foundMethod.label}` : p.metodo;
-                    return `${metodoStr}: <b>${Utils.formatCurrency(p.monto)}</b>`;
+                    return `${metodoStr}${refText}: <b>${Utils.formatCurrency(p.monto)}</b>`;
                   }).join('<br>');
+                }
+
+
+                const tipos = store.getConfig('tiposBotellon') || [];
+                let detallesHTML = '';
+                if (v.detalles && v.detalles.length > 0) {
+                  detallesHTML = v.detalles.map(d => {
+                    const prod = tipos.find(t => t.id === d.tipoBotellonId);
+                    const prodName = d.nombre || (prod ? prod.nombre : 'Prod.');
+                    return `<div style="font-size: 0.85em;">${d.cantidad}x ${Utils.formatCurrency(d.precioUnitario)} ${prodName}</div>`;
+                  }).join('');
+                } else {
+                  detallesHTML = `<div style="font-size: 0.85em;">${v.botellones || 0} botellones</div>`;
+                }
+
+                // Delivery
+                const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
+                const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
+                if (delivery > 0) {
+                  detallesHTML += `<div style="font-size: 0.8em; color: var(--color-text-secondary);">+ Delivery: ${Utils.formatCurrency(delivery)}</div>`;
                 }
 
                 return `
                   <tr>
                     <td class="text-muted">${horaStr}</td>
                     <td class="font-semibold">${Utils.escapeHtml(nombreCliente)}</td>
-                    <td class="font-bold">${v.botellones} b.</td>
+                    <td style="line-height: 1.2;">${detallesHTML}</td>
                     <td class="font-bold text-primary">${Utils.formatCurrency(v.total)}</td>
                     <td>
-                      <span class="badge ${v.tipo === 'credito' ? 'badge-danger' : 'badge-success'}">
-                        ${v.tipo === 'credito' ? 'Crédito' : 'Contado'}
+                      <span class="badge ${v.tipo === 'credito' ? 'badge-danger' : (v.tipo === 'convenio' ? 'badge-info' : 'badge-success')}">
+                        ${v.tipo === 'credito' ? 'Crédito' : (v.tipo === 'convenio' ? 'Convenio' : 'Contado')}
                       </span>
                     </td>
                     <td style="font-size: var(--font-size-xs); line-height: 1.3;">${pagoStr}</td>
@@ -530,7 +553,7 @@ function renderCierreContent(fecha) {
 }
 
 // Función auxiliar para generar el HTML con estilo de impresora matricial para el PDF
-function getMatricialReportHTML(fecha) {
+export function getMatricialReportHTML(fecha) {
   const cierre = store.getCierreCaja(fecha);
   const methods = [
     { key: 'efectivo_usd', label: 'Efectivo (USD)', icon: '💵' },
@@ -666,19 +689,42 @@ function getMatricialReportHTML(fecha) {
                 let pagoStr = '';
                 if (v.tipo === 'credito') {
                   pagoStr = 'A CRÉDITO';
+                } else if (v.tipo === 'convenio') {
+                  pagoStr = 'CONVENIO';
                 } else if (v.pagos && v.pagos.length > 0) {
                   pagoStr = v.pagos.map(p => {
                     const foundMethod = methods.find(m => m.key === p.metodo);
+                    const refText = p.referencia ? ` (REF: ${p.referencia})` : '';
                     const metodoStr = foundMethod ? foundMethod.label.toUpperCase() : p.metodo.toUpperCase();
-                    return `${metodoStr}: ${Utils.formatCurrency(p.monto)}`;
+                    return `${metodoStr}${refText}: ${Utils.formatCurrency(p.monto)}`;
                   }).join(' | ');
+                }
+
+
+                const tipos = store.getConfig('tiposBotellon') || [];
+                let detallesHTML = '';
+                if (v.detalles && v.detalles.length > 0) {
+                  detallesHTML = v.detalles.map(d => {
+                    const prod = tipos.find(t => t.id === d.tipoBotellonId);
+                    const prodName = (d.nombre || (prod ? prod.nombre : 'PROD.')).toUpperCase();
+                    return `<div style="line-height:1.2;">${d.cantidad}X ${Utils.formatCurrency(d.precioUnitario)} ${prodName}</div>`;
+                  }).join('');
+                } else {
+                  detallesHTML = `<div style="line-height:1.2;">${v.botellones || 0} BOTELLONES</div>`;
+                }
+
+                // Delivery
+                const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
+                const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
+                if (delivery > 0) {
+                  detallesHTML += `<div style="font-size: 8px; color: #666;">+ DELIV: ${Utils.formatCurrency(delivery)}</div>`;
                 }
 
                 return `
                   <tr>
                     <td style="padding: 5px 0; color:#333;">${horaStr}</td>
                     <td style="padding: 5px 0; font-weight: bold;">${nombreCliente.toUpperCase()}</td>
-                    <td style="padding: 5px 0; text-align: center;">${v.botellones}</td>
+                    <td style="padding: 5px 0; font-size: 9px; min-width: 100px;">${detallesHTML}</td>
                     <td style="padding: 5px 0; text-align: right; font-weight: bold; color: var(--color-primary-900);">${Utils.formatCurrency(v.total)}</td>
                     <td style="padding: 5px 0; padding-left: 15px; font-weight: 500; font-size:10px; color:#444;">${pagoStr}</td>
                   </tr>
@@ -695,4 +741,48 @@ function getMatricialReportHTML(fecha) {
       </div>
     </div>
   `;
+}
+
+export function renderCierreCajaHome(container) {
+  const today = Utils.todayISO();
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid var(--color-border); padding-bottom: 10px; margin-bottom: 20px; margin-top: 40px;">
+      <h3 style="margin:0; font-size: 20px; color: var(--color-text);">Cierre de Caja Diario</h3>
+      <div class="flex items-center gap-md">
+        <div class="flex items-center gap-sm">
+          <label class="form-label" style="margin:0; font-size:13px; color:var(--color-text-secondary);">Fecha:</label>
+          <input type="date" class="form-control" id="cierre-fecha-home" style="max-width:160px; height:36px; padding:4px 8px; font-size:14px;" value="${today}"/>
+        </div>
+        <button id="btn-generar-pdf-home" class="btn btn-primary" style="height:36px; padding:0 12px; font-size:13px;">📄 Guardar PDF</button>
+      </div>
+    </div>
+    <div id="cierre-caja-home-content"></div>
+  `;
+
+  const contentDiv = container.querySelector('#cierre-caja-home-content');
+  const fechaInput = container.querySelector('#cierre-fecha-home');
+  const pdfBtn = container.querySelector('#btn-generar-pdf-home');
+
+  fechaInput.addEventListener('change', () => {
+    renderCierre(contentDiv, fechaInput.value);
+  });
+
+  pdfBtn.addEventListener('click', () => {
+    const htmlMatricial = getMatricialReportHTML(fechaInput.value);
+    const opt = {
+      margin:       0.5,
+      filename:     `Cierre_Caja_${fechaInput.value}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css'] }
+    };
+    if (window.html2pdf) {
+        window.html2pdf().set(opt).from(htmlMatricial).save();
+    } else {
+        alert("La librería PDF no está lista o cargada.");
+    }
+  });
+
+  renderCierre(contentDiv, today);
 }

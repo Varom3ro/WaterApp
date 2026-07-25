@@ -268,20 +268,31 @@ class Store {
             efectivo_usd: 0, efectivo_bs: 0, punto: 0, pago_movil: 0, transferencia: 0, 
             credito: 0, total: 0, botellones: 0, cantidadVentas: ventas.length,
             cobros_credito: 0, // Suma de todos los abonos cobrados hoy
-            real_ingresado: 0 // Dinero real que entró (Ventas Contado + Cobros de Crédito)
+            real_ingresado: 0, // Dinero real que entró (Ventas Contado + Cobros de Crédito)
+            bs: { efectivo_usd: 0, efectivo_bs: 0, punto: 0, pago_movil: 0, transferencia: 0, credito: 0, total: 0, cobros_credito: 0, real_ingresado: 0 }
         };
+
+        const currentTasa = this.getConfig('tasaCambio') || 40.00;
 
         // Procesar ventas del día
         for (const v of ventas) {
             cierre.botellones += v.botellones;
             cierre.total += v.total;
+            
+            const tasa = v.tasa || currentTasa;
+            cierre.bs.total += v.total * tasa;
+
             if (v.tipo === 'credito') {
                 cierre.credito += v.total;
+                cierre.bs.credito += v.total * tasa;
             } else if (v.pagos) {
                 for (const p of v.pagos) {
                     if (cierre.hasOwnProperty(p.metodo)) {
                         cierre[p.metodo] += p.monto;
                         cierre.real_ingresado += p.monto;
+                        
+                        cierre.bs[p.metodo] += p.monto * tasa;
+                        cierre.bs.real_ingresado += p.monto * tasa;
                     }
                 }
             }
@@ -291,8 +302,14 @@ class Store {
         for (const a of abonos) {
             cierre.cobros_credito += a.monto;
             cierre.real_ingresado += a.monto;
+            
+            const tasa = a.tasa || currentTasa;
+            cierre.bs.cobros_credito += a.monto * tasa;
+            cierre.bs.real_ingresado += a.monto * tasa;
+
             if (cierre.hasOwnProperty(a.metodo)) {
-                cierre[a.metodo] += a.monto; // Sumar al dinero físico de ese método de pago
+                cierre[a.metodo] += a.monto;
+                cierre.bs[a.metodo] += a.monto * tasa;
             }
         }
         cierre.ventasDetalle = ventas;
@@ -355,6 +372,9 @@ class Store {
                 { id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }
             ]);
             this.setConfig('initialized', true);
+        }
+        if (this.getConfig('tasaCambio') === undefined) {
+            this.setConfig('tasaCambio', 40.00);
         }
     }
 }
