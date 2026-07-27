@@ -7,7 +7,7 @@ export function renderSidebar() {
     <aside class="sidebar">
       <div class="sidebar-logo">
         <img src="./img/logo.png" alt="Tu Empresa Logo" class="logo-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
-        <h1>Tu Empresa <span style="font-size: 11px; color: #888; font-weight: normal; margin-left: 4px; padding: 2px 6px; background: #eee; border-radius: 10px;">v2.0</span></h1>
+        <h1>Tu Empresa <span style="font-size: 11px; color: #888; font-weight: normal; margin-left: 4px; padding: 2px 6px; background: #eee; border-radius: 10px;" id="app-version">v2.1</span></h1>
       </div>
 
       <span class="sidebar-section-title">Menú</span>
