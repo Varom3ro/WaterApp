@@ -15,6 +15,7 @@ import { renderVentas } from './modules/ventas.js';
 import { renderInventario } from './modules/inventario.js';
 import { renderReportes } from './modules/reportes.js';
 import { renderConfiguracion } from './modules/configuracion.js';
+import { renderCierreCaja } from './modules/cierre.js';
 
 class App {
     constructor() {
@@ -151,6 +152,7 @@ class App {
         router.register('/inventario', renderInventario);
         router.register('/reportes', renderReportes);
         router.register('/configuracion', renderConfiguracion);
+        router.register('/cierre-caja', renderCierreCaja);
     }
 }
 

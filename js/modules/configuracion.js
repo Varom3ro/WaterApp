@@ -36,8 +36,13 @@ export function renderConfiguracion(container) {
             <tbody id="tipos-tbody">
               ${tipos.map(t => `
                 <tr>
-                  <td class="font-semibold">${Utils.escapeHtml(t.nombre)}</td>
-                  <td>${t.litros}L</td>
+                  <td>
+                      <div class="font-semibold">${Utils.escapeHtml(t.nombre)}</div>
+                      <div style="font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase;">
+                        ${t.categoria === 'producto' ? 'Producto Físico' : 'Recarga'}
+                      </div>
+                    </td>
+                  <td>${t.categoria === 'producto' ? 'N/A' : (t.litros + 'L')}</td>
                   <td class="text-success font-semibold">${Utils.formatCurrency(t.precio || 0)}</td>
                   <td>
                     <div class="flex gap-sm">
@@ -133,12 +138,21 @@ function openTipoModal(id = null) {
 
   const content = `
     <form id="form-tipo">
-      <div class="form-group">
-        <label class="form-label">Nombre del Botellón</label>
-        <input type="text" class="form-control" name="nombre" value="${tipo.nombre || ''}" placeholder="Ej: Botellón 20L" required/>
-      </div>
       <div class="form-row">
         <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select class="form-control" name="categoria" onchange="document.getElementById('grupo-litros').style.display = this.value === 'producto' ? 'none' : 'block'">
+            <option value="relleno" ${tipo.categoria !== 'producto' ? 'selected' : ''}>Tipo de Relleno (Recarga)</option>
+            <option value="producto" ${tipo.categoria === 'producto' ? 'selected' : ''}>Tipo de Productos (Físico)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre del Ítem</label>
+          <input type="text" class="form-control" name="nombre" value="${tipo.nombre || ''}" placeholder="Ej: Botellón 20L" required/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" id="grupo-litros" style="${tipo.categoria === 'producto' ? 'display:none;' : ''}">
           <label class="form-label">Capacidad (Litros)</label>
           <input type="number" class="form-control" name="litros" value="${tipo.litros || 20}" required/>
         </div>
@@ -156,17 +170,18 @@ function openTipoModal(id = null) {
     onSave: (overlay) => {
       const form = overlay.querySelector('#form-tipo');
       const fd = new FormData(form);
+      const categoria = fd.get('categoria');
       const nombre = fd.get('nombre').trim();
-      const litros = parseInt(fd.get('litros'));
+      const litros = categoria === 'producto' ? 0 : parseInt(fd.get('litros'));
       const precio = parseFloat(fd.get('precio'));
 
-      if (!nombre || !litros || isNaN(precio)) return;
+      if (!nombre || (categoria !== 'producto' && isNaN(litros)) || isNaN(precio)) return;
 
       if (isEdit) {
         const idx = tipos.findIndex(t => t.id === id);
-        tipos[idx] = { ...tipos[idx], nombre, litros, precio };
+        tipos[idx] = { ...tipos[idx], categoria, nombre, litros, precio };
       } else {
-        tipos.push({ id: Utils.generateId(), nombre, litros, precio });
+        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, precio });
       }
 
       store.setConfig('tiposBotellon', tipos);

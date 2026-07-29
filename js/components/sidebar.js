@@ -42,6 +42,16 @@ export function renderSidebar() {
           </span>
           Ventas
         </a>
+        <a class="sidebar-nav-item" data-route="/cierre-caja" href="#/cierre-caja">
+          <span class="nav-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16v16H4z"/>
+              <path d="M4 8h16"/>
+              <path d="M8 4v4"/>
+            </svg>
+          </span>
+          Cierre de Caja
+        </a>
         <a class="sidebar-nav-item" data-route="/inventario" href="#/inventario">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

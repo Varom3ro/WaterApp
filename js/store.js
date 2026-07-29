@@ -242,6 +242,32 @@ class Store {
         return clientes.filter(c => this.calcularEstatusCliente(c.id) === 'moroso');
     }
 
+
+    getArqueo(fecha) {
+        let arqueos = this.cache['arqueos'];
+        if (!arqueos) {
+            arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+            this.cache['arqueos'] = arqueos;
+        }
+        return arqueos.find(a => a.fecha === fecha) || null;
+    }
+
+    saveArqueo(fecha, declaracion) {
+        let arqueos = this.cache['arqueos'];
+        if (!arqueos) {
+            arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+        }
+        const idx = arqueos.findIndex(a => a.fecha === fecha);
+        const nuevo = { fecha, declaracion };
+        if (idx !== -1) {
+            arqueos[idx] = nuevo;
+        } else {
+            arqueos.push(nuevo);
+        }
+        this.cache['arqueos'] = arqueos;
+        localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
+    }
+
     getCierreCaja(fecha) {
         let day;
         if (typeof fecha === 'string' && fecha.includes('-')) {

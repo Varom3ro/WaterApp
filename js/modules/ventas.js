@@ -7,13 +7,16 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { getMatricialReportHTML } from './reportes.js';
+import { getMatricialReportHTML } from './cierre.js';
 
 export function renderVentas(container) {
   container.innerHTML = `
-    <h3 style="margin-top: 40px; margin-bottom: 20px; font-size: 20px; color: var(--color-text); border-bottom: 2px solid var(--color-border); padding-bottom: 10px;">
-      Historial de Ventas
-    </h3>
+    <div class="page-header" style="margin-bottom: 20px;">
+      <div>
+        <h1 class="page-title">Historial de Ventas</h1>
+        <p class="page-subtitle">Registro de todas las operaciones y cobros</p>
+      </div>
+    </div>
 
     <!-- Filters -->
     <div class="card mb-lg" style="overflow-x: auto;">
@@ -181,7 +184,7 @@ export function renderNuevaVentaForm(container) {
     <form id="form-venta">
 
 
-      <!-- Fila 1: Tasa, Fecha y Cliente -->
+      <!-- Fila 1: Tasa, Fecha y Disponibilidad -->
       <div class="form-row">
         <div class="form-group" style="flex: 0.8;">
           <label class="form-label">Tasa (Bs/$)</label>
@@ -192,6 +195,19 @@ export function renderNuevaVentaForm(container) {
           <input type="date" class="form-control" name="fecha" id="input-fecha" value="${Utils.todayISO()}" required/>
         </div>
         <div class="form-group" style="flex: 2;">
+          <label class="form-label">Disponibilidad del Agua</label>
+          <div class="alert-panel info" style="margin-bottom: 0; font-size: 16px; justify-content: center; padding: 7.5px; border-radius: 8px;">
+            💧 Disp: <strong style="margin-left: 8px; font-size: 18px;">${Utils.formatNumber(inventario.litros)} L</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fila 2: Nuevo Cliente y Buscar Cliente -->
+      <div style="display: grid; grid-template-columns: 250px 1fr; gap: 15px; align-items: flex-end; margin-bottom: 15px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <button type="button" class="btn" id="btn-quick-new-cliente" style="height: 38px; width: 100%; white-space: nowrap; padding: 0 20px; font-size: 16px; background: var(--color-success-light); color: var(--color-success); border: 1px solid var(--color-success-light); font-weight: 600; border-radius: 6px;">+ Nuevo Cliente</button>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label">Cliente (Nombre o RIF)</label>
           <div class="search-container">
             <input type="text" class="form-control" id="search-cliente-input" placeholder="Buscar o dejar vacío para Cliente General" autocomplete="off"/>
@@ -204,10 +220,10 @@ export function renderNuevaVentaForm(container) {
       <!-- Fila 2: Formulario Añadir Ítem -->
       <div style="border: 1px solid var(--color-border); padding: var(--space-md); border-radius: 8px; margin-bottom: var(--space-md); background: #f8fafc;">
         <h4 style="margin-bottom: var(--space-sm); font-size: 14px; color: var(--color-text-secondary);">Añadir Producto</h4>
-        <div style="display: grid; grid-template-columns: minmax(120px, 2fr) 70px 80px auto auto; gap: 12px; align-items: center; margin-bottom: 0;">
+        <div style="display: grid; grid-template-columns: minmax(120px, 2fr) 70px 80px auto; gap: 12px; align-items: center; margin-bottom: 0;">
           <div class="form-group" style="margin-bottom: 0;">
             <select class="form-control" id="select-tipo-botellon">
-              ${tipos.map(t => `<option value="${t.id}" data-precio="${t.precio}" data-litros="${t.litros}" data-nombre="${Utils.escapeHtml(t.nombre)}">${Utils.escapeHtml(t.nombre)}</option>`).join('')}
+              ${tipos.map(t => `<option value="${t.id}" data-precio="${t.precio}" data-litros="${t.litros}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
@@ -217,16 +233,7 @@ export function renderNuevaVentaForm(container) {
             <input type="number" class="form-control" step="0.01" min="0" value="${tipos[0].precio}" id="input-precio" placeholder="Precio $"/>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
-            <button type="button" class="btn btn-secondary" id="btn-add-item">+ Añadir</button>
-          </div>
-          <!-- Delivery Inline -->
-          <div style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--color-border); padding-left: 12px; height: 100%;">
-            <label class="form-check" style="margin: 0; font-size: 13px;">
-              <input type="checkbox" id="check-delivery"/> Delivery
-            </label>
-            <div id="container-monto-delivery" style="display: none; width: 80px;">
-              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00"/>
-            </div>
+            <button type="button" class="btn btn-secondary" id="btn-add-item" style="padding: 0 20px;">+ Añadir</button>
           </div>
         </div>
         
@@ -249,16 +256,25 @@ export function renderNuevaVentaForm(container) {
       </div>
 
 
-      <!-- Inventario, Total y Botón -->
-      <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 250px; gap: 15px; margin-bottom: 20px; align-items: stretch;">
-        <div class="alert-panel info" style="margin-bottom: 0; font-size: var(--font-size-lg); justify-content: flex-start; padding: var(--space-md); border-radius: 8px;">
-          💧 Disp: <strong style="margin-left: 8px; font-size: 24px;">${Utils.formatNumber(inventario.litros)} L</strong>
+      <!-- Delivery y Total a Cobrar -->
+      <div class="form-row" style="margin-bottom: 20px; align-items: center;">
+        <div class="form-group" style="flex: 1.8; display: flex; align-items: center;">
+          <!-- Delivery Inline -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label class="form-check" style="margin: 0; font-size: 14px; cursor: pointer;">
+              <input type="checkbox" id="check-delivery"/> Delivery
+            </label>
+            <div id="container-monto-delivery" style="display: none; width: 100px; margin-left: 10px;">
+              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00"/>
+            </div>
+          </div>
         </div>
-        <div class="alert-panel success" style="margin-bottom: 0; font-size: var(--font-size-lg); justify-content: space-between; padding: var(--space-sm) var(--space-md); border-radius: 8px; align-items: center;">
-          <span>Total a Cobrar:</span>
-          <strong id="total-venta" style="font-size: 24px; text-align: right; line-height: 1.1;">$0.00</strong>
+        <div class="form-group" style="flex: 2;">
+          <div class="alert-panel success" style="margin-bottom: 0; font-size: var(--font-size-lg); justify-content: space-between; padding: 10px 20px; border-radius: 8px; align-items: center;">
+            <span>Total a Cobrar:</span>
+            <strong id="total-venta" style="font-size: 24px; text-align: right; line-height: 1.1;">$0.00</strong>
+          </div>
         </div>
-        <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="padding: 12px 24px; font-size: 16px; width:100%; height: 100%;">Registrar Venta</button>
       </div>
 
       <!-- Fila 3: Condición y Pagos -->
@@ -308,17 +324,23 @@ export function renderNuevaVentaForm(container) {
              <span>Abono Extra:</span>
              <strong id="pago-diff-monto">$0.00</strong>
           </div>
+          
+          <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="padding: 10px 20px; font-size: 16px; width: 250px;">Registrar Venta</button>
+          </div>
         </div>
       </div>
     </form>
   `;
 
   const formHtml = `
-    <div style="padding: 20px 0;">
-      <h2 style="margin-bottom:20px; color:var(--color-primary); display:flex; justify-content:space-between; align-items:center;">
-        Punto de Venta
-        <button type="button" class="btn btn-secondary" id="btn-quick-new-cliente">+ Nuevo Cliente</button>
-      </h2>
+    <div style="padding: 0 0 20px 0;">
+      <div class="page-header" style="margin-bottom: 20px;">
+        <div>
+          <h1 class="page-title">Punto de Venta</h1>
+          <p class="page-subtitle">Registro de recargas y facturación</p>
+        </div>
+      </div>
       ${content}
     </div>
   `;
@@ -343,8 +365,10 @@ export function renderNuevaVentaForm(container) {
 
       carrito.forEach(item => {
         totalVenta += item.subtotal;
-        totalBotellones += item.cantidad;
-        totalLitros += item.litros;
+        if (item.categoria !== 'producto') {
+          totalBotellones += item.cantidad;
+          totalLitros += item.litros;
+        }
       });
 
       const pagos = [];
@@ -353,7 +377,8 @@ export function renderNuevaVentaForm(container) {
         const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
         overlay.querySelectorAll('.pago-row').forEach(row => {
           const metodo = row.querySelector('.pago-metodo').value;
-          const inputMonto = parseFloat(row.querySelector('.pago-monto').value) || 0;
+          const rawMonto = row.querySelector('.pago-monto').value || '0';
+          const inputMonto = parseFloat(rawMonto.replace(',', '.')) || 0;
           const monto = (metodo === 'efectivo_usd') ? inputMonto : (inputMonto / tasaActual);
           
           const refEl = row.querySelector('.pago-referencia');
@@ -365,7 +390,8 @@ export function renderNuevaVentaForm(container) {
           }
         });
         
-        if (totalPagado < totalVenta) {
+        // Margen de tolerancia de $0.02 para compensar errores de redondeo cambiario
+        if (totalVenta - totalPagado > 0.02) {
             showToast('El pago ingresado no cubre el total de la venta', 'error');
             return;
         }
@@ -488,7 +514,7 @@ export function renderNuevaVentaForm(container) {
     totalVenta += delivery;
     
     const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
-    const totalBs = totalVenta * tasa;
+    const totalBs = +(Math.round((totalVenta * tasa) + "e+2") + "e-2");
     totalDisplay.innerHTML = `${Utils.formatCurrency(totalVenta)} <br><small style="font-size: 0.6em; font-weight: normal; opacity: 0.8; color: var(--color-text-secondary); line-height:1;">Bs ${Utils.formatNumber(totalBs, true)}</small>`;
     
     carritoTbody.querySelectorAll('.btn-remove-cart').forEach(btn => {
@@ -580,9 +606,11 @@ export function renderNuevaVentaForm(container) {
     const tipoBotellonId = opt.value;
     const nombre = opt.dataset.nombre;
     const litrosPorUnidad = parseFloat(opt.dataset.litros) || 20;
+    const categoria = opt.dataset.categoria || 'relleno';
     
     const existenteIdx = carrito.findIndex(item => item.tipoBotellonId === tipoBotellonId && item.precioUnitario === precioUnitario);
     
+    // Aseguramos que la comparacion agrupe bien
     if (existenteIdx !== -1) {
       carrito[existenteIdx].cantidad += cantidad;
       carrito[existenteIdx].subtotal = carrito[existenteIdx].cantidad * carrito[existenteIdx].precioUnitario;
@@ -590,6 +618,7 @@ export function renderNuevaVentaForm(container) {
     } else {
       carrito.push({
         tipoBotellonId,
+        categoria,
         nombre,
         cantidad,
         precioUnitario,
@@ -607,7 +636,7 @@ export function renderNuevaVentaForm(container) {
     if (pagosMontoInputs.length === 1) {
         const isUsd = modal.querySelector('.pago-metodo').value === 'efectivo_usd';
         const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
-        const monto = isUsd ? totalVenta : (totalVenta * tasa);
+        let monto = isUsd ? totalVenta : +(Math.round((totalVenta * tasa) + "e+2") + "e-2");
         pagosMontoInputs[0].value = monto.toFixed(2);
     }
     actualizarInfoPagos();
@@ -624,7 +653,8 @@ export function renderNuevaVentaForm(container) {
     const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
     modal.querySelectorAll('.pago-row').forEach(row => {
       const isUsd = row.querySelector('.pago-metodo').value === 'efectivo_usd';
-      const val = parseFloat(row.querySelector('.pago-monto').value) || 0;
+      const rawVal = row.querySelector('.pago-monto').value || '0';
+      const val = parseFloat(rawVal.replace(',', '.')) || 0;
       totalPagos += isUsd ? val : (val / tasa);
     });
 
@@ -641,7 +671,9 @@ export function renderNuevaVentaForm(container) {
     let totalBotellones = 0;
     let totalVenta = 0;
     carrito.forEach(item => {
-      totalBotellones += item.cantidad;
+      if (item.categoria !== 'producto') {
+        totalBotellones += item.cantidad;
+      }
       totalVenta += item.subtotal;
     });
     const checkDelivery = modal.querySelector('#check-delivery');
@@ -653,12 +685,13 @@ export function renderNuevaVentaForm(container) {
     const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
     modal.querySelectorAll('.pago-row').forEach(row => {
       const isUsd = row.querySelector('.pago-metodo').value === 'efectivo_usd';
-      const val = parseFloat(row.querySelector('.pago-monto').value) || 0;
+      const rawVal = row.querySelector('.pago-monto').value || '0';
+      const val = parseFloat(rawVal.replace(',', '.')) || 0;
       totalPagosDolares += isUsd ? val : (val / tasaActual);
     });
     
     const remanenteDolares = Math.max(0, totalVenta - totalPagosDolares);
-    const remanenteBs = remanenteDolares * tasaActual;
+    const remanenteBs = +(Math.round((remanenteDolares * tasaActual) + "e+2") + "e-2");
     const defaultVal = remanenteBs > 0 ? remanenteBs.toFixed(2) : "0.00"; // Porque select por defecto añade "punto"
 
     const row = document.createElement('div');
@@ -711,12 +744,13 @@ export function renderNuevaVentaForm(container) {
       modal.querySelectorAll('.pago-row').forEach(r => {
         if (r === row) return;
         const isUsd = r.querySelector('.pago-metodo').value === 'efectivo_usd';
-        const val = parseFloat(r.querySelector('.pago-monto').value) || 0;
+        const rawVal = r.querySelector('.pago-monto').value || '0';
+        const val = parseFloat(rawVal.replace(',', '.')) || 0;
         totalPagosDolares += isUsd ? val : (val / tasaActual);
       });
 
       const remanenteDolares = Math.max(0, totalVenta - totalPagosDolares);
-      const remanenteBs = remanenteDolares * tasaActual;
+      const remanenteBs = +(Math.round((remanenteDolares * tasaActual) + "e+2") + "e-2");
       
       if (e.target.value === 'efectivo_usd') {
         input.value = remanenteDolares > 0 ? remanenteDolares.toFixed(2) : "0.00";
