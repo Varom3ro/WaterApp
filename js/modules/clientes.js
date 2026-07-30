@@ -212,11 +212,11 @@ export function openClienteModal(id = null, onSuccess = null) {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Límite por Monto ($)</label>
-          <input type="number" class="form-control" name="limiteMonto" value="${cliente.limiteMonto !== undefined ? cliente.limiteMonto : '50.00'}" placeholder="50.00" step="0.01" min="0"/>
+          <input type="number" class="form-control" name="limiteMonto" value="${cliente.limiteMonto !== undefined ? cliente.limiteMonto : '0.00'}" placeholder="0.00" step="0.01" min="0"/>
         </div>
         <div class="form-group">
           <label class="form-label">Límite por Días</label>
-          <input type="number" class="form-control" name="limiteDias" value="${cliente.limiteDias !== undefined ? cliente.limiteDias : '15'}" placeholder="15" min="0"/>
+          <input type="number" class="form-control" name="limiteDias" value="${cliente.limiteDias !== undefined ? cliente.limiteDias : '0'}" placeholder="0" min="0"/>
         </div>
       </div>
     </form>
