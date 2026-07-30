@@ -264,8 +264,10 @@ export function renderNuevaVentaForm(container) {
             <label class="form-check" style="margin: 0; font-size: 14px; cursor: pointer;">
               <input type="checkbox" id="check-delivery"/> Delivery
             </label>
-            <div id="container-monto-delivery" style="display: none; width: 100px; margin-left: 10px;">
-              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00"/>
+            <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px; margin-left: 10px;">
+              <input type="number" class="form-control" id="cant-delivery" min="1" value="1" style="width: 70px;" title="Cant. de viajes" placeholder="Cant."/>
+              <span style="color:var(--color-text-secondary); font-size: 14px;">x</span>
+              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00" style="width: 90px;"/>
             </div>
           </div>
         </div>
@@ -347,6 +349,16 @@ export function renderNuevaVentaForm(container) {
   container.innerHTML = formHtml;
   const modal = container;
   
+  const inputTasa = modal.querySelector('#input-tasa');
+  if (inputTasa) {
+    inputTasa.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        store.setConfig('tasaCambio', val);
+      }
+    });
+  }
+  
   modal.querySelector('#btn-save-venta-home').addEventListener('click', () => {
     const overlay = modal;
       if (carrito.length === 0) {
@@ -405,7 +417,10 @@ export function renderNuevaVentaForm(container) {
       
       const checkDeliv = modal.querySelector('#check-delivery');
       const inputDeliv = modal.querySelector('#monto-delivery');
-      const montoDelivery = (checkDeliv && checkDeliv.checked) ? (parseFloat(inputDeliv.value) || 0) : 0;
+      const cantDeliv = modal.querySelector('#cant-delivery');
+      let delivValue = parseFloat(inputDeliv.value) || 0;
+      let cantValue = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      const montoDelivery = (checkDeliv && checkDeliv.checked) ? (delivValue * cantValue) : 0;
       if (montoDelivery > 0) {
         totalVenta += montoDelivery;
       }
@@ -465,6 +480,8 @@ export function renderNuevaVentaForm(container) {
          checkDelivery.checked = false;
          modal.querySelector('#container-monto-delivery').style.display = 'none';
          modal.querySelector('#monto-delivery').value = '0.00';
+         const cDeliv = modal.querySelector('#cant-delivery');
+         if (cDeliv) cDeliv.value = '1';
       }
       // Refrescar historial
       if (typeof renderVentasTable === 'function') {
@@ -507,9 +524,12 @@ export function renderNuevaVentaForm(container) {
     // Sumar delivery si está activo
     const checkDeliv = modal.querySelector('#check-delivery');
     const inputDeliv = modal.querySelector('#monto-delivery');
+    const cantDeliv = modal.querySelector('#cant-delivery');
     let delivery = 0;
-    if (checkDeliv && checkDeliv.checked) {
-      delivery = parseFloat(inputDeliv.value) || 0;
+    if (checkDeliv && checkDeliv.checked && inputDeliv) {
+      let dVal = parseFloat(inputDeliv.value) || 0;
+      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      delivery = dVal * cVal;
     }
     totalVenta += delivery;
     
@@ -645,8 +665,12 @@ export function renderNuevaVentaForm(container) {
   function actualizarInfoPagos() {
     let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
     const checkDelivery = modal.querySelector('#check-delivery');
-    if (checkDelivery && checkDelivery.checked) {
-      totalVenta += parseFloat(modal.querySelector('#monto-delivery').value) || 0;
+    const inputDeliv = modal.querySelector('#monto-delivery');
+    const cantDeliv = modal.querySelector('#cant-delivery');
+    if (checkDelivery && checkDelivery.checked && inputDeliv) {
+      let dVal = parseFloat(inputDeliv.value) || 0;
+      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      totalVenta += dVal * cVal;
     }
     
     let totalPagos = 0;
@@ -677,8 +701,12 @@ export function renderNuevaVentaForm(container) {
       totalVenta += item.subtotal;
     });
     const checkDelivery = modal.querySelector('#check-delivery');
-    if (checkDelivery && checkDelivery.checked) {
-      totalVenta += parseFloat(modal.querySelector('#monto-delivery').value) || 0;
+    const inputDeliv = modal.querySelector('#monto-delivery');
+    const cantDeliv = modal.querySelector('#cant-delivery');
+    if (checkDelivery && checkDelivery.checked && inputDeliv) {
+      let dVal = parseFloat(inputDeliv.value) || 0;
+      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      totalVenta += dVal * cVal;
     }
     
     let totalPagosDolares = 0;
@@ -734,8 +762,12 @@ export function renderNuevaVentaForm(container) {
       
       let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
       const checkDelivery = modal.querySelector('#check-delivery');
-      if (checkDelivery && checkDelivery.checked) {
-        totalVenta += parseFloat(modal.querySelector('#monto-delivery').value) || 0;
+      const inputDeliv = modal.querySelector('#monto-delivery');
+      const cantDeliv = modal.querySelector('#cant-delivery');
+      if (checkDelivery && checkDelivery.checked && inputDeliv) {
+        let dVal = parseFloat(inputDeliv.value) || 0;
+      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      totalVenta += dVal * cVal;
       }
 
       let totalPagosDolares = 0;
@@ -778,16 +810,27 @@ export function renderNuevaVentaForm(container) {
   const checkDelivery = modal.querySelector('#check-delivery');
   const containerDelivery = modal.querySelector('#container-monto-delivery');
   const inputDelivery = modal.querySelector('#monto-delivery');
+  const cantDelivery = modal.querySelector('#cant-delivery');
   
   if (checkDelivery && containerDelivery && inputDelivery) {
     checkDelivery.addEventListener('change', (e) => {
-      containerDelivery.style.display = e.target.checked ? 'block' : 'none';
-      if (!e.target.checked) inputDelivery.value = '0.00';
+      containerDelivery.style.display = e.target.checked ? 'flex' : 'none';
+      if (e.target.checked) {
+        inputDelivery.value = (store.getConfig('precioDelivery') ?? 0.50).toFixed(2);
+        if (cantDelivery) cantDelivery.value = '1';
+      } else {
+        inputDelivery.value = '0.00';
+        if (cantDelivery) cantDelivery.value = '1';
+      }
       renderCarrito();
     });
+    
     inputDelivery.addEventListener('input', () => {
       renderCarrito();
     });
+    if (cantDelivery) {
+      cantDelivery.addEventListener('input', () => renderCarrito());
+    }
   }
   
   // Listener para mostrar u ocultar referencia

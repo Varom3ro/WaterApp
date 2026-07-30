@@ -57,6 +57,21 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
+      <!-- Delivery Config -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🚚 Tarifa de Delivery</h3>
+        </div>
+        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Monto predeterminado del servicio de envío.</p>
+        <div class="form-group" style="max-width: 200px;">
+          <label class="form-label">Precio ($)</label>
+          <div style="display:flex; gap:10px;">
+            <input type="number" id="input-config-delivery" class="form-control" step="0.01" value="${store.getConfig('precioDelivery') ?? '0.50'}" />
+            <button class="btn btn-primary" id="btn-save-delivery">Guardar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Backup -->
       <div class="card">
         <div class="card-header">
@@ -75,6 +90,17 @@ export function renderConfiguracion(container) {
   `;
 
   // Events
+  const btnSaveDeliv = container.querySelector('#btn-save-delivery');
+  if (btnSaveDeliv) {
+    btnSaveDeliv.addEventListener('click', () => {
+      const val = parseFloat(container.querySelector('#input-config-delivery').value);
+      if (!isNaN(val) && val >= 0) {
+        store.setConfig('precioDelivery', val);
+        showToast('Tarifa de delivery actualizada', 'success');
+      }
+    });
+  }
+
   container.querySelector('#btn-add-tipo').addEventListener('click', () => openTipoModal());
 
   container.querySelectorAll('.btn-edit-tipo').forEach(btn => {
