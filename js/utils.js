@@ -24,7 +24,8 @@ export const Utils = {
     if (isBs) {
       return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
     }
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+    const decimals = (num % 1 !== 0) ? 2 : 0;
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: 2 }).format(num);
   },
 
   // Formatear fecha

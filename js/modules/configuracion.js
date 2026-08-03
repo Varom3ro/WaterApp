@@ -5,6 +5,8 @@ import { openModal, closeModal } from '../components/modal.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
+  // Repartidores
+  const repartidores = store.getConfig('repartidores') || [];
 
   container.innerHTML = `
     <div class="page-header">
@@ -27,10 +29,10 @@ export function renderConfiguracion(container) {
           <table class="table">
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Capacidad</th>
-                <th>Precio de Venta</th>
-                <th>Acciones</th>
+                <th style="width: 45%;">Nombre</th>
+                <th style="width: 20%;">Capacidad</th>
+                <th style="width: 20%;">Precio de Venta</th>
+                <th style="width: 15%; text-align: right;">Acciones</th>
               </tr>
             </thead>
             <tbody id="tipos-tbody">
@@ -44,10 +46,49 @@ export function renderConfiguracion(container) {
                     </td>
                   <td>${t.categoria === 'producto' ? 'N/A' : (t.litros + 'L')}</td>
                   <td class="text-success font-semibold">${Utils.formatCurrency(t.precio || 0)}</td>
-                  <td>
-                    <div class="flex gap-sm">
+                  <td style="text-align: right;">
+                    <div class="flex gap-sm" style="justify-content: flex-end;">
                       <button class="btn btn-sm btn-secondary btn-edit-tipo" data-id="${t.id}">✏️ Editar</button>
                       <button class="btn btn-sm btn-secondary btn-delete-tipo" data-id="${t.id}">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Repartidores de Delivery -->
+      <div class="card full-width">
+        <div class="card-header">
+          <h3 class="card-title">🛵 Repartidores de Delivery</h3>
+          <button class="btn btn-sm btn-primary" id="btn-add-repartidor">
+            + Agregar Repartidor
+          </button>
+        </div>
+        <div class="table-container mt-md">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width: 45%;">Nombre del Repartidor</th>
+                <th style="width: 20%;"></th>
+                <th style="width: 20%;">Estado</th>
+                <th style="width: 15%; text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="repartidores-tbody">
+              ${repartidores.length === 0 ? `
+                <tr><td colspan="4" class="text-muted text-center" style="padding:15px;">No hay repartidores registrados.</td></tr>
+              ` : repartidores.map(r => `
+                <tr>
+                  <td class="font-semibold">${Utils.escapeHtml(r.nombre)}</td>
+                  <td></td>
+                  <td><span class="badge badge-success">Activo</span></td>
+                  <td style="text-align: right;">
+                    <div class="flex gap-sm" style="justify-content: flex-end;">
+                      <button class="btn btn-sm btn-secondary btn-edit-repartidor" data-id="${r.id}">✏️ Editar</button>
+                      <button class="btn btn-sm btn-secondary btn-delete-repartidor" data-id="${r.id}">🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -126,12 +167,42 @@ export function renderConfiguracion(container) {
           store.setConfig('tiposBotellon', nuevosTipos);
           closeModal();
           renderConfiguracion(container);
-          showToast('Tipo eliminado', 'success');
+          showToast('Eliminado correctamente', 'success');
         }
       });
     });
   });
 
+  // Eventos de Repartidores
+  const btnAddRep = container.querySelector('#btn-add-repartidor');
+  if (btnAddRep) {
+    btnAddRep.addEventListener('click', () => openRepartidorModal());
+  }
+
+  container.querySelectorAll('.btn-edit-repartidor').forEach(btn => {
+    btn.addEventListener('click', () => openRepartidorModal(btn.dataset.id));
+  });
+
+  container.querySelectorAll('.btn-delete-repartidor').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const rep = repartidores.find(r => r.id === id);
+      openModal({
+        title: 'Confirmar Eliminación',
+        content: `¿Estás seguro de eliminar al repartidor <strong>"${rep?.nombre}"</strong>?`,
+        saveLabel: 'Eliminar',
+        onSave: () => {
+          const nuevos = (store.getConfig('repartidores') || []).filter(r => r.id !== id);
+          store.setConfig('repartidores', nuevos);
+          closeModal();
+          renderConfiguracion(container);
+          showToast('Repartidor eliminado', 'success');
+        }
+      });
+    });
+  });
+
+  // Backup events
   container.querySelector('#btn-export').addEventListener('click', () => {
     const data = store.exportData();
     const blob = new Blob([data], { type: 'application/json' });
@@ -154,6 +225,41 @@ export function renderConfiguracion(container) {
       }
     };
     reader.readAsText(file);
+  });
+}
+
+function openRepartidorModal(id = null) {
+  const isEdit = !!id;
+  const reps = store.getConfig('repartidores') || [];
+  const rep = isEdit ? reps.find(r => r.id === id) : {};
+
+  openModal({
+    title: isEdit ? 'Editar Repartidor' : 'Nuevo Repartidor',
+    content: `
+      <form id="form-repartidor">
+        <div class="form-group">
+          <label class="form-label">Nombre del Repartidor</label>
+          <input type="text" class="form-control" name="nombre" value="${rep.nombre || ''}" required/>
+        </div>
+      </form>
+    `,
+    onSave: (overlay) => {
+      const nombre = overlay.querySelector('input[name="nombre"]').value.trim();
+      if (!nombre) return;
+      
+      let list = store.getConfig('repartidores') || [];
+      if (isEdit) {
+        const idx = list.findIndex(r => r.id === id);
+        list[idx] = { ...list[idx], nombre };
+      } else {
+        list.push({ id: Utils.generateId(), nombre });
+      }
+      
+      store.setConfig('repartidores', list);
+      closeModal();
+      renderConfiguracion(document.querySelector('.main-content'));
+      showToast('Repartidor guardado', 'success');
+    }
   });
 }
 

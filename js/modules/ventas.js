@@ -30,6 +30,11 @@ export function renderVentas(container) {
             <option value="credito">Crédito</option>
             <option value="convenio">Convenio</option>
           </select>
+          <select class="form-control" id="filter-estado-entrega" style="width:150px; height:38px; padding: 4px 8px;">
+            <option value="">Todas entregas</option>
+            <option value="pendiente">⏳ Pendientes</option>
+            <option value="entregado">✅ Entregados</option>
+          </select>
         </div>
       </div>
     </div>
@@ -46,6 +51,7 @@ export function renderVentas(container) {
               <th>Total</th>
               <th>Tipo</th>
               <th>Pago</th>
+              <th>Entrega</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -63,6 +69,8 @@ export function renderVentas(container) {
   container.querySelector('#filter-fecha').addEventListener('change', renderVentasTable);
   container.querySelector('#search-ventas').addEventListener('input', Utils.debounce(renderVentasTable, 200));
   container.querySelector('#filter-tipo-venta').addEventListener('change', renderVentasTable);
+  const filterEntrega = container.querySelector('#filter-estado-entrega');
+  if (filterEntrega) filterEntrega.addEventListener('change', renderVentasTable);
   
 
 }
@@ -98,6 +106,11 @@ function renderVentasTable() {
 
   if (tipo) {
     ventas = ventas.filter(v => v.tipo === tipo);
+  }
+
+  const estadoEntregaFilter = document.getElementById('filter-estado-entrega')?.value;
+  if (estadoEntregaFilter) {
+    ventas = ventas.filter(v => (v.estadoEntrega || 'entregado') === estadoEntregaFilter);
   }
 
   if (ventas.length === 0) {
@@ -144,7 +157,8 @@ function renderVentasTable() {
     const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
     
     if (delivery > 0) {
-      detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}</div>`;
+      const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
+      detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
     }
 
     return `
@@ -162,6 +176,16 @@ function renderVentasTable() {
         </td>
         <td>${pagosStr}</td>
         <td>
+          ${(v.estadoEntrega === 'pendiente') ? `
+            <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+              <span class="badge badge-warning" style="font-size: 0.75em;">⏳ Pendiente</span>
+              <button class="btn btn-xs btn-success btn-marcar-entregado" data-id="${v.id}" style="padding: 2px 6px; font-size: 11px;" title="Confirmar entrega física">
+                ✅ Entregado
+              </button>
+            </div>
+          ` : `<span class="badge badge-success" style="font-size: 0.75em;">✅ Entregado</span>`}
+        </td>
+        <td>
           <button class="btn btn-sm btn-secondary btn-delete-venta" data-id="${v.id}" title="Eliminar">🗑️</button>
         </td>
       </tr>
@@ -170,6 +194,15 @@ function renderVentasTable() {
 
   tbody.querySelectorAll('.btn-delete-venta').forEach(btn => {
     btn.addEventListener('click', () => deleteVenta(btn.dataset.id));
+  });
+
+  tbody.querySelectorAll('.btn-marcar-entregado').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      store.update('ventas', id, { estadoEntrega: 'entregado', fechaEntrega: Utils.nowISO() });
+      showToast('Entrega confirmada correctamente', 'success');
+      renderVentasTable();
+    });
   });
 }
 
@@ -259,16 +292,22 @@ export function renderNuevaVentaForm(container) {
       <!-- Delivery y Total a Cobrar -->
       <div class="form-row" style="margin-bottom: 20px; align-items: center;">
         <div class="form-group" style="flex: 1.8; display: flex; align-items: center;">
-          <!-- Delivery Inline -->
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <label class="form-check" style="margin: 0; font-size: 14px; cursor: pointer;">
               <input type="checkbox" id="check-delivery"/> Delivery
             </label>
-            <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px; margin-left: 10px;">
-              <input type="number" class="form-control" id="cant-delivery" min="1" value="1" style="width: 70px;" title="Cant. de viajes" placeholder="Cant."/>
+            <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px; margin-left: 10px; flex-wrap: wrap;">
+              <input type="number" class="form-control" id="cant-delivery" min="1" value="1" style="width: 65px;" title="Cant. de viajes" placeholder="Cant."/>
               <span style="color:var(--color-text-secondary); font-size: 14px;">x</span>
-              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00" style="width: 90px;"/>
+              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00" style="width: 85px;"/>
+              <select class="form-control" id="repartidor-delivery" style="width: 140px; font-size: 13px;">
+                <option value="">🛵 Repartidor</option>
+                ${(store.getConfig('repartidores') || []).map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
+              </select>
             </div>
+            <label class="form-check" style="margin: 0 0 0 15px; font-size: 14px; cursor: pointer; color: var(--color-warning);">
+              <input type="checkbox" id="check-pendiente-entrega"/> ⏳ Pendiente por Entregar
+            </label>
           </div>
         </div>
         <div class="form-group" style="flex: 2;">
@@ -299,32 +338,38 @@ export function renderNuevaVentaForm(container) {
           </div>
         </div>
         
-        <div class="form-group" style="flex: 2; border-left: 1px solid var(--color-border); padding-left: var(--space-md);" id="seccion-pagos">
-          <div class="flex items-center justify-between mb-sm" style="margin-bottom: 15px;">
-            <label class="form-label" style="margin:0">Métodos de Pago</label>
-            <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta">+ Añadir</button>
-          </div>
-          <div id="pagos-list">
-            <div class="pago-row" style="display: grid; grid-template-columns: 1.5fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: var(--space-xs);">
-              <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control pago-metodo">
-                  ${Utils.paymentMethods.map(m => `<option value="${m.id}">${m.icon} ${m.label}</option>`).join('')}
-                </select>
-              </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00"/>
-              </div>
-              <!-- Div invisible para mantener el grid alineado con los botones de borrar -->
-              <div style="width: 40px;"></div>
-              
-              <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+        <div class="form-group" style="flex: 2; border-left: 1px solid var(--color-border); padding-left: var(--space-md);">
+          <div id="seccion-pagos">
+            <div class="flex items-center justify-between mb-sm" style="margin-bottom: 15px;">
+              <label class="form-label" style="margin:0">Métodos de Pago</label>
+              <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta">+ Añadir</button>
+            </div>
+            <div id="pagos-list">
+              <div class="pago-row" style="display: grid; grid-template-columns: 1.5fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: var(--space-xs);">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <select class="form-control pago-metodo">
+                    ${Utils.paymentMethods.map(m => `<option value="${m.id}">${m.icon} ${m.label}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00"/>
+                </div>
+                <!-- Div invisible para mantener el grid alineado con los botones de borrar -->
+                <div style="width: 40px;"></div>
+                
+                <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
+                  <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+                </div>
               </div>
             </div>
+            <div class="alert-panel info mt-sm" id="pago-diff-panel" style="display:none; justify-content: space-between; padding: 8px;">
+               <span>Abono Extra:</span>
+               <strong id="pago-diff-monto">$0.00</strong>
+            </div>
           </div>
-          <div class="alert-panel info mt-sm" id="pago-diff-panel" style="display:none; justify-content: space-between; padding: 8px;">
-             <span>Abono Extra:</span>
-             <strong id="pago-diff-monto">$0.00</strong>
+
+          <div id="seccion-info-credito" style="display:none; padding: 15px; background: var(--color-bg-secondary); border-radius: var(--radius-md); font-size: 14px; color: var(--color-text-secondary); margin-bottom: 15px;">
+            ℹ️ Esta venta se registrará bajo modalidad de <strong id="texto-tipo-venta">Crédito</strong> (sin pago inmediato).
           </div>
           
           <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
@@ -418,12 +463,26 @@ export function renderNuevaVentaForm(container) {
       const checkDeliv = modal.querySelector('#check-delivery');
       const inputDeliv = modal.querySelector('#monto-delivery');
       const cantDeliv = modal.querySelector('#cant-delivery');
+      const repDeliv = modal.querySelector('#repartidor-delivery');
       let delivValue = parseFloat(inputDeliv.value) || 0;
       let cantValue = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
-      const montoDelivery = (checkDeliv && checkDeliv.checked) ? (delivValue * cantValue) : 0;
+      const isDelivActive = !!(checkDeliv && checkDeliv.checked);
+      const montoDelivery = isDelivActive ? (delivValue * cantValue) : 0;
       if (montoDelivery > 0) {
         totalVenta += montoDelivery;
       }
+
+      let repartidorId = null;
+      let repartidorNombre = null;
+      if (isDelivActive && repDeliv && repDeliv.value) {
+        repartidorId = repDeliv.value;
+        const repObj = (store.getConfig('repartidores') || []).find(r => r.id === repartidorId);
+        if (repObj) repartidorNombre = repObj.nombre;
+      }
+
+      const checkPendiente = modal.querySelector('#check-pendiente-entrega');
+      const isPendiente = !!(checkPendiente && checkPendiente.checked);
+      const estadoEntrega = isPendiente ? 'pendiente' : 'entregado';
       
       const tasaCambio = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
       store.setConfig('tasaCambio', tasaCambio); // memorizar
@@ -436,6 +495,11 @@ export function renderNuevaVentaForm(container) {
         botellones: totalBotellones,
         litrosTotales: totalLitros,
         delivery: montoDelivery,
+        deliveryCant: isDelivActive ? cantValue : 0,
+        repartidorId,
+        repartidorNombre,
+        estadoEntrega,
+        fechaEntrega: isPendiente ? null : Utils.nowISO(),
         total: totalVenta,
         tipo,
         pagos,
@@ -482,6 +546,10 @@ export function renderNuevaVentaForm(container) {
          modal.querySelector('#monto-delivery').value = '0.00';
          const cDeliv = modal.querySelector('#cant-delivery');
          if (cDeliv) cDeliv.value = '1';
+         const rDeliv = modal.querySelector('#repartidor-delivery');
+         if (rDeliv) rDeliv.value = '';
+         const cPend = modal.querySelector('#check-pendiente-entrega');
+         if (cPend) cPend.checked = false;
       }
       // Refrescar historial
       if (typeof renderVentasTable === 'function') {
@@ -801,9 +869,17 @@ export function renderNuevaVentaForm(container) {
 
   const radiosTipo = modal.querySelectorAll('input[name="tipo"]');
   const seccionPagos = modal.querySelector('#seccion-pagos');
+  const seccionInfoCredito = modal.querySelector('#seccion-info-credito');
+  const textoTipoVenta = modal.querySelector('#texto-tipo-venta');
+  
   radiosTipo.forEach(r => {
     r.addEventListener('change', () => {
-      seccionPagos.style.display = (r.value === 'credito' || r.value === 'convenio') ? 'none' : 'block';
+      const isCreditoConvenio = (r.value === 'credito' || r.value === 'convenio');
+      if (seccionPagos) seccionPagos.style.display = isCreditoConvenio ? 'none' : 'block';
+      if (seccionInfoCredito) {
+        seccionInfoCredito.style.display = isCreditoConvenio ? 'block' : 'none';
+        if (textoTipoVenta) textoTipoVenta.innerText = (r.value === 'credito') ? 'A Crédito' : 'Convenio';
+      }
     });
   });
   
