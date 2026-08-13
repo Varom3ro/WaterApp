@@ -1,13 +1,20 @@
-// ============================================
-// Tu Empresa - Sidebar Component
-// ============================================
+import { store } from '../store.js';
+import { Utils } from '../utils.js';
 
 export function renderSidebar() {
+  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
+
   return `
     <aside class="sidebar">
-      <div class="sidebar-logo">
-        <img src="./img/logo.png" alt="Tu Empresa Logo" class="logo-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
-        <h1>Tu Empresa <span style="font-size: 11px; color: #888; font-weight: normal; margin-left: 4px; padding: 2px 6px; background: #eee; border-radius: 10px;" id="app-version">v2.3</span></h1>
+      <div class="sidebar-logo" style="flex-direction: column; align-items: flex-start; padding: 18px 20px 14px 20px;">
+        <div style="width: 100%; text-align: center; margin-bottom: 12px;">
+          <img src="${empresaLogo}" alt="${Utils.escapeHtml(empresaNombre)}" class="logo-img" style="width: auto; height: auto; max-height: 85px; max-width: 95%; object-fit: contain; display: inline-block; border-radius: 4px;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
+        </div>
+        <h1 style="font-size: 15px; font-weight: 700; color: var(--color-text-main); margin: 0; text-align: left; line-height: 1.25; word-break: break-word; width: 100%;">
+          ${Utils.escapeHtml(empresaNombre)}
+        </h1>
+        <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px; margin-top: 6px; display: inline-block;" id="app-version">v2.4</span>
       </div>
 
       <span class="sidebar-section-title">Menú</span>

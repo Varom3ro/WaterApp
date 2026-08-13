@@ -2,11 +2,13 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
+import { renderSidebar } from '../components/sidebar.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
-  // Repartidores
   const repartidores = store.getConfig('repartidores') || [];
+  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
 
   container.innerHTML = `
     <div class="page-header">
@@ -17,6 +19,42 @@ export function renderConfiguracion(container) {
     </div>
 
     <div class="dashboard-grid">
+      <!-- Identidad de la Empresa -->
+      <div class="card full-width mb-lg">
+        <div class="card-header">
+          <h3 class="card-title">🏢 Identidad de la Empresa y Logotipo</h3>
+        </div>
+        <div class="card-body mt-md">
+          <div class="form-row" style="align-items: flex-start;">
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">Nombre de la Empresa</label>
+              <input type="text" class="form-control" id="input-empresa-nombre" value="${Utils.escapeHtml(empresaNombre)}" placeholder="Ej: Tu Empresa"/>
+              <small style="color: var(--color-text-secondary); margin-top: 4px; display: block;">
+                Este nombre aparecerá en el menú lateral, reportes y felicitaciones de WhatsApp.
+              </small>
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">Logotipo Oficial (Formato Rectangular)</label>
+              <input type="file" class="form-control" id="input-empresa-logo" accept="image/*"/>
+              <div style="margin-top: 10px; padding: 14px; border: 1px dashed var(--color-border); border-radius: 8px; text-align: center; background: var(--color-bg-body, #fafafa);">
+                <small style="color: var(--color-text-secondary); display: block; margin-bottom: 8px;">Vista previa actual:</small>
+                <img id="preview-empresa-logo" src="${empresaLogo}" alt="Logo Preview" style="max-height: 95px; max-width: 100%; object-fit: contain; border-radius: 4px; display: inline-block;"/>
+                <div style="margin-top: 8px;">
+                  <button type="button" class="btn btn-xs btn-secondary" id="btn-remove-logo" style="color: var(--color-danger); border-color: #fca5a5; padding: 4px 8px; font-size: 11px;">
+                    🗑️ Quitar Logotipo (Usar Genérico)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 15px; text-align: right;">
+            <button class="btn btn-primary" id="btn-save-empresa-info">
+              💾 Guardar Datos de la Empresa
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Tipos de Botellón -->
       <div class="card full-width">
         <div class="card-header">
@@ -131,6 +169,54 @@ export function renderConfiguracion(container) {
   `;
 
   // Events
+  let tempLogoBase64 = empresaLogo;
+  const inputLogo = container.querySelector('#input-empresa-logo');
+  const previewLogo = container.querySelector('#preview-empresa-logo');
+
+  if (inputLogo) {
+    inputLogo.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          tempLogoBase64 = evt.target.result;
+          if (previewLogo) previewLogo.src = tempLogoBase64;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  const btnRemoveLogo = container.querySelector('#btn-remove-logo');
+  if (btnRemoveLogo) {
+    btnRemoveLogo.addEventListener('click', () => {
+      tempLogoBase64 = './img/logo.png';
+      if (previewLogo) previewLogo.src = './img/logo.png';
+      if (inputLogo) inputLogo.value = '';
+    });
+  }
+
+  const btnSaveEmpresa = container.querySelector('#btn-save-empresa-info');
+  if (btnSaveEmpresa) {
+    btnSaveEmpresa.addEventListener('click', () => {
+      const inputNombre = container.querySelector('#input-empresa-nombre');
+      const nombreVal = inputNombre ? inputNombre.value.trim() : 'Tu Empresa';
+
+      store.setConfig('empresaNombre', nombreVal || 'Tu Empresa');
+      if (tempLogoBase64) {
+        store.setConfig('empresaLogo', tempLogoBase64);
+      }
+
+      showToast('Datos de la empresa actualizados correctamente', 'success');
+
+      // Actualizar inmediatamente el Sidebar en el DOM
+      const sidebarContainer = document.querySelector('.sidebar');
+      if (sidebarContainer) {
+        sidebarContainer.outerHTML = renderSidebar();
+      }
+    });
+  }
+
   const btnSaveDeliv = container.querySelector('#btn-save-delivery');
   if (btnSaveDeliv) {
     btnSaveDeliv.addEventListener('click', () => {

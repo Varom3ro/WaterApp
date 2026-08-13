@@ -9,6 +9,7 @@ import { showToast } from '../components/toast.js';
 
 export function renderClientes(container) {
   const clientes = store.getAll('clientes');
+  const cumpleaneros = getCumpleanerosHoy();
 
   container.innerHTML = `
     <div class="page-header">
@@ -23,6 +24,30 @@ export function renderClientes(container) {
         </button>
       </div>
     </div>
+
+    <!-- Banner de Cumpleaños del Día -->
+    ${cumpleaneros.length > 0 ? `
+      <div class="card mb-lg" style="background: linear-gradient(135deg, #FFF9E6, #FEF3C7); border: 2px solid #F59E0B; padding: 16px 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 32px;">🎉</span>
+            <div>
+              <h3 style="margin: 0; font-size: 16px; color: #92400E; font-weight: 700;">¡Hoy está de cumpleaños! 🎂</h3>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #B45309;">
+                ${cumpleaneros.map(c => `<strong>${Utils.escapeHtml(c.nombre)}</strong>`).join(', ')}
+              </p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            ${cumpleaneros.map(c => `
+              <a href="${getWhatsAppBirthdayUrl(c)}" target="_blank" class="btn btn-sm" style="background: #25D366; color: white; border: none; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px;">
+                💬 Felicitar a ${Utils.escapeHtml(c.nombre.split(' ')[0])} por WhatsApp
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    ` : ''}
 
     <!-- Filters -->
     <div class="card mb-lg">
@@ -74,6 +99,7 @@ function renderClientesTable(clientes) {
   const tbody = document.getElementById('clientes-tbody');
   if (!tbody) return;
 
+  const now = new Date();
   tbody.innerHTML = clientes.map(c => {
     const estatus = store.calcularEstatusCliente(c.id);
     const statusInfo = Utils.clientStatus[estatus];
@@ -82,9 +108,18 @@ function renderClientesTable(clientes) {
       ? [c.municipio, c.urbanizacion, c.calle, c.edificio].filter(Boolean).join(', ')
       : [c.sector, c.nivel, c.local, c.nombreLocal].filter(Boolean).join(' / ');
 
+    const isBirthdayToday = c.fechaNacimiento && (() => {
+      const parts = c.fechaNacimiento.split('-');
+      if (parts.length < 3) return false;
+      return parseInt(parts[1], 10) === (now.getMonth() + 1) && parseInt(parts[2], 10) === now.getDate();
+    })();
+
     return `
       <tr data-id="${c.id}">
-        <td><span class="font-semibold">${Utils.escapeHtml(c.nombre)}</span></td>
+        <td>
+          <span class="font-semibold">${Utils.escapeHtml(c.nombre)}</span>
+          ${isBirthdayToday ? '<span class="badge" style="background:#F59E0B; color:#fff; margin-left:6px; font-size:11px;" title="¡Hoy es su cumpleaños!">🎂 Cumpleaños</span>' : ''}
+        </td>
         <td>${Utils.escapeHtml(c.rif || '-')}</td>
         <td>${Utils.escapeHtml(ubicacion || '-')}</td>
         <td>${Utils.escapeHtml(c.telefono || '-')}</td>
@@ -92,6 +127,7 @@ function renderClientesTable(clientes) {
         <td><span class="badge ${statusInfo.class}">${statusInfo.label}</span></td>
         <td>
           <div class="flex gap-sm">
+            ${isBirthdayToday && c.telefono ? `<a href="${getWhatsAppBirthdayUrl(c)}" target="_blank" class="btn btn-sm" style="background:#25D366; color:#fff; text-decoration:none;" title="Felicitar por WhatsApp">💬</a>` : ''}
             ${deuda > 0 ? `<button class="btn btn-sm btn-success btn-collect-deuda" data-id="${c.id}" title="Cobrar Deuda">💵</button>` : ''}
             <button class="btn btn-sm btn-secondary btn-edit-cliente" data-id="${c.id}" title="Editar">✏️</button>
             <button class="btn btn-sm btn-secondary btn-view-cliente" data-id="${c.id}" title="Ver detalle">👁️</button>
@@ -167,9 +203,15 @@ export function openClienteModal(id = null, onSuccess = null) {
           </div>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Teléfono</label>
-        <input type="text" class="form-control" name="telefono" value="${Utils.escapeHtml(cliente.telefono || '')}" placeholder="0412-1234567"/>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input type="text" class="form-control" name="telefono" value="${Utils.escapeHtml(cliente.telefono || '')}" placeholder="0412-1234567"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">🎂 Fecha de Nacimiento</label>
+          <input type="date" class="form-control" name="fechaNacimiento" value="${cliente.fechaNacimiento || ''}"/>
+        </div>
       </div>
 
       <h3 style="font-size:var(--font-size-md);margin:var(--space-lg) 0 var(--space-md);color:var(--color-text-secondary)">📍 Ubicación del Cliente</h3>
@@ -250,6 +292,7 @@ export function openClienteModal(id = null, onSuccess = null) {
         calle: fd.get('calle')?.trim() || '',
         edificio: fd.get('edificio')?.trim() || '',
         referencia: fd.get('referencia')?.trim() || '',
+        fechaNacimiento: fd.get('fechaNacimiento') || '',
         limiteMonto: parseFloat(fd.get('limiteMonto')),
         limiteDias: parseInt(fd.get('limiteDias'))
       };
@@ -481,4 +524,33 @@ function deleteCliente(id) {
       if (container) renderClientes(container);
     }
   });
+}
+
+export function getCumpleanerosHoy() {
+  const clientes = store.getAll('clientes') || [];
+  const now = new Date();
+  const mesActual = now.getMonth() + 1;
+  const diaActual = now.getDate();
+
+  return clientes.filter(c => {
+    if (!c.fechaNacimiento) return false;
+    const parts = c.fechaNacimiento.split('-');
+    if (parts.length < 3) return false;
+    const mes = parseInt(parts[1], 10);
+    const dia = parseInt(parts[2], 10);
+    return mes === mesActual && dia === diaActual;
+  });
+}
+
+export function getWhatsAppBirthdayUrl(cliente) {
+  if (!cliente || !cliente.telefono) return '#';
+  let cleanPhone = cliente.telefono.replace(/\D/g, '');
+  if (cleanPhone.startsWith('0')) {
+    cleanPhone = '58' + cleanPhone.substring(1);
+  } else if (!cleanPhone.startsWith('58') && cleanPhone.length === 10) {
+    cleanPhone = '58' + cleanPhone;
+  }
+  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const msg = `¡Hola ${cliente.nombre}! 🎉 De parte de todo el equipo de ${empresaNombre} te deseamos un muy Feliz Cumpleaños 🎂🎈. ¡Muchas gracias por tu preferencia! Te enviamos un gran saludo y un fuerte abrazo en tu día.`;
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
 }
