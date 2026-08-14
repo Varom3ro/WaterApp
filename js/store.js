@@ -253,14 +253,14 @@ class Store {
         return arqueos.find(a => (a.fecha || '').trim() === target) || null;
     }
 
-    saveArqueo(fecha, declaracion) {
+    saveArqueo(fecha, declaracion, observaciones = '') {
         const target = (fecha || '').trim();
         let arqueos = this.cache['arqueos'];
         if (!arqueos) {
             arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
         }
         const idx = arqueos.findIndex(a => (a.fecha || '').trim() === target);
-        const nuevo = { fecha: target, declaracion };
+        const nuevo = { fecha: target, declaracion, observaciones };
         if (idx !== -1) {
             arqueos[idx] = nuevo;
         } else {
@@ -268,6 +268,20 @@ class Store {
         }
         this.cache['arqueos'] = arqueos;
         localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
+    }
+
+    updateArqueoObservacion(fecha, observacion) {
+        const target = (fecha || '').trim();
+        let arqueos = this.cache['arqueos'];
+        if (!arqueos) {
+            arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+        }
+        const idx = arqueos.findIndex(a => (a.fecha || '').trim() === target);
+        if (idx !== -1) {
+            arqueos[idx].observaciones = observacion;
+            this.cache['arqueos'] = arqueos;
+            localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
+        }
     }
 
     deleteArqueo(fecha) {

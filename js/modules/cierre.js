@@ -30,6 +30,10 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
             </div>
           `).join('')}
         </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">📝 Observaciones del Cierre (Opcional)</label>
+          <textarea class="form-control" name="observaciones" rows="2" placeholder="Ej: Motivo de faltante/sobrante, vueltos pendientes, billetes deteriorados..." style="font-size: 14px; width: 100%;"></textarea>
+        </div>
         <button type="submit" class="btn btn-primary" style="width: 100%; height: 45px; font-size: 16px;">Calcular Cuadre de Caja</button>
       </form>
     </div>
@@ -96,7 +100,8 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
       rawVal = rawVal.replace(/\./g, '').replace(',', '.'); // Quita puntos (miles) y pasa coma a punto
       declaracion[m.key] = parseFloat(rawVal) || 0;
     });
-    store.saveArqueo(fecha, declaracion);
+    const observaciones = (fd.get('observaciones') || '').trim();
+    store.saveArqueo(fecha, declaracion, observaciones);
     renderCierreContent(fecha);
   });
 }
@@ -193,6 +198,19 @@ function renderCierreContent(fecha) {
     </div>
 
     ${renderCuadreCajaWeb(arqueo, cierre, methods)}
+
+    <!-- Observaciones del Cuadre de Caja -->
+    <div class="card" style="margin-bottom: 20px; border-left: 4px solid #3B82F6; background: var(--color-surface);">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;">
+        <h3 class="card-title" style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+          <span>📝 Observaciones del Cuadre</span>
+        </h3>
+        <button id="btn-edit-observaciones" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 12px;">✏️ Editar Observación</button>
+      </div>
+      <div style="padding: 14px 16px; font-size: 14px; color: ${arqueo.observaciones ? 'var(--color-text-main)' : 'var(--color-text-secondary)'}; font-style: ${arqueo.observaciones ? 'normal' : 'italic'}; line-height: 1.4;">
+        ${Utils.escapeHtml(arqueo.observaciones || 'Sin observaciones registradas para este cuadre.')}
+      </div>
+    </div>
     
     <!-- Métricas Principales de Caja y Ventas -->
     <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
@@ -315,6 +333,35 @@ function renderCierreContent(fecha) {
       });
     });
   }
+
+  const btnEditObs = container.querySelector('#btn-edit-observaciones');
+  if (btnEditObs) {
+    btnEditObs.addEventListener('click', () => {
+      const activeFecha = document.getElementById('cierre-fecha-home')?.value || fecha;
+      const currentObs = arqueo.observaciones || '';
+      openModal({
+        title: 'Observaciones del Cuadre de Caja',
+        content: `
+          <form id="form-edit-obs">
+            <div class="form-group">
+              <label class="form-label">Escribe el motivo o detalle de las diferencias:</label>
+              <textarea class="form-control" name="nuevaObservacion" rows="4" placeholder="Ej: Hubo una diferencia de $1 por vuelto entregado / Billete deteriorado..." style="font-size: 14px; width: 100%;">${Utils.escapeHtml(currentObs)}</textarea>
+            </div>
+          </form>
+        `,
+        saveLabel: 'Guardar Observación',
+        onSave: (overlay) => {
+          const form = overlay.querySelector('#form-edit-obs');
+          const fd = new FormData(form);
+          const nuevaObs = (fd.get('nuevaObservacion') || '').trim();
+          store.updateArqueoObservacion(activeFecha, nuevaObs);
+          closeModal();
+          showToast('Observación guardada correctamente', 'success');
+          renderCierreContent(activeFecha);
+        }
+      });
+    });
+  }
 }
 
 // Función auxiliar para generar el HTML con estilo de impresora matricial para el PDF
@@ -381,6 +428,11 @@ export function getMatricialReportHTML(fecha) {
             </tr>
           </tfoot>
         </table>
+        ${arqueo.observaciones ? `
+          <div style="margin-top: 10px; padding: 6px 8px; border: 1px dashed #000; font-size: 11px;">
+            <b>OBSERVACIONES DEL CUADRE:</b> ${Utils.escapeHtml(arqueo.observaciones)}
+          </div>
+        ` : ''}
         <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
       </div>`;
   }
