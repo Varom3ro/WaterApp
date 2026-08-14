@@ -1,5 +1,7 @@
 import { store } from '../store.js';
 import { Utils } from '../utils.js';
+import { openModal, closeModal } from '../components/modal.js';
+import { showToast } from '../components/toast.js';
 
 function renderCierre(content, fecha) {
   content.innerHTML = `
@@ -186,7 +188,7 @@ function renderCierreContent(fecha) {
 
   container.innerHTML = `
     <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--color-border); padding-bottom: 15px;">
-      <h2 style="margin: 0; color: var(--color-primary-900); font-size: 24px;">Tu Empresa</h2>
+      <h2 style="margin: 0; color: var(--color-primary-900); font-size: 24px;">${Utils.escapeHtml(store.getConfig('empresaNombre') || 'Tu Empresa')}</h2>
       <p style="margin: 5px 0 0 0; color: var(--color-text-secondary); font-size: 16px;">Reporte de Cierre de Caja - ${fecha}</p>
     </div>
 
@@ -294,12 +296,23 @@ function renderCierreContent(fecha) {
   const btnRehacer = container.querySelector('#btn-rehacer-arqueo');
   if (btnRehacer) {
     btnRehacer.addEventListener('click', () => {
-      if (confirm('¿Estás seguro de que deseas borrar este Arqueo de Caja y contar de nuevo?')) {
-        let arqueos = store.getAll('arqueos');
-        arqueos = arqueos.filter(a => a.fecha !== fecha);
-        localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
-        renderCierreContent(fecha);
-      }
+      const activeFecha = document.getElementById('cierre-fecha-home')?.value || fecha;
+      openModal({
+        title: 'Rehacer Arqueo de Caja',
+        content: `<p>¿Estás seguro de que deseas borrar este Arqueo de Caja y realizar el conteo de dinero físico de nuevo?</p>`,
+        saveLabel: 'Sí, Rehacer Arqueo',
+        onSave: () => {
+          store.deleteArqueo(activeFecha);
+          closeModal();
+          showToast('Arqueo eliminado. Puedes ingresar los montos nuevamente', 'info');
+          const contentDiv = document.getElementById('cierre-caja-home-content');
+          if (contentDiv) {
+            renderCierre(contentDiv, activeFecha);
+          } else {
+            renderCierreContent(activeFecha);
+          }
+        }
+      });
     });
   }
 }

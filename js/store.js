@@ -244,26 +244,39 @@ class Store {
 
 
     getArqueo(fecha) {
+        const target = (fecha || '').trim();
         let arqueos = this.cache['arqueos'];
         if (!arqueos) {
             arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
             this.cache['arqueos'] = arqueos;
         }
-        return arqueos.find(a => a.fecha === fecha) || null;
+        return arqueos.find(a => (a.fecha || '').trim() === target) || null;
     }
 
     saveArqueo(fecha, declaracion) {
+        const target = (fecha || '').trim();
         let arqueos = this.cache['arqueos'];
         if (!arqueos) {
             arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
         }
-        const idx = arqueos.findIndex(a => a.fecha === fecha);
-        const nuevo = { fecha, declaracion };
+        const idx = arqueos.findIndex(a => (a.fecha || '').trim() === target);
+        const nuevo = { fecha: target, declaracion };
         if (idx !== -1) {
             arqueos[idx] = nuevo;
         } else {
             arqueos.push(nuevo);
         }
+        this.cache['arqueos'] = arqueos;
+        localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
+    }
+
+    deleteArqueo(fecha) {
+        const target = (fecha || '').trim();
+        let arqueos = this.cache['arqueos'];
+        if (!arqueos) {
+            arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+        }
+        arqueos = arqueos.filter(a => (a.fecha || '').trim() !== target);
         this.cache['arqueos'] = arqueos;
         localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
     }
