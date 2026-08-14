@@ -14,7 +14,7 @@ export function renderSidebar() {
         <h1 style="font-size: 15px; font-weight: 700; color: var(--color-text-main); margin: 0; text-align: left; line-height: 1.25; word-break: break-word; width: 100%;">
           ${Utils.escapeHtml(empresaNombre)}
         </h1>
-        <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px; margin-top: 6px; display: inline-block;" id="app-version">v2.4</span>
+        <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px; margin-top: 6px; display: inline-block;" id="app-version">v2.5</span>
       </div>
 
       <span class="sidebar-section-title">Menú</span>
