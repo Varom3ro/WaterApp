@@ -60,6 +60,6 @@ export function renderDashboard(container) {
 
   // Render the sales form inside the new container
   renderNuevaVentaForm(container.querySelector('#home-venta-container'));
-  // Render el historial
-  renderVentas(container.querySelector('#home-historial-container'));
+  // Render el historial sin fichas en Inicio
+  renderVentas(container.querySelector('#home-historial-container'), false);
 }

@@ -9,7 +9,7 @@ import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { getMatricialReportHTML } from './cierre.js';
 
-export function renderVentas(container) {
+export function renderVentas(container, showFichas = true) {
   container.innerHTML = `
     <div class="page-header" style="margin-bottom: 20px;">
       <div>
@@ -39,8 +39,7 @@ export function renderVentas(container) {
       </div>
     </div>
 
-    <!-- Fichas de Totales por Método de Pago -->
-    <div id="ventas-totales-fichas" style="margin-bottom: 20px;"></div>
+    ${showFichas ? '<!-- Fichas de Totales por Método de Pago --><div id="ventas-totales-fichas" style="margin-bottom: 20px;"></div>' : ''}
 
     <!-- Table -->
     <div class="card">
