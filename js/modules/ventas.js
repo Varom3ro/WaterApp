@@ -146,92 +146,95 @@ function renderVentasTable() {
 
   if (fichasContainer) {
     fichasContainer.innerHTML = `
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; overflow-x: auto; padding-bottom: 2px;">
         <!-- Ficha Efectivo USD -->
-        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #10B981; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #065F46; display: flex; align-items: center; gap: 4px;">
-            <span>💵 Efectivo USD</span>
+        <div class="metric-card" style="padding: 8px 10px; border-radius: 6px; border-left: 3px solid #10B981; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: #065F46; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            💵 Efectivo $
           </div>
-          <div class="metric-value" style="font-size: 17px; font-weight: bold; color: #10B981; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 13.5px; font-weight: 700; color: #10B981; margin: 2px 0 0 0; white-space: nowrap;">
             ${Utils.formatCurrency(totales.efectivo_usd)}
+          </div>
+          <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
+            En caja USD
           </div>
         </div>
 
         <!-- Ficha Efectivo Bs -->
-        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #3B82F6; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #1E40AF; display: flex; align-items: center; gap: 4px;">
-            <span>💴 Efectivo Bs</span>
+        <div class="metric-card" style="padding: 8px 10px; border-radius: 6px; border-left: 3px solid #3B82F6; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: #1E40AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            💴 Efectivo Bs
           </div>
-          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #2563EB; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 13px; font-weight: 700; color: #2563EB; margin: 2px 0 0 0; white-space: nowrap;">
             Bs ${Utils.formatNumber(totales.efectivo_bs * currentTasa, true)}
           </div>
-          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+          <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
             ≈ ${Utils.formatCurrency(totales.efectivo_bs)}
           </div>
         </div>
 
         <!-- Ficha Pago Móvil -->
-        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #8B5CF6; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #5B21B6; display: flex; align-items: center; gap: 4px;">
-            <span>📱 Pago Móvil</span>
+        <div class="metric-card" style="padding: 8px 10px; border-radius: 6px; border-left: 3px solid #8B5CF6; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: #5B21B6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            📱 Pago Móvil
           </div>
-          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #7C3AED; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 13px; font-weight: 700; color: #7C3AED; margin: 2px 0 0 0; white-space: nowrap;">
             Bs ${Utils.formatNumber(totales.pago_movil * currentTasa, true)}
           </div>
-          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+          <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
             ≈ ${Utils.formatCurrency(totales.pago_movil)}
           </div>
         </div>
 
         <!-- Ficha Punto de Venta -->
-        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #06B6D4; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #155E75; display: flex; align-items: center; gap: 4px;">
-            <span>💳 Punto de Venta</span>
+        <div class="metric-card" style="padding: 8px 10px; border-radius: 6px; border-left: 3px solid #06B6D4; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: #155E75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            💳 Punto Venta
           </div>
-          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #0891B2; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 13px; font-weight: 700; color: #0891B2; margin: 2px 0 0 0; white-space: nowrap;">
             Bs ${Utils.formatNumber(totales.punto * currentTasa, true)}
           </div>
-          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+          <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
             ≈ ${Utils.formatCurrency(totales.punto)}
           </div>
         </div>
 
         <!-- Ficha Transferencia -->
-        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #F59E0B; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #92400E; display: flex; align-items: center; gap: 4px;">
-            <span>🏦 Transferencia</span>
+        <div class="metric-card" style="padding: 8px 10px; border-radius: 6px; border-left: 3px solid #F59E0B; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: #92400E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            🏦 Transf.
           </div>
-          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #D97706; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 13px; font-weight: 700; color: #D97706; margin: 2px 0 0 0; white-space: nowrap;">
             Bs ${Utils.formatNumber(totales.transferencia * currentTasa, true)}
           </div>
-          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+          <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
             ≈ ${Utils.formatCurrency(totales.transferencia)}
           </div>
         </div>
 
         <!-- Ficha A Crédito -->
-        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #EF4444; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #991B1B; display: flex; align-items: center; gap: 4px;">
-            <span>📋 A Crédito</span>
+        <div class="metric-card" style="padding: 8px 10px; border-radius: 6px; border-left: 3px solid #EF4444; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: #991B1B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            📋 A Crédito
           </div>
-          <div class="metric-value" style="font-size: 17px; font-weight: bold; color: #DC2626; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 13.5px; font-weight: 700; color: #DC2626; margin: 2px 0 0 0; white-space: nowrap;">
             ${Utils.formatCurrency(totales.credito)}
           </div>
-          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+          <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
             ${ventas.filter(v => v.tipo === 'credito').length} operaciones
           </div>
         </div>
 
         <!-- Ficha Total Facturado -->
-        <div class="metric-card accent" style="padding: 12px 14px; border-radius: 8px; background: var(--color-primary-900, #1B4332); color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85);">
+        <div class="metric-card accent" style="padding: 8px 10px; border-radius: 6px; background: var(--color-primary-900, #1B4332); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-width: 105px;">
+          <div class="metric-label" style="font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             💰 Total Facturado
           </div>
-          <div class="metric-value" style="font-size: 18px; font-weight: bold; color: #fff; margin: 4px 0 0 0;">
+          <div class="metric-value" style="font-size: 14px; font-weight: 700; color: #fff; margin: 2px 0 0 0; white-space: nowrap;">
             ${Utils.formatCurrency(totales.totalUSD)}
           </div>
-          <div style="font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 2px;">
-            Bs ${Utils.formatNumber(totales.totalBs, true)} (${ventas.length} ventas)
+          <div style="font-size: 8.5px; color: rgba(255,255,255,0.8); margin-top: 1px; white-space: nowrap;">
+            Bs ${Utils.formatNumber(totales.totalBs, true)} (${ventas.length})
           </div>
         </div>
       </div>
