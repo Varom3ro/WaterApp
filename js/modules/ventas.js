@@ -19,13 +19,13 @@ export function renderVentas(container) {
     </div>
 
     <!-- Filters -->
-    <div class="card mb-lg" style="overflow-x: auto;">
+    <div class="card mb-md" style="overflow-x: auto;">
       <div class="flex items-center gap-sm" style="flex-wrap:nowrap; justify-content: space-between; min-width: 650px;">
         <div class="flex items-center gap-sm" style="flex-wrap:nowrap;">
           <input type="date" class="form-control" id="filter-fecha" style="width:140px; height:38px; padding: 4px 8px;" value="${Utils.todayISO()}"/>
           <input type="text" class="form-control" id="search-ventas" placeholder="Buscar por cliente..." style="width:200px; height:38px; padding: 4px 8px;"/>
           <select class="form-control" id="filter-tipo-venta" style="width:130px; height:38px; padding: 4px 8px;">
-            <option value="">Todos</option>
+            <option value="">Todos los tipos</option>
             <option value="contado">Contado</option>
             <option value="credito">Crédito</option>
             <option value="convenio">Convenio</option>
@@ -38,6 +38,9 @@ export function renderVentas(container) {
         </div>
       </div>
     </div>
+
+    <!-- Fichas de Totales por Método de Pago -->
+    <div id="ventas-totales-fichas" style="margin-bottom: 20px;"></div>
 
     <!-- Table -->
     <div class="card">
@@ -64,20 +67,17 @@ export function renderVentas(container) {
 
   renderVentasTable();
 
-  
-  
   container.querySelector('#filter-fecha').addEventListener('change', renderVentasTable);
   container.querySelector('#search-ventas').addEventListener('input', Utils.debounce(renderVentasTable, 200));
   container.querySelector('#filter-tipo-venta').addEventListener('change', renderVentasTable);
   const filterEntrega = container.querySelector('#filter-estado-entrega');
   if (filterEntrega) filterEntrega.addEventListener('change', renderVentasTable);
-  
-
 }
 
 function renderVentasTable() {
   const tbody = document.getElementById('ventas-tbody');
   const emptyDiv = document.getElementById('ventas-empty');
+  const fichasContainer = document.getElementById('ventas-totales-fichas');
   if (!tbody) return;
 
   let ventas = store.getAll('ventas').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -113,9 +113,134 @@ function renderVentasTable() {
     ventas = ventas.filter(v => (v.estadoEntrega || 'entregado') === estadoEntregaFilter);
   }
 
+  // Cálculo de totales por método de pago para las fichas
+  const currentTasa = store.getConfig('tasaCambio') || 40.00;
+  const totales = {
+    efectivo_usd: 0,
+    efectivo_bs: 0,
+    punto: 0,
+    pago_movil: 0,
+    transferencia: 0,
+    credito: 0,
+    totalUSD: 0,
+    totalBs: 0
+  };
+
+  ventas.forEach(v => {
+    const tasa = v.tasa || currentTasa;
+    totales.totalUSD += (v.total || 0);
+    totales.totalBs += (v.total || 0) * tasa;
+
+    if (v.tipo === 'credito') {
+      totales.credito += (v.total || 0);
+    } else if (v.pagos && Array.isArray(v.pagos)) {
+      v.pagos.forEach(p => {
+        const metodoKey = p.metodo;
+        const montoUSD = parseFloat(p.monto) || 0;
+        if (totales.hasOwnProperty(metodoKey)) {
+          totales[metodoKey] += montoUSD;
+        }
+      });
+    }
+  });
+
+  if (fichasContainer) {
+    fichasContainer.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
+        <!-- Ficha Efectivo USD -->
+        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #10B981; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #065F46; display: flex; align-items: center; gap: 4px;">
+            <span>💵 Efectivo USD</span>
+          </div>
+          <div class="metric-value" style="font-size: 17px; font-weight: bold; color: #10B981; margin: 4px 0 0 0;">
+            ${Utils.formatCurrency(totales.efectivo_usd)}
+          </div>
+        </div>
+
+        <!-- Ficha Efectivo Bs -->
+        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #3B82F6; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #1E40AF; display: flex; align-items: center; gap: 4px;">
+            <span>💴 Efectivo Bs</span>
+          </div>
+          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #2563EB; margin: 4px 0 0 0;">
+            Bs ${Utils.formatNumber(totales.efectivo_bs * currentTasa, true)}
+          </div>
+          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+            ≈ ${Utils.formatCurrency(totales.efectivo_bs)}
+          </div>
+        </div>
+
+        <!-- Ficha Pago Móvil -->
+        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #8B5CF6; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #5B21B6; display: flex; align-items: center; gap: 4px;">
+            <span>📱 Pago Móvil</span>
+          </div>
+          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #7C3AED; margin: 4px 0 0 0;">
+            Bs ${Utils.formatNumber(totales.pago_movil * currentTasa, true)}
+          </div>
+          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+            ≈ ${Utils.formatCurrency(totales.pago_movil)}
+          </div>
+        </div>
+
+        <!-- Ficha Punto de Venta -->
+        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #06B6D4; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #155E75; display: flex; align-items: center; gap: 4px;">
+            <span>💳 Punto de Venta</span>
+          </div>
+          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #0891B2; margin: 4px 0 0 0;">
+            Bs ${Utils.formatNumber(totales.punto * currentTasa, true)}
+          </div>
+          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+            ≈ ${Utils.formatCurrency(totales.punto)}
+          </div>
+        </div>
+
+        <!-- Ficha Transferencia -->
+        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #F59E0B; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #92400E; display: flex; align-items: center; gap: 4px;">
+            <span>🏦 Transferencia</span>
+          </div>
+          <div class="metric-value" style="font-size: 16px; font-weight: bold; color: #D97706; margin: 4px 0 0 0;">
+            Bs ${Utils.formatNumber(totales.transferencia * currentTasa, true)}
+          </div>
+          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+            ≈ ${Utils.formatCurrency(totales.transferencia)}
+          </div>
+        </div>
+
+        <!-- Ficha A Crédito -->
+        <div class="metric-card" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #EF4444; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: #991B1B; display: flex; align-items: center; gap: 4px;">
+            <span>📋 A Crédito</span>
+          </div>
+          <div class="metric-value" style="font-size: 17px; font-weight: bold; color: #DC2626; margin: 4px 0 0 0;">
+            ${Utils.formatCurrency(totales.credito)}
+          </div>
+          <div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
+            ${ventas.filter(v => v.tipo === 'credito').length} operaciones
+          </div>
+        </div>
+
+        <!-- Ficha Total Facturado -->
+        <div class="metric-card accent" style="padding: 12px 14px; border-radius: 8px; background: var(--color-primary-900, #1B4332); color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div class="metric-label" style="font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85);">
+            💰 Total Facturado
+          </div>
+          <div class="metric-value" style="font-size: 18px; font-weight: bold; color: #fff; margin: 4px 0 0 0;">
+            ${Utils.formatCurrency(totales.totalUSD)}
+          </div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 2px;">
+            Bs ${Utils.formatNumber(totales.totalBs, true)} (${ventas.length} ventas)
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   if (ventas.length === 0) {
     tbody.innerHTML = '';
-    if (emptyDiv) emptyDiv.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📋</span><span class="empty-state-text">No hay ventas para esta fecha</span></div>';
+    if (emptyDiv) emptyDiv.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📋</span><span class="empty-state-text">No hay ventas para esta fecha o filtros seleccionados</span></div>';
     return;
   }
 

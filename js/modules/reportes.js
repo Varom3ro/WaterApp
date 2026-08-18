@@ -44,6 +44,7 @@ export function renderReportes(container) {
         </div>
 
         <button id="btn-generar-pdf" class="btn btn-primary" style="height:36px; padding:0 12px; font-size:13px;">📄 Guardar PDF</button>
+        <button id="btn-generar-csv" class="btn btn-secondary" style="height:36px; padding:0 12px; font-size:13px; color:#1B4332; border-color:#1B4332; font-weight:600;">📊 Exportar CSV</button>
       </div>
     </div>
 
@@ -57,6 +58,7 @@ export function renderReportes(container) {
   const filtroDesde = container.querySelector('#filtro-desde');
   const filtroHasta = container.querySelector('#filtro-hasta');
   const pdfBtn = container.querySelector('#btn-generar-pdf');
+  const csvBtn = container.querySelector('#btn-generar-csv');
 
   function getRange() {
     return getPeriodoRange(filtroPeriodo.value, filtroDesde.value, filtroHasta.value);
@@ -93,36 +95,15 @@ export function renderReportes(container) {
   filtroDesde.addEventListener('change', refreshActiveTab);
   filtroHasta.addEventListener('change', refreshActiveTab);
 
-  // Generar PDF
+  // Generar PDF Consolidado Completo
   pdfBtn.addEventListener('click', () => {
     const range = getRange();
-    const activeTab = container.querySelector('.tab-btn.active').dataset.tab;
-    const tabName = container.querySelector('.tab-btn.active').innerText.trim();
-    
     const periodoLabel = filtroPeriodo.options[filtroPeriodo.selectedIndex].text;
-    const fechaTexto = `${Utils.formatDate(range.inicio)} al ${Utils.formatDate(range.fin)}`;
-
-    const contentEl = document.getElementById('tab-content');
-
-    const htmlPDF = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1B4332; padding-bottom: 10px; margin-bottom: 20px;">
-          <div>
-            <h1 style="margin: 0; color: #1B4332; font-size: 24px;">Tu Empresa - Reporte Oficial</h1>
-            <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">${tabName} (${periodoLabel})</p>
-          </div>
-          <div style="text-align: right; font-size: 12px; color: #666;">
-            <div><strong>Rango:</strong> ${fechaTexto}</div>
-            <div><strong>Generado:</strong> ${Utils.formatDateTime(Utils.nowISO())}</div>
-          </div>
-        </div>
-        ${contentEl.innerHTML}
-      </div>
-    `;
+    const htmlPDF = getConsolidatedReportHTML(range, periodoLabel);
 
     const opt = {
-      margin:       0.4,
-      filename:     `Reporte_${activeTab}_${filtroPeriodo.value}.pdf`,
+      margin:       0.3,
+      filename:     `Reporte_Consolidado_${filtroPeriodo.value}_${range.inicio.toISOString().split('T')[0]}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true, logging: false },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
@@ -135,6 +116,15 @@ export function renderReportes(container) {
         alert("La librería PDF no está lista o cargada.");
     }
   });
+
+  // Generar CSV Consolidado Completo
+  if (csvBtn) {
+    csvBtn.addEventListener('click', () => {
+      const range = getRange();
+      const periodoLabel = filtroPeriodo.options[filtroPeriodo.selectedIndex].text;
+      exportConsolidatedCSV(range, periodoLabel);
+    });
+  }
 
   // Render inicial
   renderTab('ventas_cisternas', getRange());
@@ -708,4 +698,481 @@ function renderCartera(content) {
       ` : '<div class="empty-state"><span class="empty-state-icon">🎉</span><span class="empty-state-text">¡No hay deudores! Todos los clientes están al día.</span></div>'}
     </div>
   `;
+}
+
+function getConsolidatedReportHTML(range, periodoLabel) {
+  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
+  const fechaTexto = `${Utils.formatDate(range.inicio)} al ${Utils.formatDate(range.fin)}`;
+  const currentTasa = store.getConfig('tasaCambio') || 40.00;
+
+  const ventasAll = store.getAll('ventas') || [];
+  const cisternasAll = store.getAll('cisternas') || [];
+  const clientes = store.getAll('clientes') || [];
+  const repartidores = store.getConfig('repartidores') || [];
+  const tipos = store.getConfig('tiposBotellon') || [];
+  const mermasAll = store.getAll('mermas') || [];
+
+  const ventas = ventasAll.filter(v => {
+    const f = new Date(v.fecha);
+    return f >= range.inicio && f <= range.fin;
+  }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const cisternas = cisternasAll.filter(c => {
+    const f = new Date(c.fecha);
+    return f >= range.inicio && f <= range.fin;
+  }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const mermas = mermasAll.filter(m => {
+    const f = new Date(m.fecha);
+    return f >= range.inicio && f <= range.fin;
+  });
+
+  // Métricas de ventas y productos
+  const productoResumen = {};
+  let totalLitrosVendidos = 0;
+  let totalVentasMonto = 0;
+  let totalVentasBs = 0;
+  let totalDeliveriesCant = 0;
+  let totalDeliveriesMonto = 0;
+
+  ventas.forEach(v => {
+    totalVentasMonto += v.total;
+    const tasa = v.tasa || currentTasa;
+    totalVentasBs += v.total * tasa;
+
+    if (v.detalles && Array.isArray(v.detalles)) {
+      v.detalles.forEach(d => {
+        const prod = tipos.find(t => t.id === d.tipoBotellonId);
+        const prodName = d.nombre || (prod ? prod.nombre : 'Producto');
+        const cap = d.capacidad || (prod ? prod.capacidad : 20);
+        if (!productoResumen[prodName]) {
+          productoResumen[prodName] = { cantidad: 0, monto: 0, litros: 0 };
+        }
+        productoResumen[prodName].cantidad += (d.cantidad || 1);
+        productoResumen[prodName].monto += (d.subtotal || 0);
+        productoResumen[prodName].litros += (d.cantidad || 1) * cap;
+        totalLitrosVendidos += (d.cantidad || 1) * cap;
+      });
+    } else if (v.botellones) {
+      const prodName = 'Botellón (20L)';
+      if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0, litros: 0 };
+      productoResumen[prodName].cantidad += v.botellones;
+      productoResumen[prodName].monto += v.total;
+      productoResumen[prodName].litros += v.botellones * 20;
+      totalLitrosVendidos += v.botellones * 20;
+    }
+
+    if (v.delivery > 0) {
+      totalDeliveriesCant += (v.deliveryCant || 1);
+      totalDeliveriesMonto += v.delivery;
+    }
+  });
+
+  // Stats deliveries
+  const deliveryStats = {};
+  repartidores.forEach(r => { deliveryStats[r.id] = { nombre: r.nombre, viajes: 0, monto: 0 }; });
+  deliveryStats['sin_asignar'] = { nombre: 'Sin Asignar / General', viajes: 0, monto: 0 };
+
+  ventas.forEach(v => {
+    if (v.delivery > 0) {
+      const repId = v.repartidorId || 'sin_asignar';
+      if (!deliveryStats[repId]) deliveryStats[repId] = { nombre: v.repartidorNombre || 'Desconocido', viajes: 0, monto: 0 };
+      deliveryStats[repId].viajes += (v.deliveryCant || 1);
+      deliveryStats[repId].monto += v.delivery;
+    }
+  });
+  const listDeliveryStats = Object.values(deliveryStats).filter(s => s.viajes > 0);
+
+  // Stats cartera
+  const deudores = clientes.filter(c => c.deuda > 0);
+  const totalDeuda = deudores.reduce((sum, c) => sum + c.deuda, 0);
+
+  // Stats agua
+  const totalCompradoAgua = cisternas.reduce((sum, c) => sum + c.capacidad, 0);
+  const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
+  const eficiencia = totalCompradoAgua > 0 ? Math.round((totalLitrosVendidos / totalCompradoAgua) * 100) : 0;
+
+  const listProdResumen = Object.entries(productoResumen);
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; line-height: 1.4; font-size: 12px; max-width: 900px; margin: 0 auto; background: #fff;">
+      <!-- Encabezado Institucional -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #1B4332; padding-bottom: 12px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <img src="${empresaLogo}" alt="Logo" style="max-height: 60px; max-width: 140px; object-fit: contain;" onerror="this.style.display='none'"/>
+          <div>
+            <h1 style="margin: 0; color: #1B4332; font-size: 22px; font-weight: bold; text-transform: uppercase;">${Utils.escapeHtml(empresaNombre)}</h1>
+            <div style="font-size: 13px; color: #4B5563; font-weight: bold; margin-top: 2px;">REPORTE EJECUTIVO INTEGRAL CONSOLIDADO</div>
+          </div>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #4B5563;">
+          <div><strong>Período:</strong> ${periodoLabel}</div>
+          <div><strong>Rango:</strong> ${fechaTexto}</div>
+          <div><strong>Emisión:</strong> ${Utils.formatDateTime(Utils.nowISO())}</div>
+        </div>
+      </div>
+
+      <!-- Resumen General en Cuadrícula -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 25px;">
+        <div style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 10px; border-radius: 6px;">
+          <div style="font-size: 10px; color: #166534; font-weight: bold; text-transform: uppercase;">Ventas Totales ($)</div>
+          <div style="font-size: 18px; font-weight: bold; color: #15803D; margin-top: 4px;">${Utils.formatCurrency(totalVentasMonto)}</div>
+          <div style="font-size: 10px; color: #166534;">Bs ${Utils.formatNumber(totalVentasBs, true)}</div>
+        </div>
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 10px; border-radius: 6px;">
+          <div style="font-size: 10px; color: #1E40AF; font-weight: bold; text-transform: uppercase;">Litros Vendidos</div>
+          <div style="font-size: 18px; font-weight: bold; color: #1D4ED8; margin-top: 4px;">${Utils.formatNumber(totalLitrosVendidos)} L</div>
+          <div style="font-size: 10px; color: #1E40AF;">${ventas.length} transacciones</div>
+        </div>
+        <div style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 10px; border-radius: 6px;">
+          <div style="font-size: 10px; color: #92400E; font-weight: bold; text-transform: uppercase;">Total Deliveries</div>
+          <div style="font-size: 18px; font-weight: bold; color: #B45309; margin-top: 4px;">${Utils.formatCurrency(totalDeliveriesMonto)}</div>
+          <div style="font-size: 10px; color: #92400E;">${totalDeliveriesCant} envíos realizados</div>
+        </div>
+        <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 10px; border-radius: 6px;">
+          <div style="font-size: 10px; color: #991B1B; font-weight: bold; text-transform: uppercase;">Cuentas por Cobrar</div>
+          <div style="font-size: 18px; font-weight: bold; color: #B91C1C; margin-top: 4px;">${Utils.formatCurrency(totalDeuda)}</div>
+          <div style="font-size: 10px; color: #991B1B;">${deudores.length} clientes con saldo</div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 1: RESUMEN DE PRODUCTOS VENDIDOS -->
+      <div style="margin-bottom: 25px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #1B4332; border-bottom: 1.5px solid #1B4332; padding-bottom: 4px;">
+          1. 📦 RESUMEN DE VENTAS POR PRODUCTO
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #F3F4F6; border-bottom: 1px solid #D1D5DB;">
+              <th style="text-align: left; padding: 6px 8px;">Producto / Servicio</th>
+              <th style="text-align: center; padding: 6px 8px;">Unidades Vendidas</th>
+              <th style="text-align: right; padding: 6px 8px;">Litros Totales</th>
+              <th style="text-align: right; padding: 6px 8px;">Monto Total ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listProdResumen.length === 0 ? `
+              <tr><td colspan="4" style="text-align:center; padding:10px; color:#6B7280;">No hay ventas registradas en este período.</td></tr>
+            ` : listProdResumen.map(([nombre, info]) => `
+              <tr style="border-bottom: 1px solid #E5E7EB;">
+                <td style="padding: 6px 8px; font-weight: bold;">${Utils.escapeHtml(nombre)}</td>
+                <td style="text-align: center; padding: 6px 8px;">${info.cantidad} unid.</td>
+                <td style="text-align: right; padding: 6px 8px;">${Utils.formatNumber(info.litros)} L</td>
+                <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #15803D;">${Utils.formatCurrency(info.monto)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SECCIÓN 2: DETALLE DE VENTAS DEL PERÍODO -->
+      <div style="margin-bottom: 25px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #1B4332; border-bottom: 1.5px solid #1B4332; padding-bottom: 4px;">
+          2. 📋 HISTÓRICO DETALLADO DE VENTAS (${ventas.length} Transacciones)
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+          <thead>
+            <tr style="background: #F3F4F6; border-bottom: 1px solid #D1D5DB;">
+              <th style="text-align: left; padding: 5px 6px;">Fecha/Hora</th>
+              <th style="text-align: left; padding: 5px 6px;">Cliente</th>
+              <th style="text-align: left; padding: 5px 6px;">Productos / Detalles</th>
+              <th style="text-align: right; padding: 5px 6px;">Total ($)</th>
+              <th style="text-align: center; padding: 5px 6px;">Método</th>
+              <th style="text-align: center; padding: 5px 6px;">Entrega</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ventas.length === 0 ? `
+              <tr><td colspan="6" style="text-align:center; padding:10px; color:#6B7280;">Sin ventas en el rango seleccionado.</td></tr>
+            ` : ventas.map(v => {
+              const cli = clientes.find(c => c.id === v.clienteId);
+              const cliNombre = cli ? cli.nombre : (v.clienteNombre || 'Cliente General');
+              let prodsStr = '';
+              if (v.detalles && Array.isArray(v.detalles)) {
+                prodsStr = v.detalles.map(d => `${d.cantidad}x ${d.nombre || 'Prod'}`).join(', ');
+              } else {
+                prodsStr = `${v.botellones}x Botellón`;
+              }
+              if (v.delivery > 0) prodsStr += ` + Deliv ($${Utils.formatNumber(v.delivery, true)})`;
+              const metodoStr = v.tipo === 'credito' ? 'Crédito' : (v.pagos && v.pagos.length > 1 ? 'Mixto' : (v.pagos && v.pagos[0] ? v.pagos[0].metodo : 'Contado'));
+              const entregaStr = v.estadoEntrega === 'pendiente' ? '⏳ Pendiente' : '✅ Entregado';
+              return `
+                <tr style="border-bottom: 1px solid #E5E7EB;">
+                  <td style="padding: 4px 6px; color: #4B5563;">${new Date(v.fecha).toLocaleDateString('es-VE')} ${new Date(v.fecha).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit', hour12:true})}</td>
+                  <td style="padding: 4px 6px; font-weight: bold;">${Utils.escapeHtml(cliNombre)}</td>
+                  <td style="padding: 4px 6px;">${Utils.escapeHtml(prodsStr)}</td>
+                  <td style="padding: 4px 6px; text-align: right; font-weight: bold; color: #15803D;">${Utils.formatCurrency(v.total)}</td>
+                  <td style="padding: 4px 6px; text-align: center; text-transform: capitalize;">${metodoStr}</td>
+                  <td style="padding: 4px 6px; text-align: center;">${entregaStr}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SECCIÓN 3: CONTROL DE DELIVERIES -->
+      <div style="margin-bottom: 25px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #1B4332; border-bottom: 1.5px solid #1B4332; padding-bottom: 4px;">
+          3. 🛵 CONTROL DE DELIVERIES Y REPARTIDORES
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #F3F4F6; border-bottom: 1px solid #D1D5DB;">
+              <th style="text-align: left; padding: 6px 8px;">Repartidor</th>
+              <th style="text-align: center; padding: 6px 8px;">Viajes / Entregas Realizadas</th>
+              <th style="text-align: right; padding: 6px 8px;">Monto Total Envíos ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listDeliveryStats.length === 0 ? `
+              <tr><td colspan="3" style="text-align:center; padding:10px; color:#6B7280;">No se registraron deliveries en este período.</td></tr>
+            ` : listDeliveryStats.map(s => `
+              <tr style="border-bottom: 1px solid #E5E7EB;">
+                <td style="padding: 6px 8px; font-weight: bold;">${Utils.escapeHtml(s.nombre)}</td>
+                <td style="text-align: center; padding: 6px 8px;">${s.viajes} entrega(s)</td>
+                <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #15803D;">${Utils.formatCurrency(s.monto)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SECCIÓN 4: ESTADO DE CARTERA (CUENTAS POR COBRAR) -->
+      <div style="margin-bottom: 25px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #1B4332; border-bottom: 1.5px solid #1B4332; padding-bottom: 4px;">
+          4. 💰 ESTADO DE CARTERA - CUENTAS POR COBRAR
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #F3F4F6; border-bottom: 1px solid #D1D5DB;">
+              <th style="text-align: left; padding: 6px 8px;">Cliente</th>
+              <th style="text-align: left; padding: 6px 8px;">Ubicación</th>
+              <th style="text-align: right; padding: 6px 8px;">Saldo Pendiente ($)</th>
+              <th style="text-align: center; padding: 6px 8px;">Días Mora</th>
+              <th style="text-align: center; padding: 6px 8px;">Estatus</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${deudores.length === 0 ? `
+              <tr><td colspan="5" style="text-align:center; padding:10px; color:#166534; font-weight:bold;">🎉 ¡Excelente! No hay cuentas pendientes por cobrar. Todos los clientes están al día.</td></tr>
+            ` : deudores.map(c => {
+              const estatus = store.calcularEstatusCliente(c.id);
+              const statusInfo = Utils.clientStatus[estatus] || { label: estatus };
+              const ubicacion = c.tipoUbicacion === 'externo'
+                ? [c.municipio, c.urbanizacion, c.calle].filter(Boolean).join(', ')
+                : [c.sector, c.nivel, c.local].filter(Boolean).join(' / ');
+              return `
+                <tr style="border-bottom: 1px solid #E5E7EB;">
+                  <td style="padding: 6px 8px; font-weight: bold;">${Utils.escapeHtml(c.nombre)}</td>
+                  <td style="padding: 6px 8px; color: #4B5563;">${Utils.escapeHtml(ubicacion || '-')}</td>
+                  <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #DC2626;">${Utils.formatCurrency(c.deuda)}</td>
+                  <td style="text-align: center; padding: 6px 8px;">${c.dias || 0} días</td>
+                  <td style="text-align: center; padding: 6px 8px; font-weight: bold;">${statusInfo.label}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SECCIÓN 5: RENDIMIENTO Y BALANCE DE AGUA -->
+      <div style="margin-bottom: 20px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #1B4332; border-bottom: 1.5px solid #1B4332; padding-bottom: 4px;">
+          5. 💧 BALANCE Y RENDIMIENTO DEL AGUA
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #F3F4F6; border-bottom: 1px solid #D1D5DB;">
+              <th style="text-align: left; padding: 6px 8px;">Concepto</th>
+              <th style="text-align: right; padding: 6px 8px;">Litros</th>
+              <th style="text-align: right; padding: 6px 8px;">Detalles</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #E5E7EB;">
+              <td style="padding: 6px 8px; font-weight: bold;">Total Agua Comprada (Cisternas)</td>
+              <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #2563EB;">${Utils.formatNumber(totalCompradoAgua)} L</td>
+              <td style="text-align: right; padding: 6px 8px;">${cisternas.length} cisternas recibidas</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #E5E7EB;">
+              <td style="padding: 6px 8px; font-weight: bold;">Total Agua Despachada (Ventas)</td>
+              <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #16A34A;">${Utils.formatNumber(totalLitrosVendidos)} L</td>
+              <td style="text-align: right; padding: 6px 8px;">${ventas.length} ventas procesadas</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #E5E7EB;">
+              <td style="padding: 6px 8px; font-weight: bold;">Merma Registrada (Lavado de botellones)</td>
+              <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #D97706;">${Utils.formatNumber(totalMerma)} L</td>
+              <td style="text-align: right; padding: 6px 8px;">Lavado y purgas</td>
+            </tr>
+            <tr style="background: #F9FAFB; font-weight: bold;">
+              <td style="padding: 6px 8px;">Eficiencia Operativa Estimada</td>
+              <td style="text-align: right; padding: 6px 8px; color: #1B4332; font-size: 13px;">${eficiencia}%</td>
+              <td style="text-align: right; padding: 6px 8px;">(Agua Vendida / Agua Comprada)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pie de página -->
+      <div style="border-top: 1px dashed #9CA3AF; padding-top: 10px; margin-top: 20px; text-align: center; font-size: 10px; color: #6B7280;">
+        Reporte generado automáticamente por el sistema de gestión de ${Utils.escapeHtml(empresaNombre)} • Documento Confidencial
+      </div>
+    </div>
+  `;
+}
+
+function exportConsolidatedCSV(range, periodoLabel) {
+  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const fechaTexto = `${Utils.formatDate(range.inicio)} al ${Utils.formatDate(range.fin)}`;
+  const currentTasa = store.getConfig('tasaCambio') || 40.00;
+
+  const ventasAll = store.getAll('ventas') || [];
+  const cisternasAll = store.getAll('cisternas') || [];
+  const clientes = store.getAll('clientes') || [];
+  const repartidores = store.getConfig('repartidores') || [];
+  const tipos = store.getConfig('tiposBotellon') || [];
+  const mermasAll = store.getAll('mermas') || [];
+
+  const ventas = ventasAll.filter(v => {
+    const f = new Date(v.fecha);
+    return f >= range.inicio && f <= range.fin;
+  }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const cisternas = cisternasAll.filter(c => {
+    const f = new Date(c.fecha);
+    return f >= range.inicio && f <= range.fin;
+  }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const mermas = mermasAll.filter(m => {
+    const f = new Date(m.fecha);
+    return f >= range.inicio && f <= range.fin;
+  });
+
+  let csv = '\uFEFF'; // UTF-8 BOM para Excel
+
+  // Cabecera
+  csv += `REPORTE CONSOLIDADO INTEGRAL DE GESTIÓN\n`;
+  csv += `Empresa;${empresaNombre}\n`;
+  csv += `Período;${periodoLabel}\n`;
+  csv += `Rango de Fechas;${fechaTexto}\n`;
+  csv += `Fecha de Emisión;${new Date().toLocaleString('es-VE')}\n\n`;
+
+  // SECCION 1: PRODUCTOS VENDIDOS
+  csv += `=== 1. RESUMEN DE VENTAS POR PRODUCTO ===\n`;
+  csv += `Producto;Cantidad Vendida;Monto Total ($)\n`;
+
+  const productoResumen = {};
+  let totalLitrosVendidos = 0;
+  ventas.forEach(v => {
+    if (v.detalles && Array.isArray(v.detalles)) {
+      v.detalles.forEach(d => {
+        const prod = tipos.find(t => t.id === d.tipoBotellonId);
+        const prodName = d.nombre || (prod ? prod.nombre : 'Producto');
+        const cap = d.capacidad || (prod ? prod.capacidad : 20);
+        if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0 };
+        productoResumen[prodName].cantidad += (d.cantidad || 1);
+        productoResumen[prodName].monto += (d.subtotal || 0);
+        totalLitrosVendidos += (d.cantidad || 1) * cap;
+      });
+    } else if (v.botellones) {
+      const prodName = 'Botellón (20L)';
+      if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0 };
+      productoResumen[prodName].cantidad += v.botellones;
+      productoResumen[prodName].monto += v.total;
+      totalLitrosVendidos += v.botellones * 20;
+    }
+  });
+
+  Object.entries(productoResumen).forEach(([prod, info]) => {
+    csv += `"${prod}";${info.cantidad};${info.monto.toFixed(2).replace('.', ',')}\n`;
+  });
+  csv += `\n`;
+
+  // SECCION 2: DETALLE DE VENTAS
+  csv += `=== 2. DETALLE DE VENTAS DEL PERÍODO ===\n`;
+  csv += `Fecha;Hora;Cliente;Teléfono;Productos;Total ($);Total (Bs);Método de Pago;Estado Entrega\n`;
+
+  ventas.forEach(v => {
+    const d = new Date(v.fecha);
+    const fechaFmt = d.toLocaleDateString('es-VE');
+    const horaFmt = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const cli = clientes.find(c => c.id === v.clienteId);
+    const cliNombre = cli ? cli.nombre : (v.clienteNombre || 'Cliente General');
+    const cliTlf = cli ? (cli.telefono || '-') : '-';
+    
+    let prodsStr = '';
+    if (v.detalles && Array.isArray(v.detalles)) {
+      prodsStr = v.detalles.map(det => `${det.cantidad}x ${det.nombre || 'Prod'}`).join(', ');
+    } else {
+      prodsStr = `${v.botellones}x Botellón`;
+    }
+    if (v.delivery > 0) prodsStr += ` + Delivery ($${v.delivery.toFixed(2)})`;
+
+    const tasa = v.tasa || currentTasa;
+    const totalBs = (v.total * tasa).toFixed(2).replace('.', ',');
+    const totalUsd = v.total.toFixed(2).replace('.', ',');
+    const metodo = v.tipo === 'credito' ? 'Crédito' : (v.pagos && v.pagos.length > 1 ? 'Mixto' : (v.pagos && v.pagos[0] ? v.pagos[0].metodo : 'Contado'));
+    const entrega = v.estadoEntrega === 'pendiente' ? 'Pendiente' : 'Entregado';
+
+    csv += `"${fechaFmt}";"${horaFmt}";"${cliNombre.replace(/"/g, '""')}";"${cliTlf}";"${prodsStr.replace(/"/g, '""')}";${totalUsd};${totalBs};"${metodo}";"${entrega}"\n`;
+  });
+  csv += `\n`;
+
+  // SECCION 3: CONTROL DE DELIVERIES
+  csv += `=== 3. CONTROL DE DELIVERIES Y REPARTIDORES ===\n`;
+  csv += `Repartidor;Viajes / Entregas;Monto Recaudado ($)\n`;
+  const deliveryStats = {};
+  repartidores.forEach(r => { deliveryStats[r.id] = { nombre: r.nombre, viajes: 0, monto: 0 }; });
+  deliveryStats['sin_asignar'] = { nombre: 'Sin Asignar / General', viajes: 0, monto: 0 };
+
+  ventas.forEach(v => {
+    if (v.delivery > 0) {
+      const repId = v.repartidorId || 'sin_asignar';
+      if (!deliveryStats[repId]) deliveryStats[repId] = { nombre: v.repartidorNombre || 'Desconocido', viajes: 0, monto: 0 };
+      deliveryStats[repId].viajes += (v.deliveryCant || 1);
+      deliveryStats[repId].monto += v.delivery;
+    }
+  });
+
+  Object.values(deliveryStats).filter(s => s.viajes > 0).forEach(s => {
+    csv += `"${s.nombre}";${s.viajes};${s.monto.toFixed(2).replace('.', ',')}\n`;
+  });
+  csv += `\n`;
+
+  // SECCION 4: CUENTAS POR COBRAR
+  csv += `=== 4. ESTADO DE CARTERA - CUENTAS POR COBRAR ===\n`;
+  csv += `Cliente;Teléfono;Ubicación;Deuda ($);Días de Mora;Estatus\n`;
+  const deudores = clientes.filter(c => c.deuda > 0);
+  deudores.forEach(c => {
+    const estatus = store.calcularEstatusCliente(c.id);
+    const ubicacion = c.tipoUbicacion === 'externo'
+      ? [c.municipio, c.urbanizacion, c.calle].filter(Boolean).join(', ')
+      : [c.sector, c.nivel, c.local].filter(Boolean).join(' / ');
+    csv += `"${c.nombre.replace(/"/g, '""')}";"${c.telefono || '-'}";"${ubicacion.replace(/"/g, '""')}";${c.deuda.toFixed(2).replace('.', ',')};${c.dias || 0};"${estatus}"\n`;
+  });
+  csv += `\n`;
+
+  // SECCION 5: BALANCE DE AGUA
+  csv += `=== 5. BALANCE Y RENDIMIENTO DEL AGUA ===\n`;
+  csv += `Concepto;Litros;Detalles\n`;
+  const totalCompradoAgua = cisternas.reduce((sum, c) => sum + c.capacidad, 0);
+  const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
+  const eficiencia = totalCompradoAgua > 0 ? Math.round((totalLitrosVendidos / totalCompradoAgua) * 100) : 0;
+  csv += `Total Agua Comprada (Cisternas);${totalCompradoAgua};${cisternas.length} cisternas recibidas\n`;
+  csv += `Total Agua Despachada (Ventas);${totalLitrosVendidos};${ventas.length} ventas procesadas\n`;
+  csv += `Merma Registrada (Lavado);${totalMerma};Lavado y purgas\n`;
+  csv += `Eficiencia Operativa;${eficiencia}%;(Agua Vendida / Agua Comprada)\n`;
+
+  // Descarga del archivo
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Reporte_Consolidado_${range.inicio.toISOString().split('T')[0]}_al_${range.fin.toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
