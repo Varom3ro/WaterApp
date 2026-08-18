@@ -7,9 +7,9 @@ export function renderSidebar() {
 
   return `
     <aside class="sidebar">
-      <div class="sidebar-logo" style="flex-direction: column; align-items: flex-start; padding: 16px 16px 14px 16px;">
-        <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin-bottom: 12px; min-height: 70px;">
-          <img src="${empresaLogo}" alt="${Utils.escapeHtml(empresaNombre)}" class="logo-img" style="width: 100%; max-width: 100%; height: auto; max-height: 120px; object-fit: contain; display: block; border-radius: 4px;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
+      <div class="sidebar-logo" style="flex-direction: column; align-items: flex-start; padding: 14px 16px 12px 16px;">
+        <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin-bottom: 12px;">
+          <img src="${empresaLogo}" alt="${Utils.escapeHtml(empresaNombre)}" class="logo-img" style="width: 100%; max-width: 100%; height: auto; max-height: 210px; object-fit: contain; display: block; border-radius: 6px;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
         </div>
         <h1 style="font-size: 15px; font-weight: 700; color: var(--color-text-main); margin: 0; text-align: left; line-height: 1.25; word-break: break-word; width: 100%;">
           ${Utils.escapeHtml(empresaNombre)}
