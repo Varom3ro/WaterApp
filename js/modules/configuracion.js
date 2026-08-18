@@ -34,12 +34,12 @@ export function renderConfiguracion(container) {
               </small>
             </div>
             <div class="form-group" style="flex: 1;">
-              <label class="form-label">Logotipo Oficial (Formato Rectangular)</label>
+              <label class="form-label">Logotipo de la Empresa</label>
               <input type="file" class="form-control" id="input-empresa-logo" accept="image/*"/>
-              <div style="margin-top: 10px; padding: 14px; border: 1px dashed var(--color-border); border-radius: 8px; text-align: center; background: var(--color-bg-body, #fafafa);">
+              <div style="margin-top: 10px; padding: 14px; border: 1px dashed var(--color-border); border-radius: 8px; text-align: center; background: var(--color-bg-body, #fafafa); min-height: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                 <small style="color: var(--color-text-secondary); display: block; margin-bottom: 8px;">Vista previa actual:</small>
-                <img id="preview-empresa-logo" src="${empresaLogo}" alt="Logo Preview" style="max-height: 95px; max-width: 100%; object-fit: contain; border-radius: 4px; display: inline-block;"/>
-                <div style="margin-top: 8px;">
+                <img id="preview-empresa-logo" src="${empresaLogo}" alt="Logo Preview" style="max-height: 120px; width: 100%; max-width: 100%; object-fit: contain; border-radius: 4px; display: block;"/>
+                <div style="margin-top: 10px;">
                   <button type="button" class="btn btn-xs btn-secondary" id="btn-remove-logo" style="color: var(--color-danger); border-color: #fca5a5; padding: 4px 8px; font-size: 11px;">
                     🗑️ Quitar Logotipo (Usar Genérico)
                   </button>

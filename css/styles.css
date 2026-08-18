@@ -188,18 +188,20 @@ img {
 
 .sidebar-logo {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-md);
-  padding: 0 var(--space-lg);
-  margin-bottom: var(--space-xl);
+  padding: 0 var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
 .sidebar-logo .logo-img {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  object-fit: cover;
-  box-shadow: var(--shadow-sm);
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  display: block;
 }
 
 .sidebar-logo h1 {
