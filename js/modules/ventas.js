@@ -383,14 +383,23 @@ export function renderNuevaVentaForm(container) {
         <div style="display: grid; grid-template-columns: minmax(120px, 2fr) 70px 80px auto; gap: 12px; align-items: center; margin-bottom: 0;">
           <div class="form-group" style="margin-bottom: 0;">
             <select class="form-control" id="select-tipo-botellon">
-              ${tipos.map(t => `<option value="${t.id}" data-precio="${t.precio}" data-litros="${t.litros}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)}</option>`).join('')}
+              ${tipos.map(t => {
+                const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
+                const precioLabel = isBs ? `Bs ${Utils.formatNumber(t.precio, true)}` : Utils.formatCurrency(t.precio);
+                return `<option value="${t.id}" data-precio="${t.precio}" data-moneda="${t.moneda || 'USD'}" data-litros="${t.litros}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)} (${precioLabel})</option>`;
+              }).join('')}
             </select>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <input type="number" class="form-control" min="1" value="1" id="input-botellones" placeholder="Cant."/>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
-            <input type="number" class="form-control" step="0.01" min="0" value="${tipos[0].precio}" id="input-precio" placeholder="Precio $"/>
+            <input type="number" class="form-control" step="0.01" min="0" value="${(() => {
+              const primer = tipos[0] || {};
+              const isBs = primer.moneda === 'VES' || primer.moneda === 'Bs';
+              const tasaInicial = store.getConfig('tasaCambio') || 40.00;
+              return isBs ? (tasaInicial > 0 ? (primer.precio / tasaInicial).toFixed(2) : '0.00') : (primer.precio || 1.50).toFixed(2);
+            })()}" id="input-precio" placeholder="Precio $" title="Precio unitario en dólares"/>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <button type="button" class="btn btn-secondary" id="btn-add-item" style="padding: 0 20px;">+ Añadir</button>
@@ -527,6 +536,12 @@ export function renderNuevaVentaForm(container) {
       const val = parseFloat(e.target.value);
       if (!isNaN(val) && val > 0) {
         store.setConfig('tasaCambio', val);
+        if (typeof syncPrecioSeleccionado === 'function') {
+          syncPrecioSeleccionado();
+        }
+        if (typeof renderCarrito === 'function') {
+          renderCarrito();
+        }
       }
     });
   }
@@ -808,6 +823,24 @@ export function renderNuevaVentaForm(container) {
   const diffPanel = modal.querySelector('#pago-diff-panel');
   const diffMonto = modal.querySelector('#pago-diff-monto');
 
+  function syncPrecioSeleccionado() {
+    if (!selectTipo || !inputPrecio) return;
+    const opt = selectTipo.options[selectTipo.selectedIndex];
+    if (!opt) return;
+    const isBs = opt.dataset.moneda === 'VES' || opt.dataset.moneda === 'Bs';
+    const precioBase = parseFloat(opt.dataset.precio) || 0;
+    const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
+    
+    if (isBs) {
+      const precioUSD = tasa > 0 ? (precioBase / tasa) : 0;
+      inputPrecio.value = precioUSD.toFixed(2);
+      inputPrecio.title = `Fijo en Bs (${Utils.formatNumber(precioBase, true)}) convertido a $ a tasa ${Utils.formatNumber(tasa, true)}`;
+    } else {
+      inputPrecio.value = precioBase.toFixed(2);
+      inputPrecio.title = `Fijo en dólares ($)`;
+    }
+  }
+
   modal.querySelector('#btn-add-item').addEventListener('click', () => {
     const cantidad = parseInt(inputBot.value);
     const precioUnitario = parseFloat(inputPrecio.value);
@@ -989,10 +1022,8 @@ export function renderNuevaVentaForm(container) {
     }
   });
 
-  selectTipo.addEventListener('change', () => {
-    const opt = selectTipo.options[selectTipo.selectedIndex];
-    inputPrecio.value = opt.dataset.precio;
-  });
+  selectTipo.addEventListener('change', syncPrecioSeleccionado);
+  syncPrecioSeleccionado();
 
   const radiosTipo = modal.querySelectorAll('input[name="tipo"]');
   const seccionPagos = modal.querySelector('#seccion-pagos');

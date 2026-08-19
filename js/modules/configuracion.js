@@ -74,16 +74,26 @@ export function renderConfiguracion(container) {
               </tr>
             </thead>
             <tbody id="tipos-tbody">
-              ${tipos.map(t => `
+              ${tipos.map(t => {
+                const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
+                return `
                 <tr>
                   <td>
-                      <div class="font-semibold">${Utils.escapeHtml(t.nombre)}</div>
-                      <div style="font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase;">
-                        ${t.categoria === 'producto' ? 'Producto Físico' : 'Recarga'}
-                      </div>
-                    </td>
+                    <div class="font-semibold">${Utils.escapeHtml(t.nombre)}</div>
+                    <div style="font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase;">
+                      ${t.categoria === 'producto' ? 'Producto Físico' : 'Recarga'}
+                    </div>
+                  </td>
                   <td>${t.categoria === 'producto' ? 'N/A' : (t.litros + 'L')}</td>
-                  <td class="text-success font-semibold">${Utils.formatCurrency(t.precio || 0)}</td>
+                  <td class="font-semibold" style="white-space: nowrap;">
+                    ${isBs ? `
+                      <span style="color: #2563EB;">Bs ${Utils.formatNumber(t.precio, true)}</span>
+                      <span style="font-size: 10px; color: #1E40AF; background: #EFF6FF; padding: 2px 6px; border-radius: 4px; margin-left: 4px; font-weight: normal;">Fijo en Bs</span>
+                    ` : `
+                      <span class="text-success">${Utils.formatCurrency(t.precio || 0)}</span>
+                      <span style="font-size: 10px; color: #166534; background: #F0FDF4; padding: 2px 6px; border-radius: 4px; margin-left: 4px; font-weight: normal;">Fijo en $</span>
+                    `}
+                  </td>
                   <td style="text-align: right;">
                     <div class="flex gap-sm" style="justify-content: flex-end;">
                       <button class="btn btn-sm btn-secondary btn-edit-tipo" data-id="${t.id}">✏️ Editar</button>
@@ -91,7 +101,7 @@ export function renderConfiguracion(container) {
                     </div>
                   </td>
                 </tr>
-              `).join('')}
+              `;}).join('')}
             </tbody>
           </table>
         </div>
@@ -353,13 +363,14 @@ function openTipoModal(id = null) {
   const isEdit = !!id;
   const tipos = store.getConfig('tiposBotellon') || [];
   const tipo = isEdit ? tipos.find(t => t.id === id) : {};
+  const currentMoneda = tipo.moneda || 'USD';
 
   const content = `
     <form id="form-tipo">
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Categoría</label>
-          <select class="form-control" name="categoria" onchange="document.getElementById('grupo-litros').style.display = this.value === 'producto' ? 'none' : 'block'">
+          <select class="form-control" name="categoria" id="tipo-categoria-select">
             <option value="relleno" ${tipo.categoria !== 'producto' ? 'selected' : ''}>Tipo de Relleno (Recarga)</option>
             <option value="producto" ${tipo.categoria === 'producto' ? 'selected' : ''}>Tipo de Productos (Físico)</option>
           </select>
@@ -372,11 +383,18 @@ function openTipoModal(id = null) {
       <div class="form-row">
         <div class="form-group" id="grupo-litros" style="${tipo.categoria === 'producto' ? 'display:none;' : ''}">
           <label class="form-label">Capacidad (Litros)</label>
-          <input type="number" class="form-control" name="litros" value="${tipo.litros || 20}" required/>
+          <input type="number" class="form-control" name="litros" value="${tipo.litros !== undefined ? tipo.litros : 20}" required/>
         </div>
         <div class="form-group">
-          <label class="form-label">Precio de Venta ($)</label>
-          <input type="number" class="form-control" name="precio" value="${tipo.precio || 1.50}" step="0.01" required/>
+          <label class="form-label">Moneda del Precio</label>
+          <select class="form-control" name="moneda" id="tipo-moneda-select">
+            <option value="USD" ${currentMoneda === 'USD' ? 'selected' : ''}>Dólares ($)</option>
+            <option value="VES" ${currentMoneda === 'VES' || currentMoneda === 'Bs' ? 'selected' : ''}>Bolívares (Bs.)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="label-precio-venta">Precio de Venta (${currentMoneda === 'VES' || currentMoneda === 'Bs' ? 'Bs.' : '$'})</label>
+          <input type="number" class="form-control" name="precio" id="input-precio-venta" value="${tipo.precio !== undefined ? tipo.precio : 1.50}" step="0.01" min="0" required/>
         </div>
       </div>
     </form>
@@ -385,21 +403,40 @@ function openTipoModal(id = null) {
   openModal({
     title: isEdit ? 'Editar Tipo' : 'Nuevo Tipo',
     content,
+    onOpen: (overlay) => {
+      const catSelect = overlay.querySelector('#tipo-categoria-select');
+      const grupoLitros = overlay.querySelector('#grupo-litros');
+      const monSelect = overlay.querySelector('#tipo-moneda-select');
+      const labelPrecio = overlay.querySelector('#label-precio-venta');
+
+      if (catSelect && grupoLitros) {
+        catSelect.addEventListener('change', () => {
+          grupoLitros.style.display = catSelect.value === 'producto' ? 'none' : 'block';
+        });
+      }
+
+      if (monSelect && labelPrecio) {
+        monSelect.addEventListener('change', () => {
+          labelPrecio.textContent = monSelect.value === 'VES' ? 'Precio de Venta (Bs.)' : 'Precio de Venta ($)';
+        });
+      }
+    },
     onSave: (overlay) => {
       const form = overlay.querySelector('#form-tipo');
       const fd = new FormData(form);
       const categoria = fd.get('categoria');
       const nombre = fd.get('nombre').trim();
       const litros = categoria === 'producto' ? 0 : parseInt(fd.get('litros'));
+      const moneda = fd.get('moneda') || 'USD';
       const precio = parseFloat(fd.get('precio'));
 
       if (!nombre || (categoria !== 'producto' && isNaN(litros)) || isNaN(precio)) return;
 
       if (isEdit) {
         const idx = tipos.findIndex(t => t.id === id);
-        tipos[idx] = { ...tipos[idx], categoria, nombre, litros, precio };
+        tipos[idx] = { ...tipos[idx], categoria, nombre, litros, moneda, precio };
       } else {
-        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, precio });
+        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, moneda, precio });
       }
 
       store.setConfig('tiposBotellon', tipos);
