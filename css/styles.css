@@ -605,6 +605,16 @@ img {
   background: var(--color-primary-900);
 }
 
+.btn-info {
+  background: var(--color-info);
+  color: white;
+}
+
+.btn-info:hover {
+  background: #0b5ed7;
+  box-shadow: var(--shadow-md);
+}
+
 .btn-icon {
   padding: var(--space-sm);
 }

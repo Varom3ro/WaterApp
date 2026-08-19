@@ -402,7 +402,7 @@ export function renderNuevaVentaForm(container) {
             })()}" id="input-precio" placeholder="Precio $" title="Precio unitario en dólares"/>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
-            <button type="button" class="btn btn-secondary" id="btn-add-item" style="padding: 0 20px;">+ Añadir</button>
+            <button type="button" class="btn btn-info" id="btn-add-item" style="padding: 0 20px;">+ Añadir</button>
           </div>
         </div>
         
