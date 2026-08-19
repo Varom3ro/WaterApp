@@ -558,12 +558,12 @@ export function renderNuevaVentaForm(container) {
       const clienteId = fd.get('clienteId') || null;
       const tipo = fd.get('tipo');
 
-      let totalVenta = 0;
+      const { totalUSD, totalBs } = calcularTotalesVenta();
+      let totalVenta = totalUSD;
       let totalBotellones = 0;
       let totalLitros = 0;
 
       carrito.forEach(item => {
-        totalVenta += item.subtotal;
         if (item.categoria !== 'producto') {
           totalBotellones += item.cantidad;
           totalLitros += item.litros;
@@ -571,26 +571,32 @@ export function renderNuevaVentaForm(container) {
       });
 
       const pagos = [];
-      let totalPagado = 0;
+      let totalPagadoUSD = 0;
+      let totalPagadoBs = 0;
       if (tipo === 'contado') {
         const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
         overlay.querySelectorAll('.pago-row').forEach(row => {
           const metodo = row.querySelector('.pago-metodo').value;
           const rawMonto = row.querySelector('.pago-monto').value || '0';
           const inputMonto = parseFloat(rawMonto.replace(',', '.')) || 0;
-          const monto = (metodo === 'efectivo_usd') ? inputMonto : (inputMonto / tasaActual);
+          const isUsd = (metodo === 'efectivo_usd');
+          const montoUSD = isUsd ? inputMonto : (tasaActual > 0 ? inputMonto / tasaActual : 0);
+          const montoBs = isUsd ? (inputMonto * tasaActual) : inputMonto;
           
           const refEl = row.querySelector('.pago-referencia');
           const referencia = refEl && refEl.value ? refEl.value.trim() : null;
           
-          if (monto > 0) {
-            pagos.push({ metodo, monto, referencia });
-            totalPagado += monto;
+          if (montoUSD > 0) {
+            pagos.push({ metodo, monto: montoUSD, referencia });
+            totalPagadoUSD += montoUSD;
+            totalPagadoBs += montoBs;
           }
         });
         
-        // Margen de tolerancia de $0.02 para compensar errores de redondeo cambiario
-        if (totalVenta - totalPagado > 0.02) {
+        // Margen de tolerancia inteligente para redondear en Bs o $
+        const faltaUSD = totalUSD - totalPagadoUSD;
+        const faltaBs = totalBs - totalPagadoBs;
+        if (faltaUSD > 0.03 && faltaBs > 1.00) {
             showToast('El pago ingresado no cubre el total de la venta', 'error');
             return;
         }
@@ -610,9 +616,6 @@ export function renderNuevaVentaForm(container) {
       let cantValue = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
       const isDelivActive = !!(checkDeliv && checkDeliv.checked);
       const montoDelivery = isDelivActive ? (delivValue * cantValue) : 0;
-      if (montoDelivery > 0) {
-        totalVenta += montoDelivery;
-      }
 
       let repartidorId = null;
       let repartidorNombre = null;
@@ -700,52 +703,86 @@ export function renderNuevaVentaForm(container) {
       
       const extraPagos = modal.querySelectorAll('.pago-row:not(:first-child)');
       extraPagos.forEach(r => r.remove());
-      actualizarPagosAutom(0);
+      actualizarPagosAutom(0, 0);
     });
 
   const carritoContainer = modal.querySelector('#carrito-container');
   const carritoTbody = modal.querySelector('#carrito-tbody');
   const totalDisplay = modal.querySelector('#total-venta');
   
+  function calcularTotalesVenta() {
+    const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
+    let totalUSD = 0;
+    let totalBs = 0;
+
+    carrito.forEach(item => {
+      if (item.monedaOriginal === 'VES' || item.monedaOriginal === 'Bs') {
+        const itemBs = item.cantidad * item.precioBase;
+        totalBs += itemBs;
+        totalUSD += (tasa > 0 ? (itemBs / tasa) : 0);
+      } else {
+        const itemUSD = item.cantidad * item.precioUnitario;
+        totalUSD += itemUSD;
+        totalBs += (itemUSD * tasa);
+      }
+    });
+
+    // Sumar delivery
+    const checkDelivery = modal.querySelector('#check-delivery');
+    const inputDeliv = modal.querySelector('#monto-delivery');
+    const cantDeliv = modal.querySelector('#cant-delivery');
+    if (checkDelivery && checkDelivery.checked && inputDeliv) {
+      let dVal = parseFloat(inputDeliv.value) || 0;
+      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      let delivUSD = dVal * cVal;
+      totalUSD += delivUSD;
+      totalBs += delivUSD * tasa;
+    }
+
+    return {
+      tasa,
+      totalUSD,
+      totalBs: +(Math.round(totalBs + "e+2") + "e-2")
+    };
+  }
+
   function renderCarrito() {
     if (carrito.length === 0) {
       carritoContainer.style.display = 'none';
       totalDisplay.textContent = '$0.00';
-      actualizarPagosAutom(0);
+      actualizarPagosAutom(0, 0);
       return;
     }
     
     carritoContainer.style.display = 'block';
     
-    carritoTbody.innerHTML = carrito.map((item, index) => `
-      <tr>
-        <td>${item.nombre}</td>
-        <td style="text-align:center">${item.cantidad}</td>
-        <td style="text-align:right">${Utils.formatCurrency(item.precioUnitario)}</td>
-        <td style="text-align:right; font-weight:bold;">${Utils.formatCurrency(item.subtotal)}</td>
-        <td style="text-align:center">
-          <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:4px;" title="Eliminar">✕</button>
-        </td>
-      </tr>
-    `).join('');
+    carritoTbody.innerHTML = carrito.map((item, index) => {
+      const isItemBs = item.monedaOriginal === 'VES' || item.monedaOriginal === 'Bs';
+      const precioUnitarioDisplay = isItemBs 
+        ? `Bs ${Utils.formatNumber(item.precioBase, true)}`
+        : Utils.formatCurrency(item.precioUnitario);
+      const subtotalDisplay = isItemBs
+        ? `Bs ${Utils.formatNumber(item.cantidad * item.precioBase, true)} <small style="color:var(--color-text-secondary); display:block; font-size:10px;">(~${Utils.formatCurrency(item.subtotal)})</small>`
+        : Utils.formatCurrency(item.subtotal);
+
+      return `
+        <tr>
+          <td>
+            <div style="font-weight:600;">${Utils.escapeHtml(item.nombre)}</div>
+            ${isItemBs ? '<span style="font-size:10px; color:#2563EB;">(Fijo en Bs)</span>' : ''}
+          </td>
+          <td style="text-align:center">${item.cantidad}</td>
+          <td style="text-align:right">${precioUnitarioDisplay}</td>
+          <td style="text-align:right; font-weight:bold;">${subtotalDisplay}</td>
+          <td style="text-align:center">
+            <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:4px;" title="Eliminar">✕</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
     
-    let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-    
-    // Sumar delivery si está activo
-    const checkDeliv = modal.querySelector('#check-delivery');
-    const inputDeliv = modal.querySelector('#monto-delivery');
-    const cantDeliv = modal.querySelector('#cant-delivery');
-    let delivery = 0;
-    if (checkDeliv && checkDeliv.checked && inputDeliv) {
-      let dVal = parseFloat(inputDeliv.value) || 0;
-      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
-      delivery = dVal * cVal;
-    }
-    totalVenta += delivery;
-    
-    const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
-    const totalBs = +(Math.round((totalVenta * tasa) + "e+2") + "e-2");
-    totalDisplay.innerHTML = `${Utils.formatCurrency(totalVenta)} <br><small style="font-size: 0.6em; font-weight: normal; opacity: 0.8; color: var(--color-text-secondary); line-height:1;">Bs ${Utils.formatNumber(totalBs, true)}</small>`;
+    const { totalUSD, totalBs } = calcularTotalesVenta();
+    totalDisplay.innerHTML = `${Utils.formatCurrency(totalUSD)} <br><small style="font-size: 0.6em; font-weight: normal; opacity: 0.8; color: var(--color-text-secondary); line-height:1;">Bs ${Utils.formatNumber(totalBs, true)}</small>`;
     
     carritoTbody.querySelectorAll('.btn-remove-cart').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -755,7 +792,7 @@ export function renderNuevaVentaForm(container) {
       });
     });
     
-    actualizarPagosAutom(totalVenta);
+    actualizarPagosAutom(totalUSD, totalBs);
   }
   
   const btnNewClient = modal.querySelector('#btn-quick-new-cliente');
@@ -793,7 +830,7 @@ export function renderNuevaVentaForm(container) {
       resultsDiv.innerHTML = filtered.map(c => `
         <div class="search-item" data-id="${c.id}" data-nombre="${Utils.escapeHtml(c.nombre)}">
           <span class="search-item-title">${Utils.escapeHtml(c.nombre)}</span>
-          <span class="search-item-subtitle">RIF: ${Utils.escapeHtml(c.rif || 'N/A')}</span>
+          <span class="search-item-meta">${c.rif || 'Sin RIF'} • Deuda: ${Utils.formatCurrency(c.deuda || 0)}</span>
         </div>
       `).join('');
 
@@ -802,6 +839,7 @@ export function renderNuevaVentaForm(container) {
           const id = item.dataset.id;
           const nombre = item.dataset.nombre;
           searchInput.value = nombre;
+          searchInput.dataset.id = id;
           hiddenId.value = id;
           resultsDiv.classList.remove('active');
           actualizarInfoPagos();
@@ -843,9 +881,9 @@ export function renderNuevaVentaForm(container) {
 
   modal.querySelector('#btn-add-item').addEventListener('click', () => {
     const cantidad = parseInt(inputBot.value);
-    const precioUnitario = parseFloat(inputPrecio.value);
+    const precioInputVal = parseFloat(inputPrecio.value);
     
-    if (!cantidad || cantidad < 1 || isNaN(precioUnitario) || precioUnitario < 0) {
+    if (!cantidad || cantidad < 1 || isNaN(precioInputVal) || precioInputVal < 0) {
       showToast('Cantidad o precio inválido', 'error');
       return;
     }
@@ -855,10 +893,21 @@ export function renderNuevaVentaForm(container) {
     const nombre = opt.dataset.nombre;
     const litrosPorUnidad = parseFloat(opt.dataset.litros) || 20;
     const categoria = opt.dataset.categoria || 'relleno';
+    const monedaOriginal = opt.dataset.moneda || 'USD';
+    const precioBase = parseFloat(opt.dataset.precio) || 0;
+    const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
+
+    const isBsProducto = monedaOriginal === 'VES' || monedaOriginal === 'Bs';
+    const precioCalculadoUSD = isBsProducto ? (tasa > 0 ? +(precioBase / tasa).toFixed(2) : 0) : precioBase;
     
-    const existenteIdx = carrito.findIndex(item => item.tipoBotellonId === tipoBotellonId && item.precioUnitario === precioUnitario);
+    // Si el usuario no modificó el precio convertido, mantenemos la moneda fija en Bs exacta
+    const esFijoBs = isBsProducto && Math.abs(precioInputVal - precioCalculadoUSD) <= 0.01;
+    const finalMonedaOriginal = esFijoBs ? 'VES' : 'USD';
+    const finalPrecioBase = esFijoBs ? precioBase : precioInputVal;
+    const precioUnitario = esFijoBs ? (tasa > 0 ? (precioBase / tasa) : 0) : precioInputVal;
     
-    // Aseguramos que la comparacion agrupe bien
+    const existenteIdx = carrito.findIndex(item => item.tipoBotellonId === tipoBotellonId && item.monedaOriginal === finalMonedaOriginal);
+    
     if (existenteIdx !== -1) {
       carrito[existenteIdx].cantidad += cantidad;
       carrito[existenteIdx].subtotal = carrito[existenteIdx].cantidad * carrito[existenteIdx].precioUnitario;
@@ -869,6 +918,8 @@ export function renderNuevaVentaForm(container) {
         categoria,
         nombre,
         cantidad,
+        monedaOriginal: finalMonedaOriginal,
+        precioBase: finalPrecioBase,
         precioUnitario,
         subtotal: cantidad * precioUnitario,
         litros: cantidad * litrosPorUnidad
@@ -879,40 +930,36 @@ export function renderNuevaVentaForm(container) {
     renderCarrito();
   });
 
-  function actualizarPagosAutom(totalVenta) {
+  function actualizarPagosAutom(totalUSD, totalBs) {
     const pagosMontoInputs = modal.querySelectorAll('.pago-monto');
     if (pagosMontoInputs.length === 1) {
-        const isUsd = modal.querySelector('.pago-metodo').value === 'efectivo_usd';
-        const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
-        let monto = isUsd ? totalVenta : +(Math.round((totalVenta * tasa) + "e+2") + "e-2");
-        pagosMontoInputs[0].value = monto.toFixed(2);
+      const isUsd = modal.querySelector('.pago-metodo').value === 'efectivo_usd';
+      pagosMontoInputs[0].value = isUsd ? (totalUSD || 0).toFixed(2) : (totalBs || 0).toFixed(2);
     }
     actualizarInfoPagos();
   }
 
   function actualizarInfoPagos() {
-    let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-    const checkDelivery = modal.querySelector('#check-delivery');
-    const inputDeliv = modal.querySelector('#monto-delivery');
-    const cantDeliv = modal.querySelector('#cant-delivery');
-    if (checkDelivery && checkDelivery.checked && inputDeliv) {
-      let dVal = parseFloat(inputDeliv.value) || 0;
-      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
-      totalVenta += dVal * cVal;
-    }
+    const { totalUSD, totalBs, tasa } = calcularTotalesVenta();
     
-    let totalPagos = 0;
-    const tasa = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+    let totalPagosDolares = 0;
+    let totalPagosBs = 0;
     modal.querySelectorAll('.pago-row').forEach(row => {
       const isUsd = row.querySelector('.pago-metodo').value === 'efectivo_usd';
       const rawVal = row.querySelector('.pago-monto').value || '0';
       const val = parseFloat(rawVal.replace(',', '.')) || 0;
-      totalPagos += isUsd ? val : (val / tasa);
+      if (isUsd) {
+        totalPagosDolares += val;
+        totalPagosBs += val * tasa;
+      } else {
+        totalPagosBs += val;
+        totalPagosDolares += (tasa > 0 ? val / tasa : 0);
+      }
     });
 
     const clienteId = hiddenId.value;
-    if (clienteId && totalPagos > totalVenta) {
-      diffMonto.textContent = Utils.formatCurrency(totalPagos - totalVenta);
+    if (clienteId && (totalPagosDolares > (totalUSD + 0.01) || totalPagosBs > (totalBs + 0.50))) {
+      diffMonto.textContent = Utils.formatCurrency(Math.max(0, totalPagosDolares - totalUSD));
       diffPanel.style.display = 'flex';
     } else {
       diffPanel.style.display = 'none';
@@ -920,35 +967,25 @@ export function renderNuevaVentaForm(container) {
   }
 
   modal.querySelector('#btn-add-pago-venta').addEventListener('click', () => {
-    let totalBotellones = 0;
-    let totalVenta = 0;
-    carrito.forEach(item => {
-      if (item.categoria !== 'producto') {
-        totalBotellones += item.cantidad;
-      }
-      totalVenta += item.subtotal;
-    });
-    const checkDelivery = modal.querySelector('#check-delivery');
-    const inputDeliv = modal.querySelector('#monto-delivery');
-    const cantDeliv = modal.querySelector('#cant-delivery');
-    if (checkDelivery && checkDelivery.checked && inputDeliv) {
-      let dVal = parseFloat(inputDeliv.value) || 0;
-      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
-      totalVenta += dVal * cVal;
-    }
+    const { totalUSD, totalBs, tasa } = calcularTotalesVenta();
     
-    let totalPagosDolares = 0;
-    const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+    let otrosPagosUSD = 0;
+    let otrosPagosBs = 0;
     modal.querySelectorAll('.pago-row').forEach(row => {
       const isUsd = row.querySelector('.pago-metodo').value === 'efectivo_usd';
       const rawVal = row.querySelector('.pago-monto').value || '0';
       const val = parseFloat(rawVal.replace(',', '.')) || 0;
-      totalPagosDolares += isUsd ? val : (val / tasaActual);
+      if (isUsd) {
+        otrosPagosUSD += val;
+        otrosPagosBs += val * tasa;
+      } else {
+        otrosPagosBs += val;
+        otrosPagosUSD += (tasa > 0 ? val / tasa : 0);
+      }
     });
     
-    const remanenteDolares = Math.max(0, totalVenta - totalPagosDolares);
-    const remanenteBs = +(Math.round((remanenteDolares * tasaActual) + "e+2") + "e-2");
-    const defaultVal = remanenteBs > 0 ? remanenteBs.toFixed(2) : "0.00"; // Porque select por defecto añade "punto"
+    const remanenteBs = Math.max(0, totalBs - otrosPagosBs);
+    const defaultVal = remanenteBs > 0 ? remanenteBs.toFixed(2) : "0.00";
 
     const row = document.createElement('div');
     row.className = 'pago-row';
@@ -988,32 +1025,29 @@ export function renderNuevaVentaForm(container) {
       if (!row) return;
       const input = row.querySelector('.pago-monto');
       
-      let totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-      const checkDelivery = modal.querySelector('#check-delivery');
-      const inputDeliv = modal.querySelector('#monto-delivery');
-      const cantDeliv = modal.querySelector('#cant-delivery');
-      if (checkDelivery && checkDelivery.checked && inputDeliv) {
-        let dVal = parseFloat(inputDeliv.value) || 0;
-      let cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
-      totalVenta += dVal * cVal;
-      }
+      const { totalUSD, totalBs, tasa } = calcularTotalesVenta();
 
-      let totalPagosDolares = 0;
-      const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
-      
+      let otrosPagosUSD = 0;
+      let otrosPagosBs = 0;
       modal.querySelectorAll('.pago-row').forEach(r => {
         if (r === row) return;
         const isUsd = r.querySelector('.pago-metodo').value === 'efectivo_usd';
         const rawVal = r.querySelector('.pago-monto').value || '0';
         const val = parseFloat(rawVal.replace(',', '.')) || 0;
-        totalPagosDolares += isUsd ? val : (val / tasaActual);
+        if (isUsd) {
+          otrosPagosUSD += val;
+          otrosPagosBs += val * tasa;
+        } else {
+          otrosPagosBs += val;
+          otrosPagosUSD += (tasa > 0 ? val / tasa : 0);
+        }
       });
 
-      const remanenteDolares = Math.max(0, totalVenta - totalPagosDolares);
-      const remanenteBs = +(Math.round((remanenteDolares * tasaActual) + "e+2") + "e-2");
+      const remanenteUSD = Math.max(0, totalUSD - otrosPagosUSD);
+      const remanenteBs = Math.max(0, totalBs - otrosPagosBs);
       
       if (e.target.value === 'efectivo_usd') {
-        input.value = remanenteDolares > 0 ? remanenteDolares.toFixed(2) : "0.00";
+        input.value = remanenteUSD > 0 ? remanenteUSD.toFixed(2) : "0.00";
       } else {
         input.value = remanenteBs > 0 ? remanenteBs.toFixed(2) : "0.00";
       }
