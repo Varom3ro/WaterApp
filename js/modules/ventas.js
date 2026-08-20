@@ -657,8 +657,8 @@ export function renderNuevaVentaForm(container) {
       inv.litros = Math.max(0, inv.litros - totalLitros);
       store.setConfig('inventario', inv);
 
-      if (clienteId && totalPagado > totalVenta) {
-        const excedente = totalPagado - totalVenta;
+      if (clienteId && totalPagadoUSD > totalVenta) {
+        const excedente = totalPagadoUSD - totalVenta;
         const abono = {
           id: Utils.generateId(),
           clienteId,
