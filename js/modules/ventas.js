@@ -830,7 +830,7 @@ export function renderNuevaVentaForm(container) {
       resultsDiv.innerHTML = filtered.map(c => `
         <div class="search-item" data-id="${c.id}" data-nombre="${Utils.escapeHtml(c.nombre)}">
           <span class="search-item-title">${Utils.escapeHtml(c.nombre)}</span>
-          <span class="search-item-meta">${c.rif || 'Sin RIF'} • Deuda: ${Utils.formatCurrency(c.deuda || 0)}</span>
+          <span class="search-item-meta">${c.rif || 'Sin RIF'} • Deuda: ${Utils.formatCurrency(store.getDeudaCliente(c.id))}</span>
         </div>
       `).join('');
 

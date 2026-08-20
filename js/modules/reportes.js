@@ -642,7 +642,20 @@ function drawRendimientoChart() {
 
 function renderCartera(content) {
   const clientes = store.getAll('clientes');
-  const deudores = clientes.filter(c => c.deuda > 0);
+  const deudores = clientes.map(c => {
+    const deuda = store.getDeudaCliente(c.id);
+    let dias = 0;
+    if (deuda > 0) {
+      const clientVentas = (store.getAll('ventas') || []).filter(v => v.clienteId === c.id && v.tipo === 'credito');
+      if (clientVentas.length > 0) {
+        clientVentas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        const oldestVenta = clientVentas[0];
+        const timeDiff = Date.now() - new Date(oldestVenta.fecha);
+        dias = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24)));
+      }
+    }
+    return { ...c, deuda, dias };
+  }).filter(c => c.deuda > 0);
   const totalDeuda = deudores.reduce((sum, c) => sum + c.deuda, 0);
 
   content.innerHTML = `
@@ -785,7 +798,20 @@ function getConsolidatedReportHTML(range, periodoLabel) {
   const listDeliveryStats = Object.values(deliveryStats).filter(s => s.viajes > 0);
 
   // Stats cartera
-  const deudores = clientes.filter(c => c.deuda > 0);
+  const deudores = clientes.map(c => {
+    const deuda = store.getDeudaCliente(c.id);
+    let dias = 0;
+    if (deuda > 0) {
+      const clientVentas = (store.getAll('ventas') || []).filter(v => v.clienteId === c.id && v.tipo === 'credito');
+      if (clientVentas.length > 0) {
+        clientVentas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        const oldestVenta = clientVentas[0];
+        const timeDiff = Date.now() - new Date(oldestVenta.fecha);
+        dias = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24)));
+      }
+    }
+    return { ...c, deuda, dias };
+  }).filter(c => c.deuda > 0);
   const totalDeuda = deudores.reduce((sum, c) => sum + c.deuda, 0);
 
   // Stats agua
@@ -1144,7 +1170,20 @@ function exportConsolidatedCSV(range, periodoLabel) {
   // SECCION 4: CUENTAS POR COBRAR
   csv += `=== 4. ESTADO DE CARTERA - CUENTAS POR COBRAR ===\n`;
   csv += `Cliente;Teléfono;Ubicación;Deuda ($);Días de Mora;Estatus\n`;
-  const deudores = clientes.filter(c => c.deuda > 0);
+  const deudores = clientes.map(c => {
+    const deuda = store.getDeudaCliente(c.id);
+    let dias = 0;
+    if (deuda > 0) {
+      const clientVentas = (store.getAll('ventas') || []).filter(v => v.clienteId === c.id && v.tipo === 'credito');
+      if (clientVentas.length > 0) {
+        clientVentas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        const oldestVenta = clientVentas[0];
+        const timeDiff = Date.now() - new Date(oldestVenta.fecha);
+        dias = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24)));
+      }
+    }
+    return { ...c, deuda, dias };
+  }).filter(c => c.deuda > 0);
   deudores.forEach(c => {
     const estatus = store.calcularEstatusCliente(c.id);
     const ubicacion = c.tipoUbicacion === 'externo'
