@@ -20,15 +20,20 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
       </div>
       <form id="form-arqueo">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-          ${methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').map(m => `
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">${m.icon} ${m.label}</label>
-              <div style="position:relative;">
-                 <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--color-text-secondary); font-weight:bold; font-size:14px;">${m.key === 'efectivo_usd' ? '$' : 'Bs.'}</span>
-                 <input type="text" inputmode="decimal" class="form-control currency-mask" name="arqueo_${m.key}" value="0,00" required style="font-size: 16px; font-weight: bold; padding-left: 40px;"/>
+          ${methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').map(m => {
+            const defaultValue = (m.key === 'pago_movil' && cierre && cierre.bs && typeof cierre.bs.pago_movil === 'number')
+              ? Utils.formatNumber(cierre.bs.pago_movil, true)
+              : '0,00';
+            return `
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">${m.icon} ${m.label}</label>
+                <div style="position:relative;">
+                   <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--color-text-secondary); font-weight:bold; font-size:14px;">${m.key === 'efectivo_usd' ? '$' : 'Bs.'}</span>
+                   <input type="text" inputmode="decimal" class="form-control currency-mask" name="arqueo_${m.key}" value="${defaultValue}" required style="font-size: 16px; font-weight: bold; padding-left: 40px;"/>
+                </div>
               </div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
         <div class="form-group" style="margin-bottom: 20px;">
           <label class="form-label">📝 Observaciones del Cierre (Opcional)</label>
