@@ -1,0 +1,25 @@
+{
+  "name": "Tu Empresa - Gestión de Agua",
+  "short_name": "WaterApp",
+  "description": "Sistema de Gestión y Control para Recarga de Agua Potable",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F6FA",
+  "theme_color": "#1B4332",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

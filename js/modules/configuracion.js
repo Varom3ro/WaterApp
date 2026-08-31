@@ -161,6 +161,33 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
+      <!-- Seguridad y Contraseña -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔐 Seguridad y Contraseña de Acceso</h3>
+        </div>
+        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Personaliza la clave de ingreso para la caja y administración.</p>
+        <div style="display: flex; flex-direction: column; gap: var(--space-sm); max-width: 320px;">
+          <div class="form-group mb-sm">
+            <label class="form-label" style="font-size: var(--font-size-xs);">Contraseña Actual</label>
+            <input type="password" id="input-pwd-actual" class="form-control" placeholder="Clave actual (por defecto admins)" />
+          </div>
+          <div class="form-group mb-sm">
+            <label class="form-label" style="font-size: var(--font-size-xs);">Nueva Contraseña</label>
+            <input type="password" id="input-pwd-nueva" class="form-control" placeholder="Nueva clave (mín. 4 caracteres)" />
+          </div>
+          <div class="form-group mb-sm">
+            <label class="form-label" style="font-size: var(--font-size-xs);">Confirmar Nueva Contraseña</label>
+            <input type="password" id="input-pwd-confirmar" class="form-control" placeholder="Repite la nueva clave" />
+          </div>
+          <div style="margin-top: 6px;">
+            <button class="btn btn-primary" id="btn-save-password" style="width: 100%;">
+              🔑 Actualizar Contraseña
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Backup -->
       <div class="card">
         <div class="card-header">
@@ -235,6 +262,43 @@ export function renderConfiguracion(container) {
         store.setConfig('precioDelivery', val);
         showToast('Tarifa de delivery actualizada', 'success');
       }
+    });
+  }
+
+  const btnSavePassword = container.querySelector('#btn-save-password');
+  if (btnSavePassword) {
+    btnSavePassword.addEventListener('click', () => {
+      const inputActual = container.querySelector('#input-pwd-actual');
+      const inputNueva = container.querySelector('#input-pwd-nueva');
+      const inputConfirmar = container.querySelector('#input-pwd-confirmar');
+
+      const actualVal = inputActual ? inputActual.value : '';
+      const nuevaVal = inputNueva ? inputNueva.value.trim() : '';
+      const confirmarVal = inputConfirmar ? inputConfirmar.value.trim() : '';
+
+      if (!store.checkPassword(actualVal)) {
+        showToast('La contraseña actual es incorrecta', 'danger');
+        if (inputActual) { inputActual.value = ''; inputActual.focus(); }
+        return;
+      }
+
+      if (!nuevaVal || nuevaVal.length < 4) {
+        showToast('La nueva contraseña debe tener al menos 4 caracteres', 'warning');
+        if (inputNueva) inputNueva.focus();
+        return;
+      }
+
+      if (nuevaVal !== confirmarVal) {
+        showToast('Las contraseñas nuevas no coinciden', 'danger');
+        if (inputConfirmar) { inputConfirmar.value = ''; inputConfirmar.focus(); }
+        return;
+      }
+
+      store.setPassword(nuevaVal);
+      showToast('¡Contraseña de acceso actualizada con éxito!', 'success');
+      if (inputActual) inputActual.value = '';
+      if (inputNueva) inputNueva.value = '';
+      if (inputConfirmar) inputConfirmar.value = '';
     });
   }
 

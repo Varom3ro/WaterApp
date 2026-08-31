@@ -27,12 +27,13 @@ class App {
         const licenciaValida = await Licencia.validar();
         if (!licenciaValida) return;
 
+        await store.init();
+
         if (!sessionStorage.getItem('isAuthenticated')) {
             this.renderLogin();
             return;
         }
 
-        await store.init();
         this.renderLayout();
         this.registerRoutes();
 
@@ -68,6 +69,12 @@ class App {
                     <p id="login-error" style="color: var(--color-danger); font-size: 0.85rem; display: none; margin-bottom: 1rem; text-align: left;">Contraseña incorrecta</p>
                     
                     <button id="btn-login" class="btn btn-primary" style="width:100%; margin-top: 1rem;">Ingresar al Sistema</button>
+                    
+                    <div style="margin-top: 1.25rem; text-align: center;">
+                        <a href="https://wa.me/584166315114?text=Hola,%20olvid%C3%A9%20la%20contrase%C3%B1a%20de%20acceso%20de%20mi%20caja%20en%20WaterApp.%20%C2%BFMe%20pueden%20ayudar?" target="_blank" style="font-size: 0.82rem; color: var(--color-primary-800); text-decoration: none; font-weight: 500;">
+                            ¿Olvidaste tu contraseña? Solicitar Soporte 💬
+                        </a>
+                    </div>
                 </div>
             </div>
         `;
@@ -87,7 +94,7 @@ class App {
 
         document.getElementById('btn-login').addEventListener('click', () => {
             const pwd = document.getElementById('login-password').value;
-            if (pwd === 'admins') {
+            if (store.checkPassword(pwd)) {
                 sessionStorage.setItem('isAuthenticated', 'true');
                 this.init();
             } else {
@@ -159,4 +166,13 @@ class App {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     new App();
+
+    // Registrar Service Worker para PWA (Offline y Móvil)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('[PWA] Service Worker activo:', reg.scope))
+                .catch(err => console.warn('[PWA] Error al registrar Service Worker:', err));
+        });
+    }
 });
