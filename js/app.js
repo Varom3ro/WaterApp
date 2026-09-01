@@ -43,9 +43,13 @@ class App {
 
         // Start router
         router.init('app-content');
+        syncToCloud();
 
         // Update active state on route change
-        window.addEventListener('hashchange', () => this.updateActiveLink());
+        window.addEventListener('hashchange', () => {
+            this.updateActiveLink();
+            syncToCloud();
+        });
         this.updateActiveLink();
     }
 

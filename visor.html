@@ -595,7 +595,11 @@
         <div class="store-name">
           <span id="txt-store-name">Planta Piloto Principal</span>
         </div>
-        <div class="live-status">
+        <div style="font-size: 0.75rem; color: #67E8F9; margin-top: 2px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+          <span>👤</span>
+          <span id="txt-owner-email">correo@tienda.com</span>
+        </div>
+        <div class="live-status" style="margin-top: 3px;">
           <span class="live-dot"></span>
           <span>SINCRONIZADO EN VIVO · <span id="txt-last-time">Ahora</span></span>
         </div>
@@ -936,6 +940,10 @@
 
     if (storeData.nombre_empresa) {
       document.getElementById('txt-store-name').textContent = storeData.nombre_empresa;
+    }
+    const txtOwner = document.getElementById('txt-owner-email');
+    if (txtOwner) {
+      txtOwner.textContent = storeData.empresa_email || currentStoreEmail;
     }
 
     // Ventas Hoy
