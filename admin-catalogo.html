@@ -18,6 +18,7 @@
       --border: #E2E8F0;
       --text: #0F172A;
       --text-muted: #64748B;
+      --danger: #DC2626;
       --radius: 12px;
       --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
     }
@@ -32,8 +33,67 @@
     body {
       background: var(--bg);
       color: var(--text);
-      padding: 2.5rem 1.5rem;
       min-height: 100vh;
+    }
+
+    /* Pantalla de Bloqueo de Acceso */
+    #auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, var(--primary-dark) 0%, #03140C 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      padding: 1.5rem;
+    }
+
+    .auth-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .auth-icon {
+      width: 60px;
+      height: 60px;
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      color: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      margin: 0 auto 1.25rem;
+    }
+
+    .auth-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .auth-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 1.75rem;
+      line-height: 1.5;
+    }
+
+    /* Panel Principal */
+    #admin-app {
+      display: none;
+      padding: 2.5rem 1.5rem;
     }
 
     .container {
@@ -212,7 +272,6 @@
       font-size: 0.85rem;
     }
 
-    /* Actions Bar */
     .actions-bar {
       display: flex;
       justify-content: space-between;
@@ -241,107 +300,174 @@
       color: #991B1B;
       border: 1px solid #FECACA;
     }
-
-    .pill-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
   </style>
 </head>
 <body>
 
-<div class="container">
-  
-  <!-- Header -->
-  <div class="header-card">
-    <div>
-      <h1 class="header-title">⚡ Inyector Remoto de Catálogo</h1>
-      <p class="header-subtitle">Configura productos, precios y stock desde tu laptop e inyéctalos directo a la App del cliente vía Supabase</p>
-    </div>
-    <div>
-      <a href="index.html" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color:white; border-color: rgba(255,255,255,0.3);">
-        ← Volver a la App
-      </a>
-    </div>
-  </div>
-
-  <div id="alert-box" class="alert"></div>
-
-  <!-- Paso 1: Seleccionar Cliente -->
-  <div class="card">
-    <h2 class="card-title">1. Seleccionar Cliente / Correo de Destino</h2>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: flex-end;">
-      <div class="form-group" style="margin-bottom: 0;">
-        <label class="form-label">Elegir de Cuentas Registradas en Supabase</label>
-        <select class="form-control" id="select-cliente">
-          <option value="">Cargando clientes de Supabase...</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom: 0;">
-        <label class="form-label">O escribir correo manualmente</label>
-        <input type="email" class="form-control" id="input-cliente-manual" placeholder="ejemplo@correo.com" />
+<!-- Pantalla de Seguridad / Login de Administrador -->
+<div id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-icon">🛡️</div>
+    <h2 class="auth-title">Acceso de Administrador</h2>
+    <p class="auth-desc">Esta herramienta es de uso exclusivo para configuración del sistema. Introduce la Clave Maestra para continuar:</p>
+    
+    <div class="form-group" style="text-align: left;">
+      <input type="password" id="input-admin-auth-pwd" class="form-control" placeholder="Clave Maestra de Soporte" onkeydown="if(event.key === 'Enter') document.getElementById('btn-auth-unlock').click()"/>
+      <div id="auth-error-msg" style="color: var(--danger); font-size: 0.85rem; margin-top: 8px; display: none; font-weight: 500;">
+        ⚠️ Clave incorrecta. Acceso denegado.
       </div>
     </div>
-  </div>
 
-  <!-- Paso 2: Catálogo de Productos -->
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.25rem;">
-      <h2 class="card-title" style="margin-bottom: 0;">2. Productos, Recargas, Precios y Stock</h2>
+    <button id="btn-auth-unlock" class="btn btn-success" style="width: 100%; height: 46px; font-size: 1rem;">
+      🔓 Desbloquear Panel Maestro
+    </button>
+  </div>
+</div>
+
+<!-- Panel de Control Principal -->
+<div id="admin-app">
+  <div class="container">
+    
+    <!-- Header -->
+    <div class="header-card">
+      <div>
+        <h1 class="header-title">⚡ Inyector Remoto de Catálogo</h1>
+        <p class="header-subtitle">Configura productos, precios y stock desde tu laptop e inyéctalos directo a la App del cliente vía Supabase</p>
+      </div>
       <div style="display: flex; gap: 8px;">
-        <button class="btn btn-sm btn-secondary" id="btn-plantilla-rapida">
-          ✨ Cargar Plantilla Típica
+        <button id="btn-lock-session" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color:white; border-color: rgba(255,255,255,0.3);">
+          🔒 Bloquear Panel
         </button>
-        <button class="btn btn-sm btn-primary" id="btn-add-row">
-          + Agregar Producto
-        </button>
+        <a href="index.html" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color:white; border-color: rgba(255,255,255,0.3);">
+          ← Volver a la App
+        </a>
       </div>
     </div>
 
-    <div class="table-container">
-      <table id="table-productos">
-        <thead>
-          <tr>
-            <th style="width: 25%;">Tipo / Categoría</th>
-            <th style="width: 30%;">Nombre del Producto / Recarga</th>
-            <th style="width: 15%;">Litros (Recarga)</th>
-            <th style="width: 15%;">Precio ($)</th>
-            <th style="width: 15%;">Stock Inicial</th>
-            <th style="width: 5%; text-align: center;"></th>
-          </tr>
-        </thead>
-        <tbody id="tbody-productos">
-          <!-- Filas dinámicas -->
-        </tbody>
-      </table>
+    <div id="alert-box" class="alert"></div>
+
+    <!-- Paso 1: Seleccionar Cliente -->
+    <div class="card">
+      <h2 class="card-title">1. Seleccionar Cliente / Correo de Destino</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: flex-end;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Elegir de Cuentas Registradas en Supabase</label>
+          <select class="form-control" id="select-cliente">
+            <option value="">Cargando clientes de Supabase...</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">O escribir correo manualmente</label>
+          <input type="email" class="form-control" id="input-cliente-manual" placeholder="ejemplo@correo.com" />
+        </div>
+      </div>
     </div>
 
-    <!-- Botón de Inyección Principal -->
-    <div class="actions-bar">
-      <div style="font-size: 0.9rem; color: var(--text-muted);">
-        Total de ítems preparados: <strong id="total-items-count">0</strong>
+    <!-- Paso 2: Catálogo de Productos -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.25rem;">
+        <h2 class="card-title" style="margin-bottom: 0;">2. Productos, Recargas, Precios y Stock</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-sm btn-secondary" id="btn-plantilla-rapida">
+            ✨ Cargar Plantilla Típica
+          </button>
+          <button class="btn btn-sm btn-primary" id="btn-add-row">
+            + Agregar Producto
+          </button>
+        </div>
       </div>
-      <div style="display: flex; gap: 12px;">
-        <button class="btn btn-secondary" id="btn-exportar-json">
-          💾 Descargar Archivo JSON
-        </button>
-        <button class="btn btn-success" id="btn-inyectar-supabase" style="font-size: 1.05rem; padding: 12px 28px;">
-          🚀 Inyectar a la Cuenta en Supabase (Magia ✨)
-        </button>
+
+      <div class="table-container">
+        <table id="table-productos">
+          <thead>
+            <tr>
+              <th style="width: 25%;">Tipo / Categoría</th>
+              <th style="width: 30%;">Nombre del Producto / Recarga</th>
+              <th style="width: 15%;">Litros (Recarga)</th>
+              <th style="width: 15%;">Precio ($)</th>
+              <th style="width: 15%;">Stock Inicial</th>
+              <th style="width: 5%; text-align: center;"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-productos">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Botón de Inyección Principal -->
+      <div class="actions-bar">
+        <div style="font-size: 0.9rem; color: var(--text-muted);">
+          Total de ítems preparados: <strong id="total-items-count">0</strong>
+        </div>
+        <div style="display: flex; gap: 12px;">
+          <button class="btn btn-secondary" id="btn-exportar-json">
+            💾 Descargar Archivo JSON
+          </button>
+          <button class="btn btn-success" id="btn-inyectar-supabase" style="font-size: 1.05rem; padding: 12px 28px;">
+            🚀 Inyectar a la Cuenta en Supabase (Magia ✨)
+          </button>
+        </div>
       </div>
     </div>
+
   </div>
-
 </div>
 
 <script>
+  // Hash Criptográfico SHA-256 de la Clave Maestra de Seguridad
+  const MASTER_HASH = 'd02e5de5bb9bf153e7ef0b2d6b14b44b1fe22fc86a925022437377764d04f437';
+
   const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
   let productos = [];
+
+  // Función para calcular SHA-256 en el navegador
+  async function sha256(text) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Comprobar autenticación de Administrador
+  function checkAuth() {
+    if (sessionStorage.getItem('admin_master_unlocked') === 'true') {
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.getElementById('admin-app').style.display = 'block';
+      initApp();
+    } else {
+      document.getElementById('auth-overlay').style.display = 'flex';
+      document.getElementById('admin-app').style.display = 'none';
+      setTimeout(() => {
+        const inp = document.getElementById('input-admin-auth-pwd');
+        if (inp) inp.focus();
+      }, 100);
+    }
+  }
+
+  document.getElementById('btn-auth-unlock').addEventListener('click', async () => {
+    const inputPwd = document.getElementById('input-admin-auth-pwd').value;
+    const errorMsg = document.getElementById('auth-error-msg');
+    
+    const computedHash = await sha256(inputPwd);
+    if (computedHash === MASTER_HASH) {
+      sessionStorage.setItem('admin_master_unlocked', 'true');
+      errorMsg.style.display = 'none';
+      checkAuth();
+    } else {
+      errorMsg.style.display = 'block';
+      document.getElementById('input-admin-auth-pwd').value = '';
+      document.getElementById('input-admin-auth-pwd').focus();
+    }
+  });
+
+  document.getElementById('btn-lock-session').addEventListener('click', () => {
+    sessionStorage.removeItem('admin_master_unlocked');
+    location.reload();
+  });
 
   // Plantilla típica predeterminada
   const plantillaTipica = [
@@ -537,10 +663,14 @@
     }
   });
 
-  // Init
-  cargarClientes();
-  productos = JSON.parse(JSON.stringify(plantillaTipica));
-  renderFilas();
+  function initApp() {
+    cargarClientes();
+    productos = JSON.parse(JSON.stringify(plantillaTipica));
+    renderFilas();
+  }
+
+  // Iniciar verificación de acceso
+  checkAuth();
 </script>
 
 </body>

