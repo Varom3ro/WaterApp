@@ -84,7 +84,15 @@ export function renderConfiguracion(container) {
                       ${t.categoria === 'producto' ? 'Producto Físico' : 'Recarga'}
                     </div>
                   </td>
-                  <td>${t.categoria === 'producto' ? 'N/A' : (t.litros + 'L')}</td>
+                  <td>
+                    ${t.categoria === 'producto' ? `
+                      <span class="badge ${ (t.stock || 0) > 0 ? 'badge-info' : 'badge-warning'}" style="font-size: 11px; padding: 3px 8px;">
+                        📦 Stock: <b>${t.stock !== undefined ? t.stock : 0}</b> un.
+                      </span>
+                    ` : `
+                      <span style="font-weight: 500;">💧 ${t.litros + 'L'}</span>
+                    `}
+                  </td>
                   <td class="font-semibold" style="white-space: nowrap;">
                     ${isBs ? `
                       <span style="color: #2563EB;">Bs ${Utils.formatNumber(t.precio, true)}</span>
@@ -428,35 +436,40 @@ function openTipoModal(id = null) {
   const tipos = store.getConfig('tiposBotellon') || [];
   const tipo = isEdit ? tipos.find(t => t.id === id) : {};
   const currentMoneda = tipo.moneda || 'USD';
+  const isProd = tipo.categoria === 'producto';
 
   const content = `
     <form id="form-tipo">
       <div class="form-row">
-        <div class="form-group">
+        <div class="form-group" style="flex: 1;">
           <label class="form-label">Categoría</label>
           <select class="form-control" name="categoria" id="tipo-categoria-select">
-            <option value="relleno" ${tipo.categoria !== 'producto' ? 'selected' : ''}>Tipo de Relleno (Recarga)</option>
-            <option value="producto" ${tipo.categoria === 'producto' ? 'selected' : ''}>Tipo de Productos (Físico)</option>
+            <option value="relleno" ${!isProd ? 'selected' : ''}>Tipo de Relleno (Recarga)</option>
+            <option value="producto" ${isProd ? 'selected' : ''}>Tipo de Productos (Físico)</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex: 1.5;">
           <label class="form-label">Nombre del Ítem</label>
-          <input type="text" class="form-control" name="nombre" value="${tipo.nombre || ''}" placeholder="Ej: Botellón 20L" required/>
+          <input type="text" class="form-control" name="nombre" value="${tipo.nombre || ''}" placeholder="Ej: Botellón 20L / Agarradera" required/>
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group" id="grupo-litros" style="${tipo.categoria === 'producto' ? 'display:none;' : ''}">
+        <div class="form-group" id="grupo-litros" style="${isProd ? 'display:none;' : ''}; flex: 1;">
           <label class="form-label">Capacidad (Litros)</label>
-          <input type="number" class="form-control" name="litros" value="${tipo.litros !== undefined ? tipo.litros : 20}" required/>
+          <input type="number" class="form-control" name="litros" value="${tipo.litros !== undefined ? tipo.litros : 20}" min="1"/>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="grupo-stock" style="${!isProd ? 'display:none;' : ''}; flex: 1;">
+          <label class="form-label">Stock / Cantidad Disponible</label>
+          <input type="number" class="form-control" name="stock" value="${tipo.stock !== undefined ? tipo.stock : 0}" min="0"/>
+        </div>
+        <div class="form-group" style="flex: 1;">
           <label class="form-label">Moneda del Precio</label>
           <select class="form-control" name="moneda" id="tipo-moneda-select">
             <option value="USD" ${currentMoneda === 'USD' ? 'selected' : ''}>Dólares ($)</option>
             <option value="VES" ${currentMoneda === 'VES' || currentMoneda === 'Bs' ? 'selected' : ''}>Bolívares (Bs.)</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex: 1;">
           <label class="form-label" id="label-precio-venta">Precio de Venta (${currentMoneda === 'VES' || currentMoneda === 'Bs' ? 'Bs.' : '$'})</label>
           <input type="number" class="form-control" name="precio" id="input-precio-venta" value="${tipo.precio !== undefined ? tipo.precio : 1.50}" step="0.01" min="0" required/>
         </div>
@@ -470,13 +483,19 @@ function openTipoModal(id = null) {
     onOpen: (overlay) => {
       const catSelect = overlay.querySelector('#tipo-categoria-select');
       const grupoLitros = overlay.querySelector('#grupo-litros');
+      const grupoStock = overlay.querySelector('#grupo-stock');
       const monSelect = overlay.querySelector('#tipo-moneda-select');
       const labelPrecio = overlay.querySelector('#label-precio-venta');
 
-      if (catSelect && grupoLitros) {
-        catSelect.addEventListener('change', () => {
-          grupoLitros.style.display = catSelect.value === 'producto' ? 'none' : 'block';
-        });
+      const toggleFields = () => {
+        const isProducto = catSelect.value === 'producto';
+        if (grupoLitros) grupoLitros.style.display = isProducto ? 'none' : 'block';
+        if (grupoStock) grupoStock.style.display = isProducto ? 'block' : 'none';
+      };
+
+      if (catSelect) {
+        catSelect.addEventListener('change', toggleFields);
+        toggleFields(); // sincronizar al abrir
       }
 
       if (monSelect && labelPrecio) {
@@ -490,17 +509,21 @@ function openTipoModal(id = null) {
       const fd = new FormData(form);
       const categoria = fd.get('categoria');
       const nombre = fd.get('nombre').trim();
-      const litros = categoria === 'producto' ? 0 : parseInt(fd.get('litros'));
+      const litros = categoria === 'producto' ? 0 : (parseInt(fd.get('litros')) || 20);
+      const stock = categoria === 'producto' ? (parseInt(fd.get('stock')) || 0) : 0;
       const moneda = fd.get('moneda') || 'USD';
       const precio = parseFloat(fd.get('precio'));
 
-      if (!nombre || (categoria !== 'producto' && isNaN(litros)) || isNaN(precio)) return;
+      if (!nombre || isNaN(precio)) {
+        showToast('Por favor complete los campos obligatorios', 'warning');
+        return;
+      }
 
       if (isEdit) {
         const idx = tipos.findIndex(t => t.id === id);
-        tipos[idx] = { ...tipos[idx], categoria, nombre, litros, moneda, precio };
+        tipos[idx] = { ...tipos[idx], categoria, nombre, litros, stock, moneda, precio };
       } else {
-        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, moneda, precio });
+        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, stock, moneda, precio });
       }
 
       store.setConfig('tiposBotellon', tipos);

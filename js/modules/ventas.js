@@ -386,7 +386,8 @@ export function renderNuevaVentaForm(container) {
               ${tipos.map(t => {
                 const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
                 const precioLabel = isBs ? `Bs ${Utils.formatNumber(t.precio, true)}` : Utils.formatCurrency(t.precio);
-                return `<option value="${t.id}" data-precio="${t.precio}" data-moneda="${t.moneda || 'USD'}" data-litros="${t.litros}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)} (${precioLabel})</option>`;
+                const stockText = t.categoria === 'producto' ? ` · Stock: ${t.stock !== undefined ? t.stock : 0}` : '';
+                return `<option value="${t.id}" data-precio="${t.precio}" data-moneda="${t.moneda || 'USD'}" data-litros="${t.litros}" data-stock="${t.stock !== undefined ? t.stock : 0}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)} (${precioLabel}${stockText})</option>`;
               }).join('')}
             </select>
           </div>
@@ -653,9 +654,26 @@ export function renderNuevaVentaForm(container) {
 
       store.save('ventas', venta);
       
+      // Descontar inventario de agua
       const inv = store.getInventarioActual();
       inv.litros = Math.max(0, inv.litros - totalLitros);
       store.setConfig('inventario', inv);
+
+      // Descontar inventario de productos físicos
+      const allTipos = store.getConfig('tiposBotellon') || [];
+      let tiposActualizados = false;
+      carrito.forEach(item => {
+        if (item.categoria === 'producto' && item.tipoBotellonId) {
+          const pIdx = allTipos.findIndex(p => p.id === item.tipoBotellonId);
+          if (pIdx !== -1) {
+            allTipos[pIdx].stock = Math.max(0, (allTipos[pIdx].stock || 0) - item.cantidad);
+            tiposActualizados = true;
+          }
+        }
+      });
+      if (tiposActualizados) {
+        store.setConfig('tiposBotellon', allTipos);
+      }
 
       if (clienteId && totalPagadoUSD > totalVenta) {
         const excedente = totalPagadoUSD - totalVenta;
@@ -1230,6 +1248,24 @@ function deleteVenta(id) {
         const inv = store.getInventarioActual();
         inv.litros += (venta.litrosTotales || venta.botellones * 20);
         store.setConfig('inventario', inv);
+
+        // Restore stock of physical products
+        if (venta.detalles && venta.detalles.length > 0) {
+          const allTipos = store.getConfig('tiposBotellon') || [];
+          let updated = false;
+          venta.detalles.forEach(d => {
+            if (d.categoria === 'producto' && d.tipoBotellonId) {
+              const pIdx = allTipos.findIndex(p => p.id === d.tipoBotellonId);
+              if (pIdx !== -1) {
+                allTipos[pIdx].stock = (allTipos[pIdx].stock || 0) + (d.cantidad || 0);
+                updated = true;
+              }
+            }
+          });
+          if (updated) {
+            store.setConfig('tiposBotellon', allTipos);
+          }
+        }
       }
       store.delete('ventas', id);
       showToast('Venta eliminada e inventario restaurado', 'success');

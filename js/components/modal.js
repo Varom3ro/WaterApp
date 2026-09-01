@@ -36,6 +36,10 @@ export function openModal(options = {}) {
         overlay.classList.add('active');
     });
 
+    if (typeof options.onOpen === 'function') {
+        options.onOpen(overlay);
+    }
+
     // Close handlers
     overlay.querySelector('#modal-close-btn').addEventListener('click', closeModal);
     const cancelBtn = overlay.querySelector('#modal-cancel-btn');
