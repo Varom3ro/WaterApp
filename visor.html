@@ -869,9 +869,16 @@
 
     await cargarDatosEnVivo();
 
-    // Auto-refresco cada 30 segundos
+    // Auto-refresco en vivo cada 5 segundos
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(cargarDatosEnVivo, 30000);
+    autoRefreshInterval = setInterval(cargarDatosEnVivo, 5000);
+  });
+
+  // Refrescar al volver a la pestaña/pantalla del teléfono
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && currentStoreEmail) {
+      cargarDatosEnVivo();
+    }
   });
 
   // Logout

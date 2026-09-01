@@ -97,6 +97,7 @@ class Store {
         this.cache[collection].push(item);
         this._putDB(collection, item); // flush
         this._autoBackup();
+        this._triggerCloudSync(collection);
         return item;
     }
 
@@ -107,6 +108,7 @@ class Store {
         arr[idx] = { ...arr[idx], ...updates, updatedAt: new Date().toISOString() };
         this._putDB(collection, arr[idx]);
         this._autoBackup();
+        this._triggerCloudSync(collection);
         return arr[idx];
     }
 
@@ -117,8 +119,21 @@ class Store {
         if (this.cache[collection].length < initialLen) {
             this._deleteDB(collection, id);
             this._autoBackup();
+            this._triggerCloudSync(collection);
         }
         return this.cache[collection].length < initialLen;
+    }
+
+    _triggerCloudSync(collection) {
+        if (['ventas', 'cisternas', 'mermas', 'configuracion', 'abonos'].includes(collection)) {
+            if (typeof window !== 'undefined' && typeof window.syncToCloud === 'function') {
+                try {
+                    window.syncToCloud();
+                } catch (e) {
+                    console.warn('[Store] Auto CloudSync error:', e);
+                }
+            }
+        }
     }
 
     // ---- Config ----
