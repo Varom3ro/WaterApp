@@ -22,10 +22,19 @@ export async function syncToCloud() {
     const tipos = store.getConfig('tiposBotellon') || [];
     const mermas = store.getAll('mermas') || [];
     const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+    const tasa = parseFloat(store.getConfig('tasaCambio')) || 40.00;
 
-    // Calcular ventas de hoy
-    const hoyStr = new Date().toISOString().split('T')[0];
-    const ventasHoy = ventas.filter(v => v.fecha && v.fecha.startsWith(hoyStr));
+    // Calcular ventas de hoy usando fecha local
+    const now = new Date();
+    const hoyLocalStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const dayStart = new Date(hoyLocalStr + 'T00:00:00');
+    const dayEnd = new Date(hoyLocalStr + 'T23:59:59');
+
+    const ventasHoy = ventas.filter(v => {
+      if (!v.fecha) return false;
+      const d = new Date(v.fecha);
+      return d >= dayStart && d <= dayEnd;
+    });
 
     let totalUSD = 0;
     let botellones = 0;
@@ -38,32 +47,42 @@ export async function syncToCloud() {
     let transferencia = 0;
     let credito = 0;
 
-    const tasa = store.getConfig('tasaCambio') || 40.00;
-
     ventasHoy.forEach(v => {
-      totalUSD += (v.total || 0);
-      botellones += (v.botellones || 0);
-      litros += (v.litrosTotales || (v.botellones * 20) || 0);
+      const vTotal = parseFloat(v.total) || 0;
+      totalUSD += vTotal;
+      botellones += (parseInt(v.botellones) || 0);
+      litros += (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
 
-      // Desglose de pagos
-      if (v.pagos && Array.isArray(v.pagos)) {
+      if (v.tipo === 'credito') {
+        credito += vTotal;
+      } else if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
         v.pagos.forEach(p => {
-          const m = p.monto || 0;
-          if (p.metodo === 'efectivo_usd') efectivoUSD += m;
-          else if (p.metodo === 'pago_movil') {
+          const m = parseFloat(p.monto) || 0;
+          const currentTasa = parseFloat(p.tasa) || tasa;
+          if (p.metodo === 'efectivo_usd') {
+            efectivoUSD += m;
+          } else if (p.metodo === 'pago_movil') {
             pagoMovil += m;
-            pagoMovilBs += (m * (p.tasa || tasa));
-          } else if (p.metodo === 'punto_venta') {
+            pagoMovilBs += (m * currentTasa);
+          } else if (p.metodo === 'punto_venta' || p.metodo === 'punto') {
             punto += m;
-            puntoBs += (m * (p.tasa || tasa));
+            puntoBs += (m * currentTasa);
           } else if (p.metodo === 'transferencia') {
             transferencia += m;
           }
         });
-      } else if (v.metodoPago === 'efectivo_usd') {
-        efectivoUSD += (v.total || 0);
-      } else if (v.tipo === 'credito') {
-        credito += (v.total || 0);
+      } else {
+        if (v.metodoPago === 'pago_movil') {
+          pagoMovil += vTotal;
+          pagoMovilBs += (vTotal * tasa);
+        } else if (v.metodoPago === 'punto_venta' || v.metodoPago === 'punto') {
+          punto += vTotal;
+          puntoBs += (vTotal * tasa);
+        } else if (v.metodoPago === 'transferencia') {
+          transferencia += vTotal;
+        } else {
+          efectivoUSD += vTotal;
+        }
       }
     });
 
@@ -71,15 +90,25 @@ export async function syncToCloud() {
 
     // Últimos movimientos (ventas + mermas)
     const ultimosMovs = [];
-    ventas.slice(-20).reverse().forEach(v => {
+    ventas.slice(-25).reverse().forEach(v => {
+      let metodoLabel = '💵 Pagado';
+      if (v.tipo === 'credito') metodoLabel = '📋 Crédito';
+      else if (v.pagos && v.pagos[0]) {
+        const m = v.pagos[0].metodo;
+        if (m === 'pago_movil') metodoLabel = '📱 Pago Móvil';
+        else if (m === 'punto_venta' || m === 'punto') metodoLabel = '💳 Punto Venta';
+        else if (m === 'transferencia') metodoLabel = '🏦 Transferencia';
+        else if (m === 'efectivo_usd') metodoLabel = '💵 Efectivo $';
+      }
+
       ultimosMovs.push({
         hora: Utils.formatTime(v.fecha),
         fecha: v.fecha,
         tipo: 'Venta',
         icono: '💧',
-        descripcion: `${v.botellones} Botellón(es)`,
+        descripcion: `${v.botellones || 1} Botellón(es)`,
         monto: Utils.formatCurrency(v.total),
-        metodo: v.tipo === 'credito' ? '📋 Crédito' : '💵 Pagado',
+        metodo: metodoLabel,
         cliente: v.clienteNombre || 'Cliente Mostrador'
       });
     });
@@ -113,11 +142,14 @@ export async function syncToCloud() {
     }));
 
     // Análisis del mes acumulado
-    const mesActualStr = hoyStr.substring(0, 7); // 'YYYY-MM'
-    const ventasMes = ventas.filter(v => v.fecha && v.fecha.startsWith(mesActualStr));
-    const totalMesUSD = ventasMes.reduce((s, v) => s + (v.total || 0), 0);
+    const mesActualStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const ventasMes = ventas.filter(v => {
+      if (!v.fecha) return false;
+      return v.fecha.startsWith(mesActualStr);
+    });
+    const totalMesUSD = ventasMes.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
     const totalMesBs = totalMesUSD * tasa;
-    const totalBotellonesMes = ventasMes.reduce((s, v) => s + (v.botellones || 0), 0);
+    const totalBotellonesMes = ventasMes.reduce((s, v) => s + (parseInt(v.botellones) || 0), 0);
 
     const payload = {
       empresa_email: email,
@@ -151,19 +183,31 @@ export async function syncToCloud() {
       }
     };
 
-    await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
+    const res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
+        'Prefer': 'resolution=merge-duplicates,return=representation'
       },
       body: JSON.stringify(payload)
     });
 
-    console.log('[CloudSync] Datos reales de la tienda sincronizados con éxito en Supabase');
+    if (res.ok) {
+      console.log('[CloudSync] ✅ Datos reales de la tienda sincronizados con Supabase:', payload);
+      return true;
+    } else {
+      console.warn('[CloudSync] Error en respuesta de Supabase:', await res.text());
+      return false;
+    }
   } catch (e) {
     console.warn('[CloudSync] Sincronización en segundo plano falló (modo offline):', e);
+    return false;
   }
+}
+
+// Exponer globalmente
+if (typeof window !== 'undefined') {
+  window.syncToCloud = syncToCloud;
 }

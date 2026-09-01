@@ -3,6 +3,7 @@ import { Utils } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { syncToCloud } from '../cloud-sync.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
@@ -48,7 +49,10 @@ export function renderConfiguracion(container) {
               ${diasRestantesText ? `<span style="font-size: 12px; color: #166534; font-weight: 600;">⏳ ${diasRestantesText}</span>` : ''}
             </div>
           </div>
-          <div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button id="btn-sync-cloud-manual" class="btn btn-sm btn-secondary" style="font-size: 12px; padding: 6px 12px; font-weight: 600;">
+              ☁️ Sincronizar Nube Ahora
+            </button>
             <a href="visor.html" target="_blank" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 6px 14px; text-decoration: none;">
               📱 Abrir Visor Móvil
             </a>
@@ -251,6 +255,22 @@ export function renderConfiguracion(container) {
   `;
 
   // Events
+  const btnSyncManual = container.querySelector('#btn-sync-cloud-manual');
+  if (btnSyncManual) {
+    btnSyncManual.addEventListener('click', async () => {
+      btnSyncManual.disabled = true;
+      btnSyncManual.textContent = '⏳ Sincronizando...';
+      const ok = await syncToCloud();
+      btnSyncManual.disabled = false;
+      btnSyncManual.textContent = '☁️ Sincronizar Nube Ahora';
+      if (ok) {
+        showToast('☁️ Datos reales sincronizados con la Nube con éxito', 'success');
+      } else {
+        showToast('⚠️ No se pudo sincronizar. Verifica tu conexión a internet.', 'warning');
+      }
+    });
+  }
+
   let tempLogoBase64 = empresaLogo;
   const inputLogo = container.querySelector('#input-empresa-logo');
   const previewLogo = container.querySelector('#preview-empresa-logo');
