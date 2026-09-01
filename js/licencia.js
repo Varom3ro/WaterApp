@@ -11,26 +11,20 @@ export const Licencia = {
   async validar() {
     const licenciaLocal = localStorage.getItem('licencia_usuario');
     
-    // Si ya hay licencia local, verificar expiración
+    // Si ya hay licencia local, verificar y actualizar en caliente
     if (licenciaLocal) {
       const user = JSON.parse(licenciaLocal);
-      const expiradoLocal = this._checkExpirado(user.fecha_registro, user.dias_prueba);
       
-      if (expiradoLocal) {
-        // Intentar re-validar online por si el administrador le amplió la licencia en Supabase
-        const revalidado = await this._revalidarOnline(user.email);
-        if (revalidado) {
-          // Si online es válido, se actualizó el localStorage y procedemos
-          return true;
-        } else {
-          // Si falló online (sigue expirado o no hay conexión), bloquear pantalla
-          this.bloquearPantalla();
-          return false;
-        }
+      // Intentar actualizar datos en caliente (días de licencia y catálogo inyectado)
+      await this._revalidarOnline(user.email);
+      
+      const freshLocal = localStorage.getItem('licencia_usuario') || licenciaLocal;
+      const freshUser = JSON.parse(freshLocal);
+      
+      if (!freshUser.activo || this._checkExpirado(freshUser.fecha_registro, freshUser.dias_prueba)) {
+        this.bloquearPantalla();
+        return false;
       }
-      
-      // Intentar re-validar online en segundo plano por seguridad (si hay internet)
-      this._validarOnlineSilencioso(user.email);
       return true;
     }
     
@@ -41,18 +35,24 @@ export const Licencia = {
 
   async _revalidarOnline(email) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout max
+      
       const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {
           const user = data[0];
           localStorage.setItem('licencia_usuario', JSON.stringify(user));
-          // Verificar si sigue inactivo o expirado
+          this.aplicarCatalogoRemotoSiExiste();
           if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
             return false;
           }
@@ -61,7 +61,7 @@ export const Licencia = {
       }
       return false;
     } catch (e) {
-      console.warn('[Licencia] Re-validación online en caliente falló:', e);
+      console.warn('[Licencia] Re-validación online falló (modo offline activo):', e);
       return false;
     }
   },
@@ -85,6 +85,7 @@ export const Licencia = {
         if (data && data.length > 0) {
           const user = data[0];
           localStorage.setItem('licencia_usuario', JSON.stringify(user));
+          this.aplicarCatalogoRemotoSiExiste();
           if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
             this.bloquearPantalla();
           }
@@ -92,6 +93,28 @@ export const Licencia = {
       }
     } catch (e) {
       console.warn('[Licencia] Re-validación online falló (modo offline activo):', e);
+    }
+  },
+
+  aplicarCatalogoRemotoSiExiste(storeInstance = null) {
+    const licenciaLocal = localStorage.getItem('licencia_usuario');
+    if (!licenciaLocal) return;
+    try {
+      const user = JSON.parse(licenciaLocal);
+      if (user.catalogo_inicial && Array.isArray(user.catalogo_inicial) && user.catalogo_inicial.length > 0) {
+        const versionAplicada = localStorage.getItem('catalogo_remoto_aplicado');
+        const hashActual = JSON.stringify(user.catalogo_inicial);
+        if (versionAplicada !== hashActual) {
+          const s = storeInstance || (window.__app_store || null);
+          if (s) {
+            s.setConfig('tiposBotellon', user.catalogo_inicial);
+            localStorage.setItem('catalogo_remoto_aplicado', hashActual);
+            console.log('[Licencia] Catálogo remoto inyectado exitosamente');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Licencia] Error al aplicar catálogo remoto:', e);
     }
   },
 

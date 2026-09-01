@@ -28,6 +28,8 @@ class App {
         if (!licenciaValida) return;
 
         await store.init();
+        window.__app_store = store;
+        Licencia.aplicarCatalogoRemotoSiExiste(store);
 
         if (!sessionStorage.getItem('isAuthenticated')) {
             this.renderLogin();

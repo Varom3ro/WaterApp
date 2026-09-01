@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inyector de Catálogo Remoto - WaterApp Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1B4332;
+      --primary-dark: #0B2518;
+      --primary-light: #2D6A4F;
+      --accent: #10B981;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --border: #E2E8F0;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --radius: 12px;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      padding: 2.5rem 1.5rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .header-card {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: white;
+      padding: 2rem 2.5rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .header-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .header-subtitle {
+      font-size: 0.95rem;
+      color: #D8F3DC;
+      margin-top: 4px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .form-control {
+      width: 100%;
+      height: 44px;
+      padding: 8px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      background: white;
+      transition: border-color 0.2s;
+    }
+
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Tabla interactiva */
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      min-width: 750px;
+    }
+
+    th {
+      background: #F1F5F9;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-light);
+    }
+
+    .btn-success {
+      background: var(--accent);
+      color: #04130D;
+      font-weight: 700;
+    }
+
+    .btn-success:hover {
+      background: #34D399;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #F1F5F9;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #E2E8F0;
+    }
+
+    .btn-danger {
+      background: #FEE2E2;
+      color: #DC2626;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+    }
+
+    .btn-danger:hover {
+      background: #FCA5A5;
+    }
+
+    .btn-sm {
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
+    /* Actions Bar */
+    .actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .alert {
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+
+    .alert-success {
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+    }
+
+    .alert-danger {
+      background: #FEF2F2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
+    }
+
+    .pill-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- Header -->
+  <div class="header-card">
+    <div>
+      <h1 class="header-title">⚡ Inyector Remoto de Catálogo</h1>
+      <p class="header-subtitle">Configura productos, precios y stock desde tu laptop e inyéctalos directo a la App del cliente vía Supabase</p>
+    </div>
+    <div>
+      <a href="index.html" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color:white; border-color: rgba(255,255,255,0.3);">
+        ← Volver a la App
+      </a>
+    </div>
+  </div>
+
+  <div id="alert-box" class="alert"></div>
+
+  <!-- Paso 1: Seleccionar Cliente -->
+  <div class="card">
+    <h2 class="card-title">1. Seleccionar Cliente / Correo de Destino</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: flex-end;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">Elegir de Cuentas Registradas en Supabase</label>
+        <select class="form-control" id="select-cliente">
+          <option value="">Cargando clientes de Supabase...</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">O escribir correo manualmente</label>
+        <input type="email" class="form-control" id="input-cliente-manual" placeholder="ejemplo@correo.com" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Paso 2: Catálogo de Productos -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.25rem;">
+      <h2 class="card-title" style="margin-bottom: 0;">2. Productos, Recargas, Precios y Stock</h2>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-sm btn-secondary" id="btn-plantilla-rapida">
+          ✨ Cargar Plantilla Típica
+        </button>
+        <button class="btn btn-sm btn-primary" id="btn-add-row">
+          + Agregar Producto
+        </button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table id="table-productos">
+        <thead>
+          <tr>
+            <th style="width: 25%;">Tipo / Categoría</th>
+            <th style="width: 30%;">Nombre del Producto / Recarga</th>
+            <th style="width: 15%;">Litros (Recarga)</th>
+            <th style="width: 15%;">Precio ($)</th>
+            <th style="width: 15%;">Stock Inicial</th>
+            <th style="width: 5%; text-align: center;"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-productos">
+          <!-- Filas dinámicas -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Botón de Inyección Principal -->
+    <div class="actions-bar">
+      <div style="font-size: 0.9rem; color: var(--text-muted);">
+        Total de ítems preparados: <strong id="total-items-count">0</strong>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-secondary" id="btn-exportar-json">
+          💾 Descargar Archivo JSON
+        </button>
+        <button class="btn btn-success" id="btn-inyectar-supabase" style="font-size: 1.05rem; padding: 12px 28px;">
+          🚀 Inyectar a la Cuenta en Supabase (Magia ✨)
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
+
+  let productos = [];
+
+  // Plantilla típica predeterminada
+  const plantillaTipica = [
+    { id: '20l', categoria: 'relleno', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50, stock: 0, moneda: 'USD' },
+    { id: '10l', categoria: 'relleno', nombre: 'Botellón 10 Litros', litros: 10, precio: 1.00, stock: 0, moneda: 'USD' },
+    { id: 'bot_nuevo', categoria: 'producto', nombre: 'Botellón Nuevo 20L (Vacío)', litros: 0, precio: 12.00, stock: 15, moneda: 'USD' },
+    { id: 'agarradera', categoria: 'producto', nombre: 'Agarradera Plástica', litros: 0, precio: 3.00, stock: 30, moneda: 'USD' },
+    { id: 'bomba_usb', categoria: 'producto', nombre: 'Dispensador / Bomba USB', litros: 0, precio: 8.50, stock: 8, moneda: 'USD' },
+    { id: 'tapa', categoria: 'producto', nombre: 'Tapa con Precinto', litros: 0, precio: 0.50, stock: 100, moneda: 'USD' }
+  ];
+
+  // Cargar clientes desde Supabase
+  async function cargarClientes() {
+    const select = document.getElementById('select-cliente');
+    try {
+      const res = await fetch(SUPABASE_URL, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) throw new Error('Error al conectar con Supabase');
+      const data = await res.json();
+      
+      select.innerHTML = '<option value="">-- Seleccionar cliente registrado --</option>';
+      data.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.email;
+        opt.textContent = `👤 ${c.email} (${c.dias_prueba} días | ${c.activo ? 'Activo' : 'Inactivo'})`;
+        select.appendChild(opt);
+      });
+    } catch (e) {
+      select.innerHTML = '<option value="">(Error al cargar lista automática - ingresa el correo abajo)</option>';
+      console.error(e);
+    }
+  }
+
+  // Renderizar filas
+  function renderFilas() {
+    const tbody = document.getElementById('tbody-productos');
+    tbody.innerHTML = '';
+
+    productos.forEach((p, index) => {
+      const isProd = p.categoria === 'producto';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <select class="form-control" style="height:38px; font-size:0.88rem;" onchange="cambiarCategoria(${index}, this.value)">
+            <option value="relleno" ${!isProd ? 'selected' : ''}>💧 Recarga de Agua</option>
+            <option value="producto" ${isProd ? 'selected' : ''}>📦 Producto Físico</option>
+          </select>
+        </td>
+        <td>
+          <input type="text" class="form-control" style="height:38px;" value="${p.nombre}" placeholder="Nombre del ítem" oninput="productos[${index}].nombre = this.value" required/>
+        </td>
+        <td>
+          <input type="number" class="form-control" style="height:38px; ${isProd ? 'display:none;' : ''}" value="${p.litros}" min="1" oninput="productos[${index}].litros = parseInt(this.value) || 0" />
+          ${isProd ? '<span style="color:var(--text-muted); font-size:0.85rem; padding-left:6px;">N/A</span>' : ''}
+        </td>
+        <td>
+          <input type="number" step="0.01" class="form-control" style="height:38px;" value="${p.precio}" min="0" oninput="productos[${index}].precio = parseFloat(this.value) || 0" required/>
+        </td>
+        <td>
+          <input type="number" class="form-control" style="height:38px; ${!isProd ? 'display:none;' : ''}" value="${p.stock || 0}" min="0" oninput="productos[${index}].stock = parseInt(this.value) || 0" />
+          ${!isProd ? '<span style="color:var(--text-muted); font-size:0.85rem; padding-left:6px;">-</span>' : ''}
+        </td>
+        <td style="text-align: center;">
+          <button type="button" class="btn btn-danger" onclick="eliminarFila(${index})" title="Eliminar fila">🗑️</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('total-items-count').textContent = productos.length;
+  }
+
+  function cambiarCategoria(index, nuevaCat) {
+    productos[index].categoria = nuevaCat;
+    if (nuevaCat === 'producto') {
+      productos[index].litros = 0;
+    } else {
+      productos[index].litros = 20;
+      productos[index].stock = 0;
+    }
+    renderFilas();
+  }
+
+  function eliminarFila(index) {
+    productos.splice(index, 1);
+    renderFilas();
+  }
+
+  function agregarFila() {
+    productos.push({
+      id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      categoria: 'relleno',
+      nombre: 'Nuevo Ítem',
+      litros: 20,
+      precio: 1.50,
+      stock: 0,
+      moneda: 'USD'
+    });
+    renderFilas();
+  }
+
+  function mostrarAlerta(msg, tipo = 'success') {
+    const alertBox = document.getElementById('alert-box');
+    alertBox.className = `alert alert-${tipo}`;
+    alertBox.innerHTML = msg;
+    alertBox.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Event Listeners
+  document.getElementById('btn-add-row').addEventListener('click', agregarFila);
+
+  document.getElementById('btn-plantilla-rapida').addEventListener('click', () => {
+    productos = JSON.parse(JSON.stringify(plantillaTipica));
+    renderFilas();
+    mostrarAlerta('✨ Plantilla típica cargada. Puedes ajustar los precios y cantidades antes de inyectar.');
+  });
+
+  document.getElementById('select-cliente').addEventListener('change', (e) => {
+    if (e.target.value) {
+      document.getElementById('input-cliente-manual').value = e.target.value;
+    }
+  });
+
+  // Exportar JSON
+  document.getElementById('btn-exportar-json').addEventListener('click', () => {
+    if (productos.length === 0) {
+      mostrarAlerta('Agrega al menos un producto a la lista', 'danger');
+      return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+      configuracion: [{ id: 'tiposBotellon', value: productos }],
+      _meta: { fecha: new Date().toISOString() }
+    }, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `catalogo_${document.getElementById('input-cliente-manual').value || 'cliente'}.json`);
+    dlAnchorElem.click();
+  });
+
+  // Inyectar a Supabase
+  document.getElementById('btn-inyectar-supabase').addEventListener('click', async () => {
+    const email = document.getElementById('input-cliente-manual').value.trim();
+    if (!email || !email.includes('@')) {
+      mostrarAlerta('Por favor selecciona o introduce un correo electrónico válido de destino.', 'danger');
+      return;
+    }
+
+    if (productos.length === 0) {
+      mostrarAlerta('Debes añadir al menos un producto a la tabla.', 'danger');
+      return;
+    }
+
+    const btn = document.getElementById('btn-inyectar-supabase');
+    btn.disabled = true;
+    btn.textContent = '⏳ Inyectando a Supabase...';
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          catalogo_inicial: productos
+        })
+      });
+
+      if (!res.ok) throw new Error('No se pudo actualizar el registro en Supabase.');
+      const data = await res.json();
+
+      if (data && data.length > 0) {
+        mostrarAlerta(`
+          🎉 <strong>¡MAGIA COMPLETADA!</strong><br/>
+          Se inyectaron <strong>${productos.length} productos</strong> a la cuenta <strong>${email}</strong>.<br/>
+          Cuando abran la App en la tablet o teléfono con esa cuenta, <strong>todos los productos, precios y stocks se cargarán automáticamente al instante</strong>.
+        `, 'success');
+      } else {
+        throw new Error('El correo no fue encontrado en Supabase. Asegúrate de registrar la cuenta primero.');
+      }
+    } catch (e) {
+      mostrarAlerta(`❌ Error: ${e.message}`, 'danger');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🚀 Inyectar a la Cuenta en Supabase (Magia ✨)';
+    }
+  });
+
+  // Init
+  cargarClientes();
+  productos = JSON.parse(JSON.stringify(plantillaTipica));
+  renderFilas();
+</script>
+
+</body>
+</html>
