@@ -612,20 +612,20 @@
       <!-- Hero Card de Ventas -->
       <div class="card-hero">
         <div class="hero-label">Total Facturado Hoy</div>
-        <div class="hero-amount" id="txt-total-usd">$ 185.50</div>
-        <div class="hero-bs" id="txt-total-bs">≈ Bs 7,420.00</div>
+        <div class="hero-amount" id="txt-total-usd">$ 0.00</div>
+        <div class="hero-bs" id="txt-total-bs">≈ Bs 0.00</div>
 
         <div class="hero-stats-row">
           <div class="hero-stat-item">
-            <span class="hero-stat-val" id="txt-botellones">120</span>
-            <span class="hero-stat-label">Botellones 20L</span>
+            <span class="hero-stat-val" id="txt-botellones">0</span>
+            <span class="hero-stat-label">Botellones</span>
           </div>
           <div class="hero-stat-item">
-            <span class="hero-stat-val" id="txt-litros">2,400 L</span>
+            <span class="hero-stat-val" id="txt-litros">0 L</span>
             <span class="hero-stat-label">Agua Despachada</span>
           </div>
           <div class="hero-stat-item">
-            <span class="hero-stat-val" id="txt-ventas-count">42</span>
+            <span class="hero-stat-val" id="txt-ventas-count">0</span>
             <span class="hero-stat-label">Operaciones</span>
           </div>
         </div>
@@ -636,18 +636,18 @@
       <div class="caja-grid">
         <div class="caja-card" style="border-left: 3px solid var(--primary);">
           <div class="caja-label">💵 Efectivo USD</div>
-          <div class="caja-value" id="caja-efectivo-usd">$ 95.00</div>
-          <div class="caja-sub">En caja fuerte</div>
+          <div class="caja-value" id="caja-efectivo-usd">$ 0.00</div>
+          <div class="caja-sub">En caja</div>
         </div>
         <div class="caja-card" style="border-left: 3px solid #3B82F6;">
           <div class="caja-label">📱 Pago Móvil</div>
-          <div class="caja-value" id="caja-pagomovil">$ 70.00</div>
-          <div class="caja-sub" id="caja-pagomovil-bs">Bs 2,800.00</div>
+          <div class="caja-value" id="caja-pagomovil">$ 0.00</div>
+          <div class="caja-sub" id="caja-pagomovil-bs">Bs 0.00</div>
         </div>
         <div class="caja-card" style="border-left: 3px solid #06B6D4;">
           <div class="caja-label">💳 Punto de Venta</div>
-          <div class="caja-value" id="caja-punto">$ 20.50</div>
-          <div class="caja-sub" id="caja-punto-bs">Bs 820.00</div>
+          <div class="caja-value" id="caja-punto">$ 0.00</div>
+          <div class="caja-sub" id="caja-punto-bs">Bs 0.00</div>
         </div>
         <div class="caja-card" style="border-left: 3px solid var(--warning);">
           <div class="caja-label">🏦 Transferencias</div>
@@ -661,21 +661,23 @@
       <div class="tank-card">
         <div class="tank-header">
           <span style="font-weight: 700; color: #fff; font-size: 0.95rem;">Capacidad Actual</span>
-          <span style="font-weight: 800; color: var(--primary); font-size: 1.1rem;" id="tank-pct">68%</span>
+          <span style="font-weight: 800; color: var(--primary); font-size: 1.1rem;" id="tank-pct">0%</span>
         </div>
         <div class="tank-progress-bg">
-          <div class="tank-progress-fill" id="tank-bar" style="width: 68%;"></div>
+          <div class="tank-progress-fill" id="tank-bar" style="width: 0%;"></div>
         </div>
         <div class="tank-footer">
-          <span id="tank-litros">20,400 Litros restantes</span>
-          <span id="tank-capacidad">Tanque de 30,000 L</span>
+          <span id="tank-litros">0 Litros restantes</span>
+          <span id="tank-capacidad">Tanque de 0 L</span>
         </div>
       </div>
 
       <!-- Feed de Movimientos -->
       <h3 class="section-title">🕒 Últimos Movimientos en Vivo</h3>
       <div class="feed-list" id="feed-container">
-        <!-- Movimientos dinámicos -->
+        <div style="text-align:center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.85rem; background: var(--surface); border-radius: 12px; border: 1px dashed var(--border);">
+          ⏳ Esperando primeros movimientos del día...
+        </div>
       </div>
 
     </div>
@@ -963,45 +965,63 @@
 
     // Feed de Movimientos
     const feedCont = document.getElementById('feed-container');
-    if (movs.length > 0) {
-      feedCont.innerHTML = movs.map(m => `
-        <div class="feed-item">
-          <div class="feed-left">
-            <div class="feed-icon">${m.icono || '💧'}</div>
-            <div>
-              <div class="feed-title">${escapeHtml(m.descripcion || m.tipo)}</div>
-              <div class="feed-meta">${m.hora} · ${escapeHtml(m.cliente || 'Cliente')}</div>
+    if (feedCont) {
+      if (movs.length > 0) {
+        feedCont.innerHTML = movs.map(m => `
+          <div class="feed-item">
+            <div class="feed-left">
+              <div class="feed-icon">${m.icono || '💧'}</div>
+              <div>
+                <div class="feed-title">${escapeHtml(m.descripcion || m.tipo)}</div>
+                <div class="feed-meta">${m.hora} · ${escapeHtml(m.cliente || 'Cliente')}</div>
+              </div>
+            </div>
+            <div class="feed-right">
+              <div class="feed-amount" style="color: ${m.tipo === 'Merma' ? 'var(--warning)' : 'var(--primary)'};">${m.monto}</div>
+              <div class="feed-method">${m.metodo || ''}</div>
             </div>
           </div>
-          <div class="feed-right">
-            <div class="feed-amount" style="color: ${m.tipo === 'Merma' ? 'var(--warning)' : 'var(--primary)'};">${m.monto}</div>
-            <div class="feed-method">${m.metodo || ''}</div>
+        `).join('');
+      } else {
+        feedCont.innerHTML = `
+          <div style="text-align:center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.85rem; background: var(--surface); border-radius: 12px; border: 1px dashed var(--border);">
+            ✨ Sin ventas ni movimientos registrados hoy.
           </div>
-        </div>
-      `).join('');
+        `;
+      }
     }
 
     // Productos en Inventario
     const invProdsCont = document.getElementById('inv-products-container');
-    if (prods.length > 0) {
-      invProdsCont.innerHTML = prods.map(p => `
-        <div class="stock-row">
-          <div>
-            <div style="font-weight: 700; color: #fff;">📦 ${escapeHtml(p.nombre)}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">$ ${p.precio.toFixed(2)}</div>
+    if (invProdsCont) {
+      if (prods.length > 0) {
+        invProdsCont.innerHTML = prods.map(p => `
+          <div class="stock-row">
+            <div>
+              <div style="font-weight: 700; color: #fff;">📦 ${escapeHtml(p.nombre)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">$ ${(p.precio || 0).toFixed(2)}</div>
+            </div>
+            <span class="stock-badge" style="background: ${(p.stock || 0) <= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}; color: ${(p.stock || 0) <= 5 ? 'var(--danger)' : 'var(--primary)'};">
+              ${p.stock || 0} un. disponibles
+            </span>
           </div>
-          <span class="stock-badge" style="background: ${p.stock <= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}; color: ${p.stock <= 5 ? 'var(--danger)' : 'var(--primary)'};">
-            ${p.stock} un. disponibles
-          </span>
-        </div>
-      `).join('');
+        `).join('');
+      } else {
+        invProdsCont.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">No hay productos físicos registrados aún.</div>';
+      }
     }
+
+    // Estadísticas Mes
+    const statMesUSD = document.getElementById('stat-mes-usd');
+    if (statMesUSD) statMesUSD.textContent = `$ ${(stats.totalMesUSD || 0).toFixed(2)}`;
+    const statMesBs = document.getElementById('stat-mes-bs');
+    if (statMesBs) statMesBs.textContent = `≈ Bs ${(stats.totalMesBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
 
     // Cierre
     document.getElementById('cierre-efectivo-usd').textContent = `$ ${(r.efectivoUSD || 0).toFixed(2)}`;
     document.getElementById('cierre-efectivo-usd-2').textContent = `$ ${(r.efectivoUSD || 0).toFixed(2)}`;
     document.getElementById('cierre-total-usd').textContent = `$ ${(r.totalUSD || 0).toFixed(2)}`;
-    document.getElementById('cierre-digital-usd').textContent = `$ ${((r.totalUSD || 0) - (r.efectivoUSD || 0)).toFixed(2)}`;
+    document.getElementById('cierre-digital-usd').textContent = `$ ${Math.max(0, (r.totalUSD || 0) - (r.efectivoUSD || 0)).toFixed(2)}`;
   }
 
   function escapeHtml(str) {

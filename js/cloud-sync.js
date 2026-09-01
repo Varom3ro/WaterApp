@@ -151,7 +151,7 @@ export async function syncToCloud() {
       }
     };
 
-    await fetch(SUPABASE_URL, {
+    await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
