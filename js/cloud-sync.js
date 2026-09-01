@@ -88,6 +88,14 @@ export async function syncToCloud() {
 
     const totalBs = totalUSD * tasa;
 
+    // Mermas de hoy
+    const mermasHoy = mermas.filter(m => {
+      if (!m.fecha) return false;
+      const d = new Date(m.fecha);
+      return d >= dayStart && d <= dayEnd;
+    });
+    const litrosMermasHoy = mermasHoy.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
+
     // Últimos movimientos (ventas + mermas)
     const ultimosMovs = [];
     ventas.slice(-25).reverse().forEach(v => {
@@ -151,6 +159,54 @@ export async function syncToCloud() {
     const totalMesBs = totalMesUSD * tasa;
     const totalBotellonesMes = ventasMes.reduce((s, v) => s + (parseInt(v.botellones) || 0), 0);
 
+    // Análisis de productos más vendidos reales
+    const productCounts = {};
+    ventas.forEach(v => {
+      if (v.items && Array.isArray(v.items) && v.items.length > 0) {
+        v.items.forEach(it => {
+          const name = it.nombre || it.nombreTipo || 'Botellón 20 Litros';
+          const cant = parseInt(it.cantidad) || 1;
+          productCounts[name] = (productCounts[name] || 0) + cant;
+        });
+      } else {
+        const bot = parseInt(v.botellones) || 1;
+        productCounts['Botellón 20 Litros'] = (productCounts['Botellón 20 Litros'] || 0) + bot;
+      }
+    });
+
+    const totalItemsSold = Object.values(productCounts).reduce((a, b) => a + b, 0) || 1;
+    const productosMasVendidos = Object.entries(productCounts)
+      .map(([nombre, cantidad]) => ({
+        nombre,
+        cantidad,
+        porcentaje: Math.round((cantidad / totalItemsSold) * 100)
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 5);
+
+    // Ventas por día de la semana (Lun a Dom) reales
+    const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const ventasPorDia = { 'Lun': 0, 'Mar': 0, 'Mié': 0, 'Jue': 0, 'Vie': 0, 'Sáb': 0, 'Dom': 0 };
+    
+    ventas.forEach(v => {
+      if (v.fecha) {
+        const dayIdx = new Date(v.fecha).getDay();
+        const dayName = diasSemana[dayIdx];
+        if (ventasPorDia.hasOwnProperty(dayName)) {
+          ventasPorDia[dayName] += (parseFloat(v.total) || 0);
+        }
+      }
+    });
+
+    let maxDia = 'Lun';
+    let maxMonto = 0;
+    Object.entries(ventasPorDia).forEach(([d, m]) => {
+      if (m > maxMonto) {
+        maxMonto = m;
+        maxDia = d;
+      }
+    });
+
     const payload = {
       empresa_email: email,
       nombre_empresa: empresaNombre,
@@ -167,7 +223,8 @@ export async function syncToCloud() {
         punto,
         puntoBs,
         transferencia,
-        credito
+        credito,
+        litrosMermasHoy
       },
       nivel_tanque: {
         litros: inventario.litros || 0,
@@ -179,7 +236,11 @@ export async function syncToCloud() {
       analisis_mes: {
         totalMesUSD,
         totalMesBs,
-        totalBotellonesMes
+        totalBotellonesMes,
+        productosMasVendidos,
+        ventasPorDia,
+        maxDia,
+        maxMonto
       }
     };
 
@@ -202,7 +263,7 @@ export async function syncToCloud() {
       return false;
     }
   } catch (e) {
-    console.warn('[CloudSync] Sincronización en segundo plano falló (modo offline):', e);
+    console.error('[CloudSync] Sincronización en segundo plano falló:', e);
     return false;
   }
 }
