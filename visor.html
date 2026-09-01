@@ -568,22 +568,21 @@
 
       <div class="form-group">
         <label class="form-label">Clave de Acceso</label>
-        <input type="password" id="login-pwd" class="form-control" placeholder="Introduce tu clave" value="admins" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()"/>
+        <div style="position: relative; display: flex; align-items: center;">
+          <input type="password" id="login-pwd" class="form-control" placeholder="Introduce tu clave" value="admin" style="padding-right: 46px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()"/>
+          <button type="button" id="btn-toggle-pwd" style="position: absolute; right: 12px; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center; justify-content: center;" title="Mostrar / Ocultar clave">
+            👁️
+          </button>
+        </div>
       </div>
 
       <div id="login-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem; display: none; font-weight: 600;">
         ⚠️ Correo o clave incorrecta.
       </div>
 
-      <button id="btn-login" class="btn btn-primary">
+      <button id="btn-login" class="btn btn-primary" style="margin-top: 0.5rem;">
         🚀 Ingresar al Visor
       </button>
-
-      <div style="text-align: center; margin-top: 1.25rem;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);">
-          ¿Eres el administrador general? <a href="superadmin.html" style="color: var(--accent); text-decoration: none;">Ir al SuperAdmin</a>
-        </span>
-      </div>
     </div>
   </div>
 
@@ -824,15 +823,36 @@
   let currentStoreEmail = '';
   let autoRefreshInterval = null;
 
+  // Alternar ver clave (Ojito)
+  const btnTogglePwd = document.getElementById('btn-toggle-pwd');
+  const loginPwd = document.getElementById('login-pwd');
+  if (btnTogglePwd && loginPwd) {
+    btnTogglePwd.addEventListener('click', () => {
+      if (loginPwd.type === 'password') {
+        loginPwd.type = 'text';
+        btnTogglePwd.textContent = '🙈';
+      } else {
+        loginPwd.type = 'password';
+        btnTogglePwd.textContent = '👁️';
+      }
+    });
+  }
+
   // Login
   document.getElementById('btn-login').addEventListener('click', async () => {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const pwd = document.getElementById('login-pwd').value.trim();
+    const errorBox = document.getElementById('login-error');
 
     if (!email) {
-      alert('Introduce el correo de tu tienda');
+      if (errorBox) {
+        errorBox.textContent = '⚠️ Introduce el correo de tu tienda.';
+        errorBox.style.display = 'block';
+      }
       return;
     }
+
+    if (errorBox) errorBox.style.display = 'none';
 
     // Comprobación de acceso (demo o en vivo)
     currentStoreEmail = email;

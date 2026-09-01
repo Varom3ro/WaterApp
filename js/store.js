@@ -159,8 +159,8 @@ class Store {
 
         const stored = this.getConfig('adminPassword');
         if (!stored) {
-            // Verificación con hash de clave inicial
-            return inputHash === 'h_f1728ec1';
+            // Verificación con hash de clave inicial ('admin' o 'admins')
+            return inputHash === 'h_f12fc8e' || inputHash === 'h_f1728ec1';
         }
         return clean === stored || inputHash === stored;
     }
