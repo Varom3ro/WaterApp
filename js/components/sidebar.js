@@ -115,6 +115,10 @@ export function renderSidebar() {
           </span>
           Configuración
         </a>
+        <a id="btn-install-pwa" class="sidebar-nav-item" onclick="if(window.triggerInstallPWA) window.triggerInstallPWA();" style="color: #047857; font-weight: 600; cursor: pointer;">
+          <span class="nav-icon">📲</span>
+          Instalar App
+        </a>
         <a id="btn-logout" class="sidebar-nav-item" style="color:var(--color-danger)">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -171,16 +171,43 @@ class App {
     }
 }
 
+// Capturar evento de instalación nativa PWA
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    window.pwaDeferredPrompt = e;
+    console.log('[PWA] Evento beforeinstallprompt capturado y listo');
+    const pwaBtn = document.getElementById('btn-install-pwa');
+    if (pwaBtn) pwaBtn.style.display = 'flex';
+});
+
+window.triggerInstallPWA = async () => {
+    const promptEvent = deferredInstallPrompt || window.pwaDeferredPrompt;
+    if (promptEvent) {
+        promptEvent.prompt();
+        const { outcome } = await promptEvent.userChoice;
+        console.log('[PWA] Decisión de instalación:', outcome);
+        deferredInstallPrompt = null;
+        window.pwaDeferredPrompt = null;
+        const pwaBtn = document.getElementById('btn-install-pwa');
+        if (pwaBtn) pwaBtn.style.display = 'none';
+    } else {
+        alert('Para instalar en esta tablet: Toca los 3 puntos (⋮) de Chrome arriba a la derecha y selecciona "Instalar aplicación" o "Agregar a la pantalla principal". Si no aparece, verifica tener desmarcada la opción "Sitio para computadoras".');
+    }
+};
+
+// Registrar Service Worker de forma directa e inmediata
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+            console.log('[PWA] Service Worker registrado exitosamente:', reg.scope);
+            reg.update();
+        })
+        .catch(err => console.warn('[PWA] Error al registrar Service Worker:', err));
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     new App();
-
-    // Registrar Service Worker para PWA (Offline y Móvil)
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('[PWA] Service Worker activo:', reg.scope))
-                .catch(err => console.warn('[PWA] Error al registrar Service Worker:', err));
-        });
-    }
 });

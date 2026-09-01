@@ -1,6 +1,7 @@
 {
   "name": "Tu Empresa - Gestión de Agua",
   "short_name": "WaterApp",
+  "id": "waterapp-pwa",
   "description": "Sistema de Gestión y Control para Recarga de Agua Potable",
   "start_url": "./index.html",
   "scope": "./",
