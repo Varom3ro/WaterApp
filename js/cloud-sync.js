@@ -8,7 +8,7 @@ import { Utils } from './utils.js';
 const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
-export async function syncToCloud() {
+export async function syncToCloud(isManual = false) {
   const licenciaLocal = localStorage.getItem('licencia_usuario');
   if (!licenciaLocal) return;
 
@@ -87,6 +87,39 @@ export async function syncToCloud() {
     });
 
     const totalBs = totalUSD * tasa;
+
+    // 🛡️ ESCUDO PROTECTOR ANTI-SOBRESCRITURA DE DISPOSITIVOS NUEVOS:
+    // Si este dispositivo tiene 0 ventas hoy y no tiene inventario configurado,
+    // verificar si la tienda principal ya tiene datos en la nube para NO borrarlos con ceros.
+    if (ventasHoy.length === 0 && (!inventario.litros || inventario.litros === 0) && !isManual) {
+      try {
+        const checkRes = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`
+          }
+        });
+        if (checkRes.ok) {
+          const cloudData = await checkRes.json();
+          if (cloudData && cloudData.length > 0) {
+            const remote = cloudData[0];
+            const remoteTotal = remote.resumen_hoy?.totalUSD || 0;
+            const remoteLitros = remote.nivel_tanque?.litros || 0;
+
+            if (remoteTotal > 0 || remoteLitros > 0) {
+              console.log('[CloudSync] 🛡️ Dispositivo secundario vacío detectado. Se protegen los datos activos de la nube para no sobreescribir.');
+              // Adoptar nivel de tanque si está disponible
+              if (remoteLitros > 0 && inventario.litros === 0) {
+                store.setConfig('inventario', remote.nivel_tanque);
+              }
+              return true;
+            }
+          }
+        }
+      } catch (checkErr) {
+        console.warn('[CloudSync] Error al verificar datos remotos:', checkErr);
+      }
+    }
 
     // Mermas de hoy
     const mermasHoy = mermas.filter(m => {
