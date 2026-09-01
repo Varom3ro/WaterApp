@@ -1,0 +1,237 @@
+{
+  "configuracion": [
+    {
+      "id": "tiposBotellon",
+      "value": [
+        {
+          "id": "20l",
+          "categoria": "relleno",
+          "nombre": "Botellón 20 Lts",
+          "litros": 20,
+          "precio": 2,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "10l",
+          "categoria": "relleno",
+          "nombre": "Botellón 12 Lts",
+          "litros": 12,
+          "precio": 1.5,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788276756624_am00",
+          "categoria": "relleno",
+          "nombre": "Botellón 5 Lts",
+          "litros": 5,
+          "precio": 1,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788276783554_1orm",
+          "categoria": "producto",
+          "nombre": "Botellón 5 Lts",
+          "litros": 0,
+          "precio": 3,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788276951325_m6ag",
+          "categoria": "producto",
+          "nombre": "Botellón Liso 19 Lts",
+          "litros": 0,
+          "precio": 10,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277021574_tqx3",
+          "categoria": "producto",
+          "nombre": "Botellón Liso 12 Lts",
+          "litros": 0,
+          "precio": 9,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277093821_7kxh",
+          "categoria": "producto",
+          "nombre": "Botellón Asa 18 Lts",
+          "litros": 0,
+          "precio": 12,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277122537_tyki",
+          "categoria": "producto",
+          "nombre": "Botellón Asa 12 Lts",
+          "litros": 0,
+          "precio": 10,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277145307_3cfc",
+          "categoria": "producto",
+          "nombre": "Botellón Prolipopileno 19 Lts",
+          "litros": 0,
+          "precio": 16,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277231519_ifno",
+          "categoria": "producto",
+          "nombre": "Botellón Prolipopileno 12 Lts",
+          "litros": 0,
+          "precio": 14,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277257697_9qbg",
+          "categoria": "producto",
+          "nombre": "Botellón Boca ancha 20 Lts",
+          "litros": 0,
+          "precio": 35,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277262189_28b1",
+          "categoria": "producto",
+          "nombre": "Dispensador Electrónico",
+          "litros": 0,
+          "precio": 10,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277264000_ageh",
+          "categoria": "producto",
+          "nombre": "Dispensador Electrónico Plus",
+          "litros": 0,
+          "precio": 12,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277264148_gvp7",
+          "categoria": "producto",
+          "nombre": "Dispensador Manual",
+          "litros": 0,
+          "precio": 8,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277264366_8aor",
+          "categoria": "producto",
+          "nombre": "Porta Botellón",
+          "litros": 0,
+          "precio": 6,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277264678_x6sl",
+          "categoria": "producto",
+          "nombre": "Base Invertida",
+          "litros": 0,
+          "precio": 18,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277518767_l2t7",
+          "categoria": "producto",
+          "nombre": "Aquatabs x 5",
+          "litros": 0,
+          "precio": 6,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277519440_h7z1",
+          "categoria": "producto",
+          "nombre": "Aquatabs Blister",
+          "litros": 0,
+          "precio": 3,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277519784_lhn5",
+          "categoria": "producto",
+          "nombre": "Hielo",
+          "litros": 0,
+          "precio": 3,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277519942_awlm",
+          "categoria": "producto",
+          "nombre": "Cepillo",
+          "litros": 0,
+          "precio": 10,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277520252_dph2",
+          "categoria": "producto",
+          "nombre": "Grifo",
+          "litros": 0,
+          "precio": 6,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277520561_eg41",
+          "categoria": "producto",
+          "nombre": "Regilla",
+          "litros": 0,
+          "precio": 10,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277520766_nc2y",
+          "categoria": "producto",
+          "nombre": "Tobito SA",
+          "litros": 0,
+          "precio": 14,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277521207_nkh5",
+          "categoria": "producto",
+          "nombre": "Tapa Reusable",
+          "litros": 0,
+          "precio": 0.25,
+          "stock": 0,
+          "moneda": "USD"
+        },
+        {
+          "id": "item_1788277844320_zfni",
+          "categoria": "producto",
+          "nombre": "Silicón",
+          "litros": 0,
+          "precio": 5,
+          "stock": 0,
+          "moneda": "USD"
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "fecha": "2026-09-01T15:51:49.296Z"
+  }
+}
