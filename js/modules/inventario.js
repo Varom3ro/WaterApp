@@ -6,6 +6,7 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { syncToCloud } from '../cloud-sync.js';
 
 export function renderInventario(container) {
   const inventario = store.getInventarioActual();
@@ -371,6 +372,7 @@ function openAjustarStockModal(selectedId = null, container = null) {
 
       allTipos[idx].stock = nuevoStock;
       store.setConfig('tiposBotellon', allTipos);
+      syncToCloud();
 
       closeModal();
       showToast(`Stock de "${allTipos[idx].nombre}" actualizado a ${nuevoStock} un.`, 'success');
@@ -394,6 +396,7 @@ function deleteCisterna(id, container) {
     onSave: () => {
       store.delete('cisternas', id);
       store.agregarCisterna(-c.capacidad);
+      syncToCloud();
       closeModal();
       renderInventario(container);
       showToast('Cisterna eliminada', 'success');
@@ -411,6 +414,7 @@ function deleteMerma(id, container) {
     onSave: () => {
       store.delete('mermas', id);
       store.registrarMerma(-m.litros);
+      syncToCloud();
       closeModal();
       renderInventario(container);
       showToast('Merma eliminada', 'success');
@@ -473,6 +477,7 @@ function openCisternaModal(id = null) {
         showToast(`Cisterna de ${Utils.formatNumber(capacidad)}L registrada`, 'success');
       }
 
+      syncToCloud();
       closeModal();
       const main = document.querySelector('.main-content');
       if (main) renderInventario(main);
@@ -534,6 +539,7 @@ function openMermaModal(id = null) {
         showToast(`Merma de ${Utils.formatNumber(litros)}L registrada`, 'success');
       }
 
+      syncToCloud();
       closeModal();
       const main = document.querySelector('.main-content');
       if (main) renderInventario(main);
@@ -572,6 +578,7 @@ function openConfigTanqueModal() {
       }
 
       store.setConfig('inventario', { litros: Math.min(litros, capacidadTanque), capacidadTanque });
+      syncToCloud();
       showToast('Configuración del tanque guardada', 'success');
       closeModal();
       const main = document.querySelector('.main-content');

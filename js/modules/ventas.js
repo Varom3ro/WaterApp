@@ -8,6 +8,7 @@ import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { getMatricialReportHTML } from './cierre.js';
+import { syncToCloud } from '../cloud-sync.js';
 
 export function renderVentas(container, showFichas = true) {
   container.innerHTML = `
@@ -691,6 +692,8 @@ export function renderNuevaVentaForm(container) {
         showToast('Venta registrada con éxito', 'success');
       }
 
+      syncToCloud();
+
       // Reset form for continuous selling
       carrito.length = 0;
       renderCarrito();
@@ -1268,6 +1271,7 @@ function deleteVenta(id) {
         }
       }
       store.delete('ventas', id);
+      syncToCloud();
       showToast('Venta eliminada e inventario restaurado', 'success');
       closeModal();
       renderVentasTable();

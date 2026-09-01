@@ -7,6 +7,7 @@ import { store } from './store.js';
 import { renderSidebar } from './components/sidebar.js';
 import { renderHeader } from './components/header.js';
 import { Licencia } from './licencia.js';
+import { syncToCloud } from './cloud-sync.js';
 
 // Import modules
 import { renderDashboard } from './modules/dashboard.js';
@@ -30,6 +31,7 @@ class App {
         await store.init();
         window.__app_store = store;
         Licencia.aplicarCatalogoRemotoSiExiste(store);
+        syncToCloud();
 
         if (!sessionStorage.getItem('isAuthenticated')) {
             this.renderLogin();
