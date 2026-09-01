@@ -50,12 +50,9 @@ export function renderConfiguracion(container) {
             </div>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button id="btn-sync-cloud-manual" class="btn btn-sm btn-secondary" style="font-size: 12px; padding: 6px 12px; font-weight: 600;">
+            <button id="btn-sync-cloud-manual" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 7px 14px; font-weight: 600;">
               ☁️ Sincronizar Nube Ahora
             </button>
-            <a href="visor.html" target="_blank" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 6px 14px; text-decoration: none;">
-              📱 Abrir Visor Móvil
-            </a>
           </div>
         </div>
       </div>
