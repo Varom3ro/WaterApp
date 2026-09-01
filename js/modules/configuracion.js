@@ -10,6 +10,19 @@ export function renderConfiguracion(container) {
   const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
 
+  let usuarioEmail = 'Licencia Local';
+  let diasRestantesText = '';
+  try {
+    const lic = JSON.parse(localStorage.getItem('licencia_usuario') || '{}');
+    if (lic.email) usuarioEmail = lic.email;
+    if (lic.fecha_registro && lic.dias_prueba) {
+      const reg = new Date(lic.fecha_registro);
+      const exp = new Date(reg.getTime() + (lic.dias_prueba * 24 * 60 * 60 * 1000));
+      const diffDays = Math.max(0, Math.ceil((exp - new Date()) / (1000 * 60 * 60 * 24)));
+      diasRestantesText = `${diffDays} días restantes`;
+    }
+  } catch (e) {}
+
   container.innerHTML = `
     <div class="page-header">
       <div>
@@ -19,6 +32,30 @@ export function renderConfiguracion(container) {
     </div>
 
     <div class="dashboard-grid">
+      <!-- Cuenta y Licencia -->
+      <div class="card full-width mb-md" style="background: linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 100%); border: 1.5px solid #BBF7D0;">
+        <div class="card-header" style="border-bottom: 1px solid #DCFCE7;">
+          <h3 class="card-title" style="color: #166534;">👤 Cuenta y Licencia Activa</h3>
+        </div>
+        <div class="card-body mt-md" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #15803D; text-transform: uppercase; letter-spacing: 0.5px;">Correo de la Cuenta / Tienda</div>
+            <div style="font-size: 17px; font-weight: 800; color: #0F172A; margin-top: 2px;">
+              ${Utils.escapeHtml(usuarioEmail)}
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
+              <span class="badge badge-success" style="font-size: 11px; padding: 3px 8px;">🟢 Licencia Activa</span>
+              ${diasRestantesText ? `<span style="font-size: 12px; color: #166534; font-weight: 600;">⏳ ${diasRestantesText}</span>` : ''}
+            </div>
+          </div>
+          <div>
+            <a href="visor.html" target="_blank" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 6px 14px; text-decoration: none;">
+              📱 Abrir Visor Móvil
+            </a>
+          </div>
+        </div>
+      </div>
+
       <!-- Identidad de la Empresa -->
       <div class="card full-width mb-lg">
         <div class="card-header">

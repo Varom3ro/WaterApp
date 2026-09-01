@@ -5,6 +5,19 @@ export function renderSidebar() {
   const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
 
+  let usuarioEmail = 'Licencia Local';
+  let diasRestantesText = '';
+  try {
+    const lic = JSON.parse(localStorage.getItem('licencia_usuario') || '{}');
+    if (lic.email) usuarioEmail = lic.email;
+    if (lic.fecha_registro && lic.dias_prueba) {
+      const reg = new Date(lic.fecha_registro);
+      const exp = new Date(reg.getTime() + (lic.dias_prueba * 24 * 60 * 60 * 1000));
+      const diffDays = Math.max(0, Math.ceil((exp - new Date()) / (1000 * 60 * 60 * 24)));
+      diasRestantesText = `${diffDays} días restantes`;
+    }
+  } catch (e) {}
+
   return `
     <aside class="sidebar">
       <div class="sidebar-logo" style="flex-direction: column; align-items: flex-start; padding: 14px 16px 12px 16px;">
@@ -14,7 +27,20 @@ export function renderSidebar() {
         <h1 style="font-size: 15px; font-weight: 700; color: var(--color-text-main); margin: 0; text-align: left; line-height: 1.25; word-break: break-word; width: 100%;">
           ${Utils.escapeHtml(empresaNombre)}
         </h1>
-        <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px; margin-top: 6px; display: inline-block;" id="app-version">v2.5</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 6px;">
+          <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px;" id="app-version">v2.6</span>
+          ${diasRestantesText ? `
+            <span style="font-size: 10px; color: #065F46; background: #DCFCE7; font-weight: 700; padding: 2px 6px; border-radius: 6px;">
+              🟢 ${diasRestantesText}
+            </span>
+          ` : ''}
+        </div>
+        <div style="font-size: 11px; color: #1E293B; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; margin-top: 8px; word-break: break-all; width: 100%; display: flex; align-items: center; gap: 6px;">
+          <span>👤</span>
+          <span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${Utils.escapeHtml(usuarioEmail)}">
+            ${Utils.escapeHtml(usuarioEmail)}
+          </span>
+        </div>
       </div>
 
       <span class="sidebar-section-title">Menú</span>
