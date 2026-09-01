@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuperAdmin - Panel de Control de Clientes y Licencias</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1B4332;
+      --primary-dark: #0B2518;
+      --primary-light: #2D6A4F;
+      --accent: #10B981;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --border: #E2E8F0;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --danger: #DC2626;
+      --warning: #D97706;
+      --info: #2563EB;
+      --radius: 12px;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Pantalla de Bloqueo de Acceso */
+    #auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, var(--primary-dark) 0%, #03140C 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      padding: 1.5rem;
+    }
+
+    .auth-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .auth-icon {
+      width: 65px;
+      height: 65px;
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      color: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 1.25rem;
+    }
+
+    .auth-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .auth-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 1.75rem;
+      line-height: 1.5;
+    }
+
+    /* Panel Principal */
+    #admin-app {
+      display: none;
+      padding: 2rem 1.5rem;
+    }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .header-card {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: white;
+      padding: 1.75rem 2.25rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+    }
+
+    .header-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-subtitle {
+      font-size: 0.95rem;
+      color: #D8F3DC;
+      margin-top: 4px;
+    }
+
+    /* Métricas */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--border);
+    }
+
+    .metric-card.accent::before { background: var(--accent); }
+    .metric-card.warning::before { background: var(--warning); }
+    .metric-card.info::before { background: var(--info); }
+    .metric-card.primary::before { background: var(--primary); }
+
+    .metric-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--text);
+      margin: 0.35rem 0;
+    }
+
+    .metric-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Controles y Filtros */
+    .toolbar-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 1.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 250px;
+      height: 42px;
+      padding: 8px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Grid de Clientes / Tiendas */
+    .clients-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .client-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .client-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.08);
+    }
+
+    .client-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+      gap: 10px;
+    }
+
+    .client-name {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.3;
+    }
+
+    .client-email {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      word-break: break-all;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-success { background: #DCFCE7; color: #166534; }
+    .badge-warning { background: #FEF3C7; color: #92400E; }
+    .badge-danger { background: #FEE2E2; color: #991B1B; }
+    .badge-info { background: #DBEAFE; color: #1E40AF; }
+
+    .client-info-list {
+      list-style: none;
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      background: #F8FAFC;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #EDF2F7;
+    }
+
+    .client-info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .client-info-label {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .client-info-val {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* Progress bar */
+    .progress-bar-bg {
+      height: 6px;
+      background: #E2E8F0;
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 9999px;
+      transition: width 0.3s;
+    }
+
+    /* Botones */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-light); }
+    .btn-success { background: var(--accent); color: #04130D; font-weight: 700; }
+    .btn-success:hover { background: #34D399; }
+    .btn-secondary { background: #F1F5F9; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #E2E8F0; }
+    .btn-danger { background: #FEE2E2; color: #DC2626; }
+    .btn-danger:hover { background: #FCA5A5; }
+    .btn-warning { background: #FEF3C7; color: #92400E; }
+    .btn-warning:hover { background: #FDE68A; }
+    .btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+
+    .client-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .client-actions-sub {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    /* Modales */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 1.5rem;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-card {
+      background: white;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 520px;
+      padding: 2rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .form-group {
+      margin-bottom: 1.2rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+
+    .form-control {
+      width: 100%;
+      height: 42px;
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Toast */
+    #toast-box {
+      position: fixed;
+      bottom: 25px;
+      right: 25px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: var(--text);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2);
+      font-size: 0.92rem;
+      font-weight: 600;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    .toast-success { background: #065F46; border-left: 4px solid var(--accent); }
+    .toast-error { background: #991B1B; border-left: 4px solid #EF4444; }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Pantalla de Seguridad / Login de Administrador -->
+<div id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-icon">🛡️</div>
+    <h2 class="auth-title">SuperAdmin Privado</h2>
+    <p class="auth-desc">Panel central de gestión de tiendas, licencias y cobros. Introduce la Clave Maestra para continuar:</p>
+    
+    <div class="form-group" style="text-align: left;">
+      <input type="password" id="input-admin-auth-pwd" class="form-control" placeholder="Clave Maestra de Soporte" onkeydown="if(event.key === 'Enter') document.getElementById('btn-auth-unlock').click()"/>
+      <div id="auth-error-msg" style="color: var(--danger); font-size: 0.85rem; margin-top: 8px; display: none; font-weight: 500;">
+        ⚠️ Clave incorrecta. Acceso denegado.
+      </div>
+    </div>
+
+    <button id="btn-auth-unlock" class="btn btn-success" style="width: 100%; height: 46px; font-size: 1rem;">
+      🔓 Desbloquear Panel SuperAdmin
+    </button>
+  </div>
+</div>
+
+<!-- Panel de Control Principal -->
+<div id="admin-app">
+  <div class="container">
+    
+    <!-- Header -->
+    <div class="header-card">
+      <div>
+        <h1 class="header-title">
+          <span>🛡️</span> Panel de Control de Licencias y Tiendas
+        </h1>
+        <p class="header-subtitle">Control de activación, vencimientos, cobros mensuales y configuración de tus clientes</p>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button id="btn-open-nuevo-cliente" class="btn btn-success">
+          ➕ Nueva Licencia / Cliente
+        </button>
+        <a href="admin-catalogo.html" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color:white; border-color: rgba(255,255,255,0.3);">
+          📦 Inyector de Catálogo
+        </a>
+        <button id="btn-lock-session" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color:white; border-color: rgba(255,255,255,0.3);">
+          🔒 Bloquear
+        </button>
+      </div>
+    </div>
+
+    <!-- Métricas del Negocio -->
+    <div class="metrics-grid">
+      <div class="metric-card primary">
+        <div class="metric-label">Total Clientes / Tiendas</div>
+        <div class="metric-value" id="m-total-clientes">0</div>
+        <div class="metric-subtitle">Plantas registradas en el sistema</div>
+      </div>
+      <div class="metric-card accent">
+        <div class="metric-label">Licencias Activas</div>
+        <div class="metric-value" id="m-activas">0</div>
+        <div class="metric-subtitle">Al día y operativas</div>
+      </div>
+      <div class="metric-card warning">
+        <div class="metric-label">Por Vencer (&le; 15 días)</div>
+        <div class="metric-value" id="m-por-vencer">0</div>
+        <div class="metric-subtitle">Requieren cobro o aviso</div>
+      </div>
+      <div class="metric-card info">
+        <div class="metric-label">Ingresos Mensuales Cloud</div>
+        <div class="metric-value" id="m-ingresos-mes">$0</div>
+        <div class="metric-subtitle">En planes de $15/mes</div>
+      </div>
+    </div>
+
+    <!-- Toolbar / Buscador -->
+    <div class="toolbar-card">
+      <input type="text" id="search-input" class="search-input" placeholder="🔍 Buscar por nombre de planta, correo o teléfono..." />
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <select id="filter-status" class="form-control" style="width: auto; height: 42px;">
+          <option value="todos">Todos los Estados</option>
+          <option value="activos">🟢 Solo Activos</option>
+          <option value="por_vencer">🟡 Por Vencer (&le; 15 días)</option>
+          <option value="vencidos">🔴 Vencidos / Suspendidos</option>
+        </select>
+        <button id="btn-refresh" class="btn btn-secondary" title="Recargar datos">
+          🔄 Refrescar
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid de Clientes -->
+    <div id="clients-container" class="clients-grid">
+      <!-- Tarjetas de clientes generadas dinámicamente -->
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: Crear / Editar Licencia -->
+<div id="modal-cliente" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-cliente-title">➕ Registrar Nueva Licencia</h3>
+      <button class="modal-close" onclick="cerrarModalCliente()">&times;</button>
+    </div>
+
+    <form id="form-cliente">
+      <input type="hidden" id="input-client-id" />
+
+      <div class="form-group">
+        <label class="form-label">Nombre de la Empresa / Planta *</label>
+        <input type="text" id="input-empresa" class="form-control" placeholder="Ej: Inversiones Agua Clara, C.A." required />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Correo Electrónico (Identificador de Licencia) *</label>
+        <input type="email" id="input-email" class="form-control" placeholder="ejemplo@correo.com" required />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Teléfono / WhatsApp de Contacto</label>
+        <input type="tel" id="input-telefono" class="form-control" placeholder="Ej: +58 412 1234567" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">Plan Comercial</label>
+          <select id="select-plan" class="form-control" onchange="cambiarPlanSugerido(this.value)">
+            <option value="local_anual">💻 Plan Local Anual ($50/año)</option>
+            <option value="cloud_mensual">☁️ Plan Cloud ($15/mes)</option>
+            <option value="trial">⏳ Prueba Gratuita</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Días de Licencia *</label>
+          <input type="number" id="input-dias" class="form-control" min="1" value="365" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notas / Observaciones</label>
+        <textarea id="input-notas" class="form-control" style="height: 65px; resize: vertical;" placeholder="Ubicación, forma de pago acordada, etc."></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="cerrarModalCliente()">Cancelar</button>
+        <button type="submit" class="btn btn-success" id="btn-save-cliente">Guardar Licencia</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast-box"></div>
+
+<script>
+  // Hash Criptográfico SHA-256 de la Clave Maestra de Seguridad
+  const MASTER_HASH = 'd02e5de5bb9bf153e7ef0b2d6b14b44b1fe22fc86a925022437377764d04f437';
+
+  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
+
+  let clientes = [];
+
+  // Función para calcular SHA-256 en el navegador
+  async function sha256(text) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Comprobar autenticación
+  function checkAuth() {
+    if (sessionStorage.getItem('superadmin_unlocked') === 'true') {
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.getElementById('admin-app').style.display = 'block';
+      cargarClientes();
+    } else {
+      document.getElementById('auth-overlay').style.display = 'flex';
+      document.getElementById('admin-app').style.display = 'none';
+      setTimeout(() => {
+        const inp = document.getElementById('input-admin-auth-pwd');
+        if (inp) inp.focus();
+      }, 100);
+    }
+  }
+
+  document.getElementById('btn-auth-unlock').addEventListener('click', async () => {
+    const inputPwd = document.getElementById('input-admin-auth-pwd').value;
+    const errorMsg = document.getElementById('auth-error-msg');
+    
+    const computedHash = await sha256(inputPwd);
+    if (computedHash === MASTER_HASH) {
+      sessionStorage.setItem('superadmin_unlocked', 'true');
+      errorMsg.style.display = 'none';
+      checkAuth();
+    } else {
+      errorMsg.style.display = 'block';
+      document.getElementById('input-admin-auth-pwd').value = '';
+      document.getElementById('input-admin-auth-pwd').focus();
+    }
+  });
+
+  document.getElementById('btn-lock-session').addEventListener('click', () => {
+    sessionStorage.removeItem('superadmin_unlocked');
+    location.reload();
+  });
+
+  // Mostrar Toast
+  function showToast(msg, type = 'success') {
+    const box = document.getElementById('toast-box');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = msg;
+    box.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 3500);
+  }
+
+  // Cargar Clientes desde Supabase
+  async function cargarClientes() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}?order=created_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) throw new Error('Error al cargar datos desde Supabase');
+      clientes = await res.json();
+      renderMetrics();
+      renderClientes();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // Calcular métricas
+  function renderMetrics() {
+    const now = new Date();
+    let activas = 0;
+    let porVencer = 0;
+    let ingresosCloud = 0;
+
+    clientes.forEach(c => {
+      const reg = new Date(c.fecha_registro);
+      const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 24 * 60 * 60 * 1000));
+      const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+      const isExp = diffDays <= 0;
+
+      if (c.activo && !isExp) {
+        activas++;
+        if (diffDays <= 15) porVencer++;
+      }
+
+      if (c.plan === 'cloud_mensual' && c.activo && !isExp) {
+        ingresosCloud += 15;
+      }
+    });
+
+    document.getElementById('m-total-clientes').textContent = clientes.length;
+    document.getElementById('m-activas').textContent = activas;
+    document.getElementById('m-por-vencer').textContent = porVencer;
+    document.getElementById('m-ingresos-mes').textContent = `$${ingresosCloud}`;
+  }
+
+  // Renderizar Clientes
+  function renderClientes() {
+    const container = document.getElementById('clients-container');
+    const query = document.getElementById('search-input').value.toLowerCase().trim();
+    const filterStatus = document.getElementById('filter-status').value;
+    const now = new Date();
+
+    const filtrados = clientes.filter(c => {
+      const reg = new Date(c.fecha_registro);
+      const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 24 * 60 * 60 * 1000));
+      const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+      const isExp = diffDays <= 0;
+
+      // Filtro de texto
+      const matchText = (c.nombre_empresa || '').toLowerCase().includes(query) ||
+                        (c.email || '').toLowerCase().includes(query) ||
+                        (c.telefono || '').toLowerCase().includes(query);
+      if (!matchText) return false;
+
+      // Filtro de estado
+      if (filterStatus === 'activos') return c.activo && !isExp;
+      if (filterStatus === 'por_vencer') return c.activo && !isExp && diffDays <= 15;
+      if (filterStatus === 'vencidos') return !c.activo || isExp;
+
+      return true;
+    });
+
+    if (filtrados.length === 0) {
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; background: white; border-radius: var(--radius); border: 1px dashed var(--border);">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔍</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">No se encontraron clientes</div>
+          <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Prueba ajustando los filtros o registra una nueva licencia.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtrados.map(c => {
+      const reg = new Date(c.fecha_registro);
+      const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 24 * 60 * 60 * 1000));
+      const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+      const isExp = diffDays <= 0;
+
+      let badge = '<span class="badge badge-success">🟢 Al Día</span>';
+      if (!c.activo) {
+        badge = '<span class="badge badge-danger">⏸️ Suspendido</span>';
+      } else if (isExp) {
+        badge = '<span class="badge badge-danger">🔴 Vencido</span>';
+      } else if (diffDays <= 15) {
+        badge = `<span class="badge badge-warning">🟡 Vence en ${diffDays}d</span>`;
+      }
+
+      // Nombre amigable del plan
+      let planBadge = '💻 Local Anual';
+      if (c.plan === 'cloud_mensual') planBadge = '☁️ Nube ($15/mes)';
+      else if (c.plan === 'trial') planBadge = '⏳ Prueba';
+
+      // Progreso de tiempo
+      const pct = Math.max(0, Math.min(100, Math.round((diffDays / (c.dias_prueba || 365)) * 100)));
+
+      // Mensaje de WhatsApp
+      const msgWa = encodeURIComponent(`Hola ${c.nombre_empresa || 'amigo(a)'}, te saludamos de WaterApp. Tu licencia se encuentra próxima a renovar (${diffDays > 0 ? 'quedan ' + diffDays + ' días' : 'venció'}). ¿Deseas que te enviemos los datos de pago para la renovación?`);
+      const waLink = c.telefono ? `https://wa.me/${c.telefono.replace(/[^0-9]/g, '')}?text=${msgWa}` : null;
+
+      return `
+        <div class="client-card">
+          <div>
+            <div class="client-card-header">
+              <div>
+                <div class="client-name">${escapeHtml(c.nombre_empresa || 'Planta / Tienda')}</div>
+                <div class="client-email">${escapeHtml(c.email)}</div>
+              </div>
+              <div>${badge}</div>
+            </div>
+
+            <ul class="client-info-list">
+              <li class="client-info-item">
+                <span class="client-info-label">Plan Contratado:</span>
+                <span class="client-info-val">${planBadge}</span>
+              </li>
+              <li class="client-info-item">
+                <span class="client-info-label">Fecha Vencimiento:</span>
+                <span class="client-info-val" style="color: ${isExp ? 'var(--danger)' : 'inherit'};">
+                  ${exp.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+              </li>
+              <li class="client-info-item">
+                <span class="client-info-label">Días Restantes:</span>
+                <span class="client-info-val" style="font-size: 1rem; color: ${isExp ? 'var(--danger)' : (diffDays <= 15 ? 'var(--warning)' : 'var(--accent)')};">
+                  ${isExp ? 'Expirado' : `${diffDays} días`}
+                </span>
+              </li>
+              <li style="margin-top: 4px;">
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" style="width: ${pct}%; background: ${isExp ? 'var(--danger)' : (diffDays <= 15 ? 'var(--warning)' : 'var(--accent)')};"></div>
+                </div>
+              </li>
+              ${c.telefono ? `
+                <li class="client-info-item" style="margin-top: 4px;">
+                  <span class="client-info-label">Teléfono:</span>
+                  <span class="client-info-val">${escapeHtml(c.telefono)}</span>
+                </li>
+              ` : ''}
+              ${c.notas ? `
+                <li style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
+                  📝 ${escapeHtml(c.notas)}
+                </li>
+              ` : ''}
+            </ul>
+          </div>
+
+          <div>
+            <div class="client-actions">
+              <button class="btn btn-sm btn-primary" onclick="renovarDias('${c.id}', 30)">
+                ➕ +30 Días
+              </button>
+              <button class="btn btn-sm btn-primary" onclick="renovarDias('${c.id}', 365)">
+                🌟 +1 Año
+              </button>
+            </div>
+
+            <div class="client-actions-sub">
+              <button class="btn btn-sm ${c.activo ? 'btn-warning' : 'btn-success'}" onclick="toggleActivo('${c.id}', ${!c.activo})" title="${c.activo ? 'Suspender acceso' : 'Reactivar acceso'}">
+                ${c.activo ? '⏸️ Suspender' : '▶️ Reactivar'}
+              </button>
+              
+              ${waLink ? `
+                <a href="${waLink}" target="_blank" class="btn btn-sm btn-secondary" style="background:#25D366; color:white; border-color:#25D366;" title="Enviar WhatsApp">
+                  💬 WhatsApp
+                </a>
+              ` : ''}
+
+              <a href="admin-catalogo.html" class="btn btn-sm btn-secondary" title="Configurar productos">
+                📦 Catálogo
+              </a>
+
+              <button class="btn btn-sm btn-secondary" onclick="abrirEditarCliente('${c.id}')" title="Editar datos">
+                ✏️
+              </button>
+
+              <button class="btn btn-sm btn-danger" onclick="eliminarCliente('${c.id}', '${escapeHtml(c.email)}')" title="Eliminar cliente">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Renovar días
+  async function renovarDias(id, diasToAdd) {
+    const c = clientes.find(item => item.id === id);
+    if (!c) return;
+
+    const nuevosDias = (c.dias_prueba || 0) + diasToAdd;
+    try {
+      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          dias_prueba: nuevosDias,
+          activo: true
+        })
+      });
+      if (!res.ok) throw new Error('Error al actualizar en Supabase');
+      showToast(`✨ Se añadieron +${diasToAdd} días a ${c.nombre_empresa || c.email}`, 'success');
+      cargarClientes();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // Activar / Suspender
+  async function toggleActivo(id, nuevoEstado) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ activo: nuevoEstado })
+      });
+      if (!res.ok) throw new Error('Error al cambiar estado en Supabase');
+      showToast(nuevoEstado ? '▶️ Licencia Reactivada' : '⏸️ Licencia Suspendida', 'success');
+      cargarClientes();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // Eliminar Cliente
+  async function eliminarCliente(id, email) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente la licencia de "${email}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) throw new Error('Error al eliminar en Supabase');
+      showToast('🗑️ Licencia eliminada con éxito', 'success');
+      cargarClientes();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // Modal Crear / Editar
+  document.getElementById('btn-open-nuevo-cliente').addEventListener('click', () => {
+    document.getElementById('modal-cliente-title').textContent = '➕ Registrar Nueva Licencia';
+    document.getElementById('input-client-id').value = '';
+    document.getElementById('input-empresa').value = '';
+    document.getElementById('input-email').value = '';
+    document.getElementById('input-telefono').value = '';
+    document.getElementById('select-plan').value = 'local_anual';
+    document.getElementById('input-dias').value = '365';
+    document.getElementById('input-notas').value = '';
+    document.getElementById('modal-cliente').style.display = 'flex';
+  });
+
+  function abrirEditarCliente(id) {
+    const c = clientes.find(item => item.id === id);
+    if (!c) return;
+
+    document.getElementById('modal-cliente-title').textContent = '✏️ Editar Datos de Licencia';
+    document.getElementById('input-client-id').value = c.id;
+    document.getElementById('input-empresa').value = c.nombre_empresa || '';
+    document.getElementById('input-email').value = c.email || '';
+    document.getElementById('input-telefono').value = c.telefono || '';
+    document.getElementById('select-plan').value = c.plan || 'local_anual';
+    document.getElementById('input-dias').value = c.dias_prueba || 365;
+    document.getElementById('input-notas').value = c.notas || '';
+    document.getElementById('modal-cliente').style.display = 'flex';
+  }
+
+  function cerrarModalCliente() {
+    document.getElementById('modal-cliente').style.display = 'none';
+  }
+
+  function cambiarPlanSugerido(plan) {
+    const inputDias = document.getElementById('input-dias');
+    if (plan === 'local_anual') inputDias.value = '365';
+    else if (plan === 'cloud_mensual') inputDias.value = '30';
+    else if (plan === 'trial') inputDias.value = '15';
+  }
+
+  // Guardar Formulario
+  document.getElementById('form-cliente').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('input-client-id').value;
+    const empresa = document.getElementById('input-empresa').value.trim();
+    const email = document.getElementById('input-email').value.trim().toLowerCase();
+    const telefono = document.getElementById('input-telefono').value.trim();
+    const plan = document.getElementById('select-plan').value;
+    const dias = parseInt(document.getElementById('input-dias').value) || 365;
+    const notas = document.getElementById('input-notas').value.trim();
+
+    const btn = document.getElementById('btn-save-cliente');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    try {
+      if (id) {
+        // Actualizar
+        const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre_empresa: empresa,
+            email,
+            telefono,
+            plan,
+            dias_prueba: dias,
+            notas
+          })
+        });
+        if (!res.ok) throw new Error('Error al actualizar');
+        showToast('✅ Licencia actualizada exitosamente');
+      } else {
+        // Crear
+        const res = await fetch(SUPABASE_URL, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre_empresa: empresa,
+            email,
+            telefono,
+            plan,
+            dias_prueba: dias,
+            notas,
+            activo: true,
+            fecha_registro: new Date().toISOString()
+          })
+        });
+        if (!res.ok) throw new Error('Error al registrar. Verifica que el correo no esté duplicado.');
+        showToast('🎉 ¡Licencia creada exitosamente!');
+      }
+
+      cerrarModalCliente();
+      cargarClientes();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Guardar Licencia';
+    }
+  });
+
+  // Filtros y Búsqueda
+  document.getElementById('search-input').addEventListener('input', renderClientes);
+  document.getElementById('filter-status').addEventListener('change', renderClientes);
+  document.getElementById('btn-refresh').addEventListener('click', cargarClientes);
+
+  // Inicializar
+  checkAuth();
+</script>
+
+</body>
+</html>
