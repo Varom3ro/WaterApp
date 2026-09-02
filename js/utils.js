@@ -30,6 +30,16 @@ export const Utils = {
 
   // Formatear fecha
   formatDate(dateStr) {
+    if (!dateStr) return '';
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return new Intl.DateTimeFormat('es-VE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }).format(date);
+    }
     const date = new Date(dateStr);
     return new Intl.DateTimeFormat('es-VE', {
       day: '2-digit',
