@@ -10,6 +10,8 @@ export function renderConfiguracion(container) {
   const repartidores = store.getConfig('repartidores') || [];
   const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
+  const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
+  const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
 
   let usuarioEmail = 'Licencia Local';
   let diasRestantesText = '';
@@ -207,6 +209,46 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
+      <!-- Reloj Medidor de Agua (Caudalímetro) -->
+      <div class="card full-width" style="border-left: 4px solid var(--color-primary-600, #1B4332);">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>⏱️</span> Reloj Medidor de Agua (Caudalímetro)
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Permite registrar la lectura inicial al abrir la tienda y la lectura final al cerrar para auditar los litros despachados en Punto de Venta y Cierre de Caja.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="label-status-caudalimetro" style="font-size: 13px; font-weight: 700; color: ${moduloCaudalimetro ? '#15803D' : '#64748B'};">
+              ${moduloCaudalimetro ? '🟢 Activado' : '⚪ Desactivado'}
+            </span>
+            <label style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0; cursor: pointer;">
+              <input type="checkbox" id="toggle-caudalimetro" ${moduloCaudalimetro ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+              <span id="slider-caudalimetro" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${moduloCaudalimetro ? '#15803D' : '#CBD5E1'}; transition: .3s; border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+                <span id="slider-knob-caudalimetro" style="position: absolute; content: ''; height: 20px; width: 20px; left: ${moduloCaudalimetro ? '27px' : '3px'}; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div id="caudalimetro-config-body" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--color-border); display: ${moduloCaudalimetro ? 'block' : 'none'};">
+          <div class="form-row" style="align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div class="form-group" style="max-width: 260px; margin-bottom: 0;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600;">Unidad de Medida del Reloj:</label>
+              <select id="select-unidad-caudalimetro" class="form-control" style="height: 38px;">
+                <option value="L" ${unidadCaudalimetro === 'L' ? 'selected' : ''}>Litros (L)</option>
+                <option value="m3" ${unidadCaudalimetro === 'm3' ? 'selected' : ''}>Metros Cúbicos (m³ = 1.000 L)</option>
+              </select>
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary); max-width: 500px; line-height: 1.4;">
+              💡 <em>Al estar activado, aparecerá el contador al lado derecho del título <strong>"Punto de Venta"</strong> y una sección de auditoría en el <strong>Cierre de Caja</strong> para comparar los litros del reloj físico con las ventas facturadas.</em>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Seguridad y Contraseña -->
       <div class="card">
         <div class="card-header">
@@ -265,6 +307,42 @@ export function renderConfiguracion(container) {
       } else {
         showToast('⚠️ No se pudo sincronizar. Verifica tu conexión a internet.', 'warning');
       }
+    });
+  }
+
+  // Caudalímetro Toggle & Unidad
+  const toggleCaudalimetro = container.querySelector('#toggle-caudalimetro');
+  const caudalimetroBody = container.querySelector('#caudalimetro-config-body');
+  const labelStatusCaudalimetro = container.querySelector('#label-status-caudalimetro');
+  const sliderCaudalimetro = container.querySelector('#slider-caudalimetro');
+  const sliderKnobCaudalimetro = container.querySelector('#slider-knob-caudalimetro');
+  const selectUnidadCaudalimetro = container.querySelector('#select-unidad-caudalimetro');
+
+  if (toggleCaudalimetro) {
+    toggleCaudalimetro.addEventListener('change', (e) => {
+      const activo = e.target.checked;
+      store.setConfig('moduloCaudalimetro', activo);
+      
+      if (caudalimetroBody) caudalimetroBody.style.display = activo ? 'block' : 'none';
+      if (labelStatusCaudalimetro) {
+        labelStatusCaudalimetro.textContent = activo ? '🟢 Activado' : '⚪ Desactivado';
+        labelStatusCaudalimetro.style.color = activo ? '#15803D' : '#64748B';
+      }
+      if (sliderCaudalimetro) {
+        sliderCaudalimetro.style.backgroundColor = activo ? '#15803D' : '#CBD5E1';
+      }
+      if (sliderKnobCaudalimetro) {
+        sliderKnobCaudalimetro.style.left = activo ? '27px' : '3px';
+      }
+
+      showToast(activo ? '⏱️ Módulo Reloj Medidor Activado' : 'Módulo Reloj Medidor Desactivado', activo ? 'success' : 'info');
+    });
+  }
+
+  if (selectUnidadCaudalimetro) {
+    selectUnidadCaudalimetro.addEventListener('change', (e) => {
+      store.setConfig('unidadCaudalimetro', e.target.value);
+      showToast('Unidad de medida del reloj actualizada', 'success');
     });
   }
 
