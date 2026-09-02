@@ -88,10 +88,10 @@ export async function syncToCloud(isManual = false) {
 
     const totalBs = totalUSD * tasa;
 
-    // 🛡️ ESCUDO PROTECTOR ANTI-SOBRESCRITURA DE DISPOSITIVOS NUEVOS:
-    // Si este dispositivo tiene 0 ventas hoy y no tiene inventario configurado,
-    // verificar si la tienda principal ya tiene datos en la nube para NO borrarlos con ceros.
-    if (ventasHoy.length === 0 && (!inventario.litros || inventario.litros === 0) && !isManual) {
+    // 🛡️ ESCUDO PROTECTOR ANTI-SOBRESCRITURA:
+    // Si este dispositivo tiene 0 ventas en todo su historial y el tanque en 0,
+    // comprobar si la tienda ya tiene datos en la nube para NO borrar el tanque ni el mes con ceros.
+    if (ventas.length === 0 && (!inventario.litros || inventario.litros === 0) && !isManual) {
       try {
         const checkRes = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
           headers: {
@@ -103,12 +103,12 @@ export async function syncToCloud(isManual = false) {
           const cloudData = await checkRes.json();
           if (cloudData && cloudData.length > 0) {
             const remote = cloudData[0];
-            const remoteTotal = remote.resumen_hoy?.totalUSD || 0;
+            const remoteTotalMes = remote.analisis_mes?.totalMesUSD || 0;
             const remoteLitros = remote.nivel_tanque?.litros || 0;
+            const remoteMovs = remote.ultimos_movimientos?.length || 0;
 
-            if (remoteTotal > 0 || remoteLitros > 0) {
-              console.log('[CloudSync] 🛡️ Dispositivo secundario vacío detectado. Se protegen los datos activos de la nube para no sobreescribir.');
-              // Adoptar nivel de tanque si está disponible
+            if (remoteTotalMes > 0 || remoteLitros > 0 || remoteMovs > 0) {
+              console.log('[CloudSync] 🛡️ Dispositivo vacío detectado. Se protegen datos activos de la nube (tanque, mes, movimientos).');
               if (remoteLitros > 0 && inventario.litros === 0) {
                 store.setConfig('inventario', remote.nivel_tanque);
               }
@@ -182,7 +182,7 @@ export async function syncToCloud(isManual = false) {
       precio: p.precio || 0
     }));
 
-    // Análisis del mes acumulado
+    // Análisis del mes acumulado (Septiembre 2026)
     const mesActualStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const ventasMes = ventas.filter(v => {
       if (!v.fecha) return false;
