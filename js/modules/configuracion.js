@@ -53,9 +53,6 @@ export function renderConfiguracion(container) {
             <button id="btn-sync-cloud-manual" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 7px 14px; font-weight: 600;">
               ☁️ Sincronizar Nube Ahora
             </button>
-            <button id="btn-cambiar-cuenta" class="btn btn-sm btn-secondary" style="font-size: 12px; padding: 7px 14px; font-weight: 600; color: #DC2626; border-color: #FCA5A5;">
-              🔄 Cambiar de Cuenta / Tienda
-            </button>
           </div>
         </div>
       </div>
@@ -267,18 +264,6 @@ export function renderConfiguracion(container) {
         showToast('☁️ Datos reales sincronizados con la Nube con éxito', 'success');
       } else {
         showToast('⚠️ No se pudo sincronizar. Verifica tu conexión a internet.', 'warning');
-      }
-    });
-  }
-
-  const btnCambiarCuenta = container.querySelector('#btn-cambiar-cuenta');
-  if (btnCambiarCuenta) {
-    btnCambiarCuenta.addEventListener('click', () => {
-      if (confirm('¿Deseas cerrar la sesión de esta tienda e ingresar con otra cuenta de correo?')) {
-        localStorage.removeItem('licencia_usuario');
-        localStorage.removeItem('catalogo_remoto_aplicado');
-        sessionStorage.removeItem('isAuthenticated');
-        window.location.reload();
       }
     });
   }
