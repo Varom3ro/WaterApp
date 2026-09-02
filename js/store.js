@@ -465,6 +465,46 @@ class Store {
         }
     }
 
+    // ---- Caudalímetro / Reloj Medidor de Agua ----
+
+    getLecturaCaudalimetro(fecha) {
+        const key = `caudalimetro_${fecha}`;
+        return this.getConfig(key) || {
+            fecha,
+            inicial: null,
+            final: null,
+            litrosReloj: 0,
+            horaInicial: null,
+            horaFinal: null
+        };
+    }
+
+    saveLecturaCaudalimetro(fecha, data) {
+        const key = `caudalimetro_${fecha}`;
+        const current = this.getLecturaCaudalimetro(fecha);
+        const inicial = data.inicial !== undefined && data.inicial !== null && data.inicial !== '' ? parseFloat(data.inicial) : current.inicial;
+        const final = data.final !== undefined && data.final !== null && data.final !== '' ? parseFloat(data.final) : current.final;
+        
+        let litrosReloj = 0;
+        if (inicial !== null && final !== null && !isNaN(inicial) && !isNaN(final)) {
+            const factor = this.getConfig('unidadCaudalimetro') === 'm3' ? 1000 : 1;
+            litrosReloj = Math.max(0, (final - inicial) * factor);
+        }
+
+        const updated = {
+            fecha,
+            inicial: (inicial !== null && !isNaN(inicial)) ? inicial : null,
+            final: (final !== null && !isNaN(final)) ? final : null,
+            litrosReloj,
+            horaInicial: data.horaInicial || current.horaInicial || (inicial !== null ? new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : null),
+            horaFinal: data.horaFinal || current.horaFinal || (final !== null ? new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : null),
+            updatedAt: new Date().toISOString()
+        };
+
+        this.setConfig(key, updated);
+        return updated;
+    }
+
     // ---- Defaults ----
 
     _initDefaults() {
@@ -477,6 +517,12 @@ class Store {
         }
         if (this.getConfig('tasaCambio') === undefined) {
             this.setConfig('tasaCambio', 40.00);
+        }
+        if (this.getConfig('moduloCaudalimetro') === undefined) {
+            this.setConfig('moduloCaudalimetro', false);
+        }
+        if (this.getConfig('unidadCaudalimetro') === undefined) {
+            this.setConfig('unidadCaudalimetro', 'L');
         }
     }
 }

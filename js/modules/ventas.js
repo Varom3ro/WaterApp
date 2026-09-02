@@ -518,19 +518,50 @@ export function renderNuevaVentaForm(container) {
     </form>
   `;
 
+  const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
+  const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
+  const todayStr = Utils.todayISO();
+  const lecturaHoy = store.getLecturaCaudalimetro(todayStr);
+
   const formHtml = `
     <div style="padding: 0 0 20px 0;">
-      <div class="page-header" style="margin-bottom: 20px;">
+      <div class="page-header" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div>
           <h1 class="page-title">Punto de Venta</h1>
           <p class="page-subtitle">Registro de recargas y facturación</p>
         </div>
+        ${moduloCaudalimetro ? `
+          <div id="widget-caudalimetro-pv" style="display: flex; align-items: center; gap: 10px; background: var(--color-surface, #fff); border: 1.5px solid #10B981; border-radius: 10px; padding: 6px 14px; box-shadow: var(--shadow-sm); cursor: pointer;" title="Haga clic para registrar o actualizar la lectura del reloj">
+            <div style="font-size: 22px;">⏱️</div>
+            <div>
+              <div style="font-size: 11px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.5px;">
+                Reloj Medidor (${unidadCaudalimetro})
+              </div>
+              <div style="font-size: 13px; font-weight: 800; color: #0F172A;">
+                ${lecturaHoy.inicial !== null ? `Ini: ${lecturaHoy.inicial.toLocaleString()}` : 'Ini: <span style="color:#DC2626;">Sin registrar</span>'} 
+                ${lecturaHoy.final !== null ? `· Fin: ${lecturaHoy.final.toLocaleString()} (<strong>${lecturaHoy.litrosReloj.toLocaleString()} L</strong>)` : ''}
+              </div>
+            </div>
+            <button type="button" id="btn-abrir-modal-caudalimetro" class="btn btn-xs btn-primary" style="margin-left: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px;">
+              ${lecturaHoy.inicial === null ? '📝 Abrir Tienda' : (lecturaHoy.final === null ? '📝 Anotar Cierre' : '✏️ Editar')}
+            </button>
+          </div>
+        ` : ''}
       </div>
       ${content}
     </div>
   `;
   container.innerHTML = formHtml;
   const modal = container;
+
+  const widgetCaudalimetro = modal.querySelector('#widget-caudalimetro-pv');
+  if (widgetCaudalimetro) {
+    widgetCaudalimetro.addEventListener('click', () => {
+      openModalCaudalimetro(todayStr, () => {
+        renderNuevaVentaForm(container);
+      });
+    });
+  }
   
   const inputTasa = modal.querySelector('#input-tasa');
   if (inputTasa) {
@@ -1277,4 +1308,100 @@ function deleteVenta(id) {
       renderVentasTable();
     }
   });
+}
+
+export function openModalCaudalimetro(fecha = Utils.todayISO(), onSaved = null) {
+  const unidad = store.getConfig('unidadCaudalimetro') || 'L';
+  const lectura = store.getLecturaCaudalimetro(fecha);
+  
+  openModal({
+    title: '⏱️ Lectura de Reloj Medidor de Agua',
+    content: `
+      <form id="form-caudalimetro-modal" style="padding: 10px 0;">
+        <p class="text-muted" style="font-size: 13px; margin-bottom: 15px;">
+          Ingresa el número marcado en el reloj medidor de flujo físico de la tienda para la fecha <strong>${Utils.formatDate(fecha)}</strong>.
+        </p>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 12px; font-weight: 700; color: #1E293B;">
+              🌅 Lectura Inicial (Apertura)
+            </label>
+            <div style="position: relative;">
+              <input type="number" step="any" class="form-control" name="inicial" id="caud-input-inicial" value="${lectura.inicial !== null ? lectura.inicial : ''}" placeholder="Ej: 124500" style="font-size: 16px; font-weight: 700; padding-right: 35px;" />
+              <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--color-text-secondary); font-weight: bold;">${unidad}</span>
+            </div>
+            <small style="color: var(--color-text-secondary); font-size: 11px;">Al abrir la tienda en la mañana.</small>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 12px; font-weight: 700; color: #1E293B;">
+              🌇 Lectura Final (Cierre)
+            </label>
+            <div style="position: relative;">
+              <input type="number" step="any" class="form-control" name="final" id="caud-input-final" value="${lectura.final !== null ? lectura.final : ''}" placeholder="Ej: 126000" style="font-size: 16px; font-weight: 700; padding-right: 35px;" />
+              <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--color-text-secondary); font-weight: bold;">${unidad}</span>
+            </div>
+            <small style="color: var(--color-text-secondary); font-size: 11px;">Al terminar la jornada de ventas.</small>
+          </div>
+        </div>
+
+        <div id="caud-preview-calculo" style="background: var(--color-bg-body, #F8FAFC); border: 1.5px dashed var(--color-border, #CBD5E1); border-radius: 8px; padding: 12px; text-align: center; margin-top: 10px;">
+          <div style="font-size: 12px; color: var(--color-text-secondary);">Agua Despachada según Reloj:</div>
+          <div id="caud-total-litros-preview" style="font-size: 20px; font-weight: 800; color: #10B981; margin-top: 2px;">
+            ${lectura.litrosReloj.toLocaleString()} Litros
+          </div>
+        </div>
+      </form>
+    `,
+    onSave: (overlay) => {
+      const form = overlay.querySelector('#form-caudalimetro-modal');
+      const iniVal = form.querySelector('#caud-input-inicial').value.trim();
+      const finVal = form.querySelector('#caud-input-final').value.trim();
+
+      const iniNum = iniVal !== '' ? parseFloat(iniVal) : null;
+      const finNum = finVal !== '' ? parseFloat(finVal) : null;
+
+      if (iniNum !== null && finNum !== null && finNum < iniNum) {
+        showToast('⚠️ La lectura final no puede ser menor a la lectura inicial', 'warning');
+        return;
+      }
+
+      const saved = store.saveLecturaCaudalimetro(fecha, {
+        inicial: iniNum,
+        final: finNum
+      });
+
+      closeModal();
+      showToast('⏱️ Lectura de reloj medidor guardada con éxito', 'success');
+      if (onSaved) onSaved(saved);
+      if (typeof syncToCloud === 'function') syncToCloud();
+    }
+  });
+
+  // Cálculo en vivo dentro del modal
+  setTimeout(() => {
+    const iniInput = document.getElementById('caud-input-inicial');
+    const finInput = document.getElementById('caud-input-final');
+    const previewEl = document.getElementById('caud-total-litros-preview');
+
+    const updatePreview = () => {
+      const ini = parseFloat(iniInput?.value) || 0;
+      const fin = parseFloat(finInput?.value) || 0;
+      const factor = unidad === 'm3' ? 1000 : 1;
+      const diff = Math.max(0, (fin - ini) * factor);
+      if (previewEl) {
+        if (fin > 0 && ini > 0) {
+          previewEl.textContent = `${diff.toLocaleString()} Litros`;
+          previewEl.style.color = fin >= ini ? '#10B981' : '#DC2626';
+        } else {
+          previewEl.textContent = 'Ingrese lecturas para calcular';
+          previewEl.style.color = 'var(--color-text-secondary)';
+        }
+      }
+    };
+
+    if (iniInput) iniInput.addEventListener('input', updatePreview);
+    if (finInput) finInput.addEventListener('input', updatePreview);
+  }, 100);
 }

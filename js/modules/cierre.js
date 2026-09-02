@@ -2,6 +2,7 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { openModalCaudalimetro } from './ventas.js';
 
 function renderCierre(content, fecha) {
   content.innerHTML = `
@@ -12,10 +13,14 @@ function renderCierre(content, fecha) {
 }
 
 function renderFormularioArqueo(container, fecha, cierre, methods) {
+  const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
+  const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
+  const lecturaCaud = store.getLecturaCaudalimetro(fecha);
+
   container.innerHTML = `
     <div style="max-width: 600px; margin: 0 auto; background: var(--color-surface); border-radius: 12px; border: 1px solid var(--color-border); padding: 20px;">
       <div style="text-align: center; margin-bottom: 20px;">
-        <h3 style="margin: 0; color: var(--color-primary-900);">Arqueo de Caja</h3>
+        <h3 style="margin: 0; color: var(--color-primary-900);">Arqueo de Caja y Cierre</h3>
         <p class="text-muted" style="margin-top: 5px; font-size: 14px;">Por favor, ingresa los montos contados físicamente para la fecha ${Utils.formatDate(fecha)}.</p>
       </div>
       <form id="form-arqueo">
@@ -35,11 +40,33 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
             `;
           }).join('')}
         </div>
+
+        ${moduloCaudalimetro ? `
+          <div style="background: var(--color-bg-body, #F8FAFC); border: 1.5px solid #10B981; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 style="margin: 0; color: #047857; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <span>⏱️</span> Auditoría de Reloj Medidor de Agua (${unidadCaudalimetro})
+              </h4>
+              <span style="font-size: 12px; color: var(--color-text-secondary); font-weight: 600;">Flujo Físico</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 12px; font-weight: 600;">🌅 Lectura Inicial (Apertura)</label>
+                <input type="number" step="any" class="form-control" name="caudalimetro_inicial" id="arqueo-caud-ini" value="${lecturaCaud.inicial !== null ? lecturaCaud.inicial : ''}" placeholder="Ej: 124500" style="font-weight: bold; font-size: 15px;" />
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 12px; font-weight: 600;">🌇 Lectura Final (Cierre)</label>
+                <input type="number" step="any" class="form-control" name="caudalimetro_final" id="arqueo-caud-fin" value="${lecturaCaud.final !== null ? lecturaCaud.final : ''}" placeholder="Ej: 126000" style="font-weight: bold; font-size: 15px;" />
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
         <div class="form-group" style="margin-bottom: 20px;">
           <label class="form-label">📝 Observaciones del Cierre (Opcional)</label>
           <textarea class="form-control" name="observaciones" rows="2" placeholder="Ej: Motivo de faltante/sobrante, vueltos pendientes, billetes deteriorados..." style="font-size: 14px; width: 100%;"></textarea>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; height: 45px; font-size: 16px;">Calcular Cuadre de Caja</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; height: 45px; font-size: 16px;">Calcular Cuadre de Caja y Agua</button>
       </form>
     </div>
   `;
@@ -105,6 +132,19 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
       rawVal = rawVal.replace(/\./g, '').replace(',', '.'); // Quita puntos (miles) y pasa coma a punto
       declaracion[m.key] = parseFloat(rawVal) || 0;
     });
+
+    // Guardar lecturas de caudalímetro si el módulo está activo
+    if (store.getConfig('moduloCaudalimetro')) {
+      const iniRaw = fd.get('caudalimetro_inicial');
+      const finRaw = fd.get('caudalimetro_final');
+      const iniVal = iniRaw !== null && iniRaw !== '' ? parseFloat(iniRaw) : null;
+      const finVal = finRaw !== null && finRaw !== '' ? parseFloat(finRaw) : null;
+      store.saveLecturaCaudalimetro(fecha, {
+        inicial: iniVal,
+        final: finVal
+      });
+    }
+
     const observaciones = (fd.get('observaciones') || '').trim();
     store.saveArqueo(fecha, declaracion, observaciones);
     renderCierreContent(fecha);
@@ -196,6 +236,17 @@ function renderCierreContent(fecha) {
   }
 
 
+  const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
+  const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
+  const lecturaCaud = store.getLecturaCaudalimetro(fecha);
+
+  const ventasDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
+  const litrosFacturados = ventasDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+  const mermasDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
+  const litrosMermas = mermasDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
+  const totalAguaSistema = litrosFacturados + litrosMermas;
+  const diffAgua = lecturaCaud.litrosReloj - totalAguaSistema;
+
   container.innerHTML = `
     <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--color-border); padding-bottom: 15px;">
       <h2 style="margin: 0; color: var(--color-primary-900); font-size: 24px;">${Utils.escapeHtml(store.getConfig('empresaNombre') || 'Tu Empresa')}</h2>
@@ -203,6 +254,79 @@ function renderCierreContent(fecha) {
     </div>
 
     ${renderCuadreCajaWeb(arqueo, cierre, methods)}
+
+    ${moduloCaudalimetro ? `
+      <!-- Auditoría de Reloj Medidor de Agua (Caudalímetro) -->
+      <div class="card" style="margin-bottom: 20px; border-left: 4px solid #10B981;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;">
+          <h3 class="card-title" style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+            <span>⏱️</span> Auditoría de Agua (Reloj Medidor vs. Sistema)
+          </h3>
+          <button id="btn-edit-caudalimetro-cierre" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 12px;">✏️ Editar Lecturas</button>
+        </div>
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Concepto de Medición</th>
+                <th style="text-align: right;">Lectura Reloj (${unidadCaudalimetro})</th>
+                <th style="text-align: right;">Litros Calculados</th>
+                <th style="text-align: right;">Estado / Cuadre</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>🌅 Lectura Inicial (Apertura)</td>
+                <td style="text-align: right; font-weight: bold;">${lecturaCaud.inicial !== null ? lecturaCaud.inicial.toLocaleString() : '<span class="text-muted">No registrada</span>'}</td>
+                <td style="text-align: right; color: var(--color-text-secondary);">-</td>
+                <td style="text-align: right;"><span class="badge badge-secondary">${lecturaCaud.horaInicial || 'Mañana'}</span></td>
+              </tr>
+              <tr>
+                <td>🌇 Lectura Final (Cierre)</td>
+                <td style="text-align: right; font-weight: bold;">${lecturaCaud.final !== null ? lecturaCaud.final.toLocaleString() : '<span class="text-muted">No registrada</span>'}</td>
+                <td style="text-align: right; color: var(--color-text-secondary);">-</td>
+                <td style="text-align: right;"><span class="badge badge-secondary">${lecturaCaud.horaFinal || 'Tarde/Noche'}</span></td>
+              </tr>
+              <tr style="background: rgba(16, 185, 129, 0.05); font-weight: bold;">
+                <td>🌊 <strong>Agua Total según Reloj Físico:</strong></td>
+                <td style="text-align: right;">-</td>
+                <td style="text-align: right; font-size: 15px; color: #047857;">${lecturaCaud.litrosReloj.toLocaleString()} Litros</td>
+                <td style="text-align: right;"><span class="badge badge-success">Flujo Físico</span></td>
+              </tr>
+              <tr>
+                <td>💧 Ventas Facturadas (Sistema)</td>
+                <td style="text-align: right;">-</td>
+                <td style="text-align: right;">${litrosFacturados.toLocaleString()} Litros</td>
+                <td style="text-align: right;"><span class="badge badge-info">${ventasDia.length} ventas</span></td>
+              </tr>
+              <tr>
+                <td>🧹 Mermas / Lavado Reportadas</td>
+                <td style="text-align: right;">-</td>
+                <td style="text-align: right;">${litrosMermas.toLocaleString()} Litros</td>
+                <td style="text-align: right;"><span class="badge badge-warning">${mermasDia.length} mermas</span></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr style="border-top: 2px solid var(--color-border); font-size: 14px;">
+                <th colspan="2" style="text-align: right;">DIFERENCIA DE AGUA (Reloj - Sistema):</th>
+                <th style="text-align: right; font-size: 16px;">
+                  <span class="${diffAgua === 0 ? 'text-success' : (diffAgua > 0 ? 'text-danger' : 'text-info')}" style="font-weight: 800;">
+                    ${diffAgua > 0 ? '+' : ''}${diffAgua.toLocaleString()} Litros
+                  </span>
+                </th>
+                <th style="text-align: right; font-size: 11px;">
+                  ${diffAgua === 0 
+                    ? '<span class="badge badge-success">✅ Cuadre Perfecto</span>' 
+                    : (diffAgua > 0 
+                      ? '<span class="badge badge-danger">⚠️ Posible merma no registrada</span>' 
+                      : '<span class="badge badge-info">ℹ️ Menos flujo que ventas</span>')}
+                </th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    ` : ''}
 
     <!-- Observaciones del Cuadre de Caja -->
     <div class="card" style="margin-bottom: 20px; border-left: 4px solid #3B82F6; background: var(--color-surface);">
@@ -315,6 +439,21 @@ function renderCierreContent(fecha) {
     </div>
 
   `;
+
+  const btnEditCaud = container.querySelector('#btn-edit-caudalimetro-cierre');
+  if (btnEditCaud) {
+    btnEditCaud.addEventListener('click', () => {
+      const activeFecha = document.getElementById('cierre-fecha-home')?.value || fecha;
+      openModalCaudalimetro(activeFecha, () => {
+        const contentDiv = document.getElementById('cierre-caja-home-content');
+        if (contentDiv) {
+          renderCierre(contentDiv, activeFecha);
+        } else {
+          renderCierreContent(activeFecha);
+        }
+      });
+    });
+  }
 
   const btnRehacer = container.querySelector('#btn-rehacer-arqueo');
   if (btnRehacer) {
@@ -494,10 +633,52 @@ export function getMatricialReportHTML(fecha) {
             <td style="padding: 4px 0;">VENTAS FACTURADAS HOY (OPERACIONES):</td>
             <td style="text-align: right; padding: 4px 0; font-weight: bold;">${cierre.cantidadVentas}</td>
           </tr>
-
         </table>
         <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
       </div>
+
+      ${(() => {
+        const moduloCaud = store.getConfig('moduloCaudalimetro') || false;
+        if (!moduloCaud) return '';
+        const unidadCaud = store.getConfig('unidadCaudalimetro') || 'L';
+        const lectCaud = store.getLecturaCaudalimetro(fecha);
+        const vDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
+        const lFact = vDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+        const mDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
+        const lMerm = mDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
+        const totSist = lFact + lMerm;
+        const dAgua = lectCaud.litrosReloj - totSist;
+
+        return `
+        <!-- Resumen Caudalímetro -->
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ AUDITORÍA DE RELOJ MEDIDOR DE AGUA ]</div>
+          <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: inherit;">
+            <tr>
+              <td style="padding: 3px 0;">LECTURA INICIAL (APERTURA):</td>
+              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.inicial !== null ? lectCaud.inicial.toLocaleString() : 'N/R'} ${unidadCaud}</td>
+            </tr>
+            <tr>
+              <td style="padding: 3px 0;">LECTURA FINAL (CIERRE):</td>
+              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.final !== null ? lectCaud.final.toLocaleString() : 'N/R'} ${unidadCaud}</td>
+            </tr>
+            <tr style="border-top: 1px dotted #000;">
+              <td style="padding: 3px 0; font-weight: bold;">AGUA SEGÚN RELOJ FÍSICO:</td>
+              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.litrosReloj.toLocaleString()} L</td>
+            </tr>
+            <tr>
+              <td style="padding: 3px 0;">AGUA JUSTIFICADA (VENTAS + MERMAS):</td>
+              <td style="text-align: right; padding: 3px 0;">${totSist.toLocaleString()} L</td>
+            </tr>
+            <tr style="border-top: 1px solid #000; font-weight: bold;">
+              <td style="padding: 4px 0;">DIFERENCIA DE AGUA:</td>
+              <td style="text-align: right; padding: 4px 0; font-size: 13px;">${dAgua > 0 ? '+' : ''}${dAgua.toLocaleString()} L (${dAgua === 0 ? 'CUADRE EXACTO' : (dAgua > 0 ? 'SOBRANTE DE FLUJO' : 'MENOS FLUJO')})</td>
+            </tr>
+          </table>
+          <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
+        </div>
+        `;
+      })()}
 
       ${cuadreHtml}
       <!-- Desglose por Método de Pago -->

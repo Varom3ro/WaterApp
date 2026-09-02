@@ -523,7 +523,7 @@ function renderRendimiento(content, range) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card mb-lg">
       <div class="card-header">
         <h3 class="card-title">Comprado vs Vendido (Últimos 7 días)</h3>
       </div>
@@ -531,6 +531,82 @@ function renderRendimiento(content, range) {
         <canvas id="chart-rendimiento"></canvas>
       </div>
     </div>
+
+    ${(() => {
+      const moduloCaud = store.getConfig('moduloCaudalimetro') || false;
+      if (!moduloCaud) return '';
+      const unidadCaud = store.getConfig('unidadCaudalimetro') || 'L';
+
+      // Recorrer los últimos 15 días o el rango seleccionado
+      const diasArray = [];
+      const numDays = 14;
+      for (let i = 0; i <= numDays; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const fStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const lect = store.getLecturaCaudalimetro(fStr);
+        if (lect.inicial !== null || lect.final !== null) {
+          const vDia = ventasAll.filter(v => v.fecha && v.fecha.startsWith(fStr));
+          const lFact = vDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+          const mDia = mermasAll.filter(m => m.fecha && m.fecha.startsWith(fStr));
+          const lMerm = mDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
+          const totSist = lFact + lMerm;
+          const diff = lect.litrosReloj - totSist;
+          diasArray.push({
+            fecha: fStr,
+            lect,
+            lFact,
+            lMerm,
+            totSist,
+            diff
+          });
+        }
+      }
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">⏱️ Historial de Auditoría: Reloj Medidor vs. Sistema</h3>
+          </div>
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th style="text-align: right;">Lectura Inicial</th>
+                  <th style="text-align: right;">Lectura Final</th>
+                  <th style="text-align: right;">Litros Reloj</th>
+                  <th style="text-align: right;">Litros Facturados + Mermas</th>
+                  <th style="text-align: right;">Diferencia</th>
+                  <th style="text-align: right;">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${diasArray.length === 0 ? `
+                  <tr><td colspan="7" class="text-center text-muted" style="padding: 20px;">No hay lecturas de reloj medidor registradas en este período.</td></tr>
+                ` : diasArray.map(d => `
+                  <tr>
+                    <td class="font-semibold">${Utils.formatDate(d.fecha)}</td>
+                    <td style="text-align: right;">${d.lect.inicial !== null ? `${d.lect.inicial.toLocaleString()} ${unidadCaud}` : '<span class="text-muted">-</span>'}</td>
+                    <td style="text-align: right;">${d.lect.final !== null ? `${d.lect.final.toLocaleString()} ${unidadCaud}` : '<span class="text-muted">-</span>'}</td>
+                    <td style="text-align: right; font-weight: bold; color: #047857;">${d.lect.litrosReloj.toLocaleString()} L</td>
+                    <td style="text-align: right;">${d.totSist.toLocaleString()} L</td>
+                    <td style="text-align: right; font-weight: bold;" class="${d.diff === 0 ? 'text-success' : (d.diff > 0 ? 'text-danger' : 'text-info')}">
+                      ${d.diff > 0 ? '+' : ''}${d.diff.toLocaleString()} L
+                    </td>
+                    <td style="text-align: right;">
+                      <span class="badge ${d.diff === 0 ? 'badge-success' : (d.diff > 0 ? 'badge-danger' : 'badge-info')}">
+                        ${d.diff === 0 ? 'Cuadrado' : (d.diff > 0 ? 'Sobrante Flujo' : 'Menor Flujo')}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    })()}
   `;
 
   drawRendimientoChart();
