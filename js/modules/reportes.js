@@ -29,8 +29,8 @@ export function renderReportes(container) {
         <div class="flex items-center gap-sm">
           <label class="form-label" style="margin:0; font-size:13px; color:var(--color-text-secondary);">Período:</label>
           <select class="form-control" id="filtro-periodo" style="min-width:160px; height:36px; padding:4px 28px 4px 10px; font-size:13px;">
-            <option value="diario">Hoy (Diario)</option>
-            <option value="semanal" selected>Semanal (7 días)</option>
+            <option value="diario" selected>Hoy (Diario)</option>
+            <option value="semanal">Semanal (7 días)</option>
             <option value="quincenal">Quincenal (15 días)</option>
             <option value="mensual">Mensual (30 días)</option>
             <option value="custom">Personalizado</option>
