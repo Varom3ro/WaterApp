@@ -7,7 +7,11 @@ let currentModal = null;
 export function openModal(options = {}) {
     const { title = '', content = '', size = '', onSave = null, saveLabel = 'Guardar', showFooter = true } = options;
 
-    closeModal();
+    // Immediately remove any existing modal overlays
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    currentModal = null;
 
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -61,12 +65,13 @@ export function openModal(options = {}) {
 
 export function closeModal() {
     if (currentModal) {
-        currentModal.classList.remove('active');
+        const modalToClose = currentModal;
+        currentModal = null;
+        modalToClose.classList.remove('active');
         setTimeout(() => {
-            if (currentModal && currentModal.parentNode) {
-                currentModal.parentNode.removeChild(currentModal);
+            if (modalToClose && modalToClose.parentNode) {
+                modalToClose.parentNode.removeChild(modalToClose);
             }
-            currentModal = null;
         }, 250);
     }
 }

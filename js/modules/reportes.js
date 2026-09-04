@@ -304,7 +304,8 @@ function renderVentasYCisternas(content, range) {
                 pagosStr = '<span class="badge badge-info" style="font-size: 0.75em;">Convenio</span>';
               } else if (v.pagos && v.pagos.length > 0) {
                 pagosStr = v.pagos.map(p => {
-                  const method = Utils.paymentMethods.find(m => m.id === p.metodo);
+                  const allMethods = store.getMetodosPago ? store.getMetodosPago(false) : (Utils.paymentMethods || []);
+                  const method = allMethods.find(m => m.id === p.metodo);
                   const icon = method ? method.icon : '';
                   const name = method ? method.label : p.metodo;
                   return `<div style="font-size: 0.8em; white-space: nowrap; line-height: 1.2;">${icon} ${name}: <b>${Utils.formatCurrency(p.monto)}</b></div>`;

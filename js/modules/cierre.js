@@ -26,6 +26,7 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
       <form id="form-arqueo">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
           ${methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').map(m => {
+            const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
             const defaultValue = (m.key === 'pago_movil' && cierre && cierre.bs && typeof cierre.bs.pago_movil === 'number')
               ? Utils.formatNumber(cierre.bs.pago_movil, true)
               : '0,00';
@@ -33,7 +34,7 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
               <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label">${m.icon} ${m.label}</label>
                 <div style="position:relative;">
-                   <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--color-text-secondary); font-weight:bold; font-size:14px;">${m.key === 'efectivo_usd' ? '$' : 'Bs.'}</span>
+                   <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--color-text-secondary); font-weight:bold; font-size:14px;">${isUsd ? '$' : 'Bs.'}</span>
                    <input type="text" inputmode="decimal" class="form-control currency-mask" name="arqueo_${m.key}" value="${defaultValue}" required style="font-size: 16px; font-weight: bold; padding-left: 40px;"/>
                 </div>
               </div>
@@ -156,7 +157,7 @@ function renderCuadreCajaWeb(arqueo, cierre, methods) {
   let totalDiferenciaBs = 0;
   
   const filas = methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').map(m => {
-    const isUsd = m.key === 'efectivo_usd';
+    const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
     const declarado = arqueo.declaracion[m.key] || 0;
     const sistema = isUsd ? (cierre[m.key] || 0) : (cierre.bs[m.key] || 0);
     const dif = declarado - sistema;
@@ -220,14 +221,17 @@ function renderCierreContent(fecha) {
 
   const cierre = store.getCierreCaja(fecha);
   const arqueo = store.getArqueo(fecha);
+  const allMetodos = store.getMetodosPago(false);
   const methods = [
-    { key: 'efectivo_usd', label: 'Efectivo (USD)', icon: '💵', color: '#2D6A4F' },
-    { key: 'efectivo_bs', label: 'Efectivo (Bs)', icon: '💴', color: '#40916C' },
-    { key: 'punto', label: 'Punto de Venta', icon: '💳', color: '#52B788' },
-    { key: 'pago_movil', label: 'Pago Móvil', icon: '📱', color: '#74C69D' },
-    { key: 'transferencia', label: 'Transferencia', icon: '🏦', color: '#95D5B2' },
-    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋', color: '#E9A820' },
-    { key: 'convenio', label: 'Convenios', icon: '🤝', color: '#0077B6' }
+    ...allMetodos.map(m => ({
+      key: m.id,
+      label: m.label,
+      icon: m.icon || '💳',
+      moneda: m.moneda || 'Bs',
+      color: m.color || (m.moneda === 'USD' ? '#2D6A4F' : '#3B82F6')
+    })),
+    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋', moneda: 'USD', color: '#E9A820' },
+    { key: 'convenio', label: 'Convenios', icon: '🤝', moneda: 'USD', color: '#0077B6' }
   ];
 
   if (!arqueo) {
@@ -436,9 +440,85 @@ function renderCierreContent(fecha) {
       ` : '<div class="empty-state" style="padding: 20px; text-align: center; color: var(--color-text-muted);">No se registraron abonos el día de hoy.</div>'}
     </div>
 
+    <!-- Detalle de Propinas por Punto/Banco Recibidas Hoy -->
+    <div class="card" style="margin-bottom: 20px; border-left: 4px solid #F59E0B;">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <h3 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>🎁</span> Propinas por Punto/Banco a Liquidar al Personal (${cierre.propinasDetalle ? cierre.propinasDetalle.length : 0})
+        </h3>
+        <div style="font-size: 14px; font-weight: bold; color: #B45309;">
+          Total a Entregar: ${Utils.formatCurrency(cierre.totalPropinasUSD || 0)} <span style="font-size: 12px; color: var(--color-text-secondary);">(Bs ${Utils.formatNumber(cierre.totalPropinasBs || 0, true)})</span>
+        </div>
+      </div>
+      ${cierre.propinasDetalle && cierre.propinasDetalle.length > 0 ? `
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Método de Pago</th>
+                <th>Referencia Voucher</th>
+                <th>Nota / Destinatario</th>
+                <th style="text-align: right;">Monto (Bs)</th>
+                <th style="text-align: right;">Monto ($)</th>
+                <th style="text-align: center;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${cierre.propinasDetalle.map(p => {
+                const horaStr = new Date(p.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const foundMethod = methods.find(m => m.key === p.metodo);
+                const metodoStr = foundMethod ? `${foundMethod.icon} ${foundMethod.label}` : (p.metodo === 'punto' ? '💳 Punto de Venta' : p.metodo);
+                const montoBs = p.moneda === 'Bs' || p.moneda === 'VES' ? p.monto : (p.monto * (p.tasa || 40));
+                const montoUSD = p.moneda === 'USD' ? p.monto : (p.monto / (p.tasa || 40));
+                return `
+                  <tr>
+                    <td class="text-muted">${horaStr}</td>
+                    <td>${metodoStr}</td>
+                    <td class="font-semibold text-primary" style="letter-spacing: 0.5px;">${Utils.escapeHtml(p.referencia || '-')}</td>
+                    <td class="text-muted">${Utils.escapeHtml(p.nota || 'Personal de turno')}</td>
+                    <td style="text-align: right; font-weight: bold; color: #92400E;">Bs ${Utils.formatNumber(montoBs, true)}</td>
+                    <td style="text-align: right; font-weight: bold; color: #047857;">${Utils.formatCurrency(montoUSD)}</td>
+                    <td style="text-align: center;">
+                      <button class="btn btn-xs btn-danger btn-delete-propina" data-id="${p.id}" title="Eliminar registro de propina">🗑️</button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background: rgba(245, 158, 11, 0.08); font-weight: bold;">
+                <td colspan="4" style="text-align: right;">TOTAL PROPINAS A ENTREGAR:</td>
+                <td style="text-align: right; color: #92400E; font-size: 15px;">Bs ${Utils.formatNumber(cierre.totalPropinasBs || 0, true)}</td>
+                <td style="text-align: right; color: #047857; font-size: 15px;">${Utils.formatCurrency(cierre.totalPropinasUSD || 0)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ` : '<div class="empty-state" style="padding: 20px; text-align: center; color: var(--color-text-muted);">No se registraron propinas por punto o banco en esta fecha.</div>'}
+    </div>
+
     </div>
 
   `;
+
+  container.querySelectorAll('.btn-delete-propina').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.id;
+      openModal({
+        title: 'Eliminar Propina',
+        content: '<p>¿Estás seguro de que deseas eliminar este registro de propina?</p>',
+        saveLabel: 'Sí, Eliminar',
+        onSave: () => {
+          store.delete('propinas', pid);
+          closeModal();
+          showToast('Registro de propina eliminado', 'info');
+          renderCierreContent(fecha);
+        }
+      });
+    });
+  });
 
   const btnEditCaud = container.querySelector('#btn-edit-caudalimetro-cierre');
   if (btnEditCaud) {
@@ -512,21 +592,21 @@ function renderCierreContent(fecha) {
 export function getMatricialReportHTML(fecha) {
   const cierre = store.getCierreCaja(fecha);
   const arqueo = store.getArqueo(fecha);
+  const allMetodos = store.getMetodosPago(false);
   
-  const methodsArqueo = [
-    { key: 'efectivo_usd', label: 'Efectivo ($)', icon: '💵' },
-    { key: 'efectivo_bs', label: 'Efectivo (Bs)', icon: '💴' },
-    { key: 'punto', label: 'Punto de Venta', icon: '💳' },
-    { key: 'pago_movil', label: 'Pago Móvil', icon: '📱' },
-    { key: 'transferencia', label: 'Transferencia', icon: '🏦' }
-  ];
+  const methodsArqueo = allMetodos.map(m => ({
+    key: m.id,
+    label: m.label,
+    icon: m.icon || '💳',
+    moneda: m.moneda || 'Bs'
+  }));
 
   let cuadreHtml = '';
   if (arqueo) {
       let totalDiferenciaUsd = 0;
       let totalDiferenciaBs = 0;
       let cuadreRows = methodsArqueo.map(m => {
-          const isUsd = m.key === 'efectivo_usd';
+          const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
           const declarado = arqueo.declaracion[m.key] || 0;
           const sistema = isUsd ? (cierre[m.key] || 0) : (cierre.bs[m.key] || 0);
           const dif = declarado - sistema;
@@ -582,12 +662,13 @@ export function getMatricialReportHTML(fecha) {
   }
 
   const methods = [
-    { key: 'efectivo_usd', label: 'Efectivo (USD)', icon: '💵' },
-    { key: 'efectivo_bs', label: 'Efectivo (Bs)', icon: '💴' },
-    { key: 'punto', label: 'Punto de Venta', icon: '💳' },
-    { key: 'pago_movil', label: 'Pago Móvil', icon: '📱' },
-    { key: 'transferencia', label: 'Transferencia', icon: '🏦' },
-    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋' }
+    ...allMetodos.map(m => ({
+      key: m.id,
+      label: m.label,
+      icon: m.icon || '💳',
+      moneda: m.moneda || 'Bs'
+    })),
+    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋', moneda: 'USD' }
   ];
 
   return `
@@ -686,7 +767,7 @@ export function getMatricialReportHTML(fecha) {
         <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ DESGLOSE DE INGRESOS FISICOS ]</div>
         <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: inherit;">
           ${methods.map(m => {
-            const isUsd = m.key === 'efectivo_usd';
+            const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
             const val = isUsd ? (cierre[m.key] || 0) : (cierre.bs[m.key] || 0);
             const formatter = (v) => isUsd ? Utils.formatCurrency(v) : `Bs ${Utils.formatNumber(v, true)}`;
             return `
@@ -737,6 +818,49 @@ export function getMatricialReportHTML(fecha) {
         <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
       </div>
 
+      <!-- Detalle de Propinas por Punto/Banco a Liquidar al Personal -->
+      ${cierre.propinasDetalle && cierre.propinasDetalle.length > 0 ? `
+      <div style="margin-bottom: 25px; page-break-inside: avoid;">
+        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ PROPINAS POR PUNTO/BANCO A LIQUIDAR AL PERSONAL ]</div>
+        <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px;">
+          <thead>
+            <tr style="border-bottom: 1px solid #000;">
+              <th style="text-align: left; padding: 6px 0; width: 12%;">HORA</th>
+              <th style="text-align: left; padding: 6px 0; width: 20%;">MÉTODO</th>
+              <th style="text-align: left; padding: 6px 0; width: 20%;">REF. VOUCHER</th>
+              <th style="text-align: right; padding: 6px 0; width: 24%;">MONTO (Bs)</th>
+              <th style="text-align: right; padding: 6px 0; width: 24%;">MONTO ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cierre.propinasDetalle.map(p => {
+              const horaStr = new Date(p.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
+              const foundMethod = methods.find(m => m.key === p.metodo);
+              const metodoStr = foundMethod ? foundMethod.label.toUpperCase() : (p.metodo || 'PUNTO').toUpperCase();
+              const montoBs = p.moneda === 'Bs' || p.moneda === 'VES' ? p.monto : (p.monto * (p.tasa || 40));
+              const montoUSD = p.moneda === 'USD' ? p.monto : (p.monto / (p.tasa || 40));
+              return `
+                <tr>
+                  <td style="padding: 5px 0; color:#333;">${horaStr}</td>
+                  <td style="padding: 5px 0;">${metodoStr}</td>
+                  <td style="padding: 5px 0; font-weight: bold; color:#111;">${(p.referencia || '-').toUpperCase()}</td>
+                  <td style="padding: 5px 0; text-align: right; font-weight: bold;">Bs ${Utils.formatNumber(montoBs, true)}</td>
+                  <td style="padding: 5px 0; text-align: right; font-weight: bold;">${Utils.formatCurrency(montoUSD)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="border-top: 1px solid #000; font-weight: bold;">
+              <td colspan="3" style="padding: 6px 0; text-align: right;">TOTAL PROPINAS A ENTREGAR:</td>
+              <td style="padding: 6px 0; text-align: right; font-size: 12px;">Bs ${Utils.formatNumber(cierre.totalPropinasBs || 0, true)}</td>
+              <td style="padding: 6px 0; text-align: right; font-size: 12px;">${Utils.formatCurrency(cierre.totalPropinasUSD || 0)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
+      </div>
+      ` : ''}
 
       <div style="text-align: center; font-size: 10px; margin-top: 15px; color: #555; letter-spacing: 1px;">
         *** FIN DEL REPORTE - IMPRESO DESDE SISTEMA LOCAL ***

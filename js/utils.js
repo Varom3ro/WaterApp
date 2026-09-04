@@ -127,13 +127,14 @@ export const Utils = {
   // Capacidades de cisterna disponibles
   cisternCapacities: [4500, 7500, 10000, 15000],
 
-  // Métodos de pago
+  // Métodos de pago base
   paymentMethods: [
-    { id: 'punto', label: 'Punto de Venta', icon: '💳' },
-    { id: 'efectivo_usd', label: 'Efectivo (USD)', icon: '💵' },
-    { id: 'efectivo_bs', label: 'Efectivo (Bs)', icon: '💴' },
-    { id: 'pago_movil', label: 'Pago Móvil', icon: '📱' },
-    { id: 'transferencia', label: 'Transferencia', icon: '🏦' }
+    { id: 'efectivo_usd', label: 'Efectivo (USD)', icon: '💵', moneda: 'USD', color: '#2D6A4F', isCustom: false },
+    { id: 'efectivo_bs', label: 'Efectivo (Bs)', icon: '💴', moneda: 'Bs', color: '#40916C', isCustom: false },
+    { id: 'punto', label: 'Punto de Venta', icon: '💳', moneda: 'Bs', color: '#52B788', isCustom: false },
+    { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', moneda: 'Bs', color: '#74C69D', isCustom: false },
+    { id: 'transferencia', label: 'Transferencia', icon: '🏦', moneda: 'Bs', color: '#95D5B2', isCustom: false },
+    { id: 'saldo_favor', label: 'Saldo a Favor', icon: '💰', moneda: 'USD', color: '#10B981', isCustom: false }
   ],
 
   // Estatus de cliente

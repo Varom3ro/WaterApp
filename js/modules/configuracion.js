@@ -12,6 +12,7 @@ export function renderConfiguracion(container) {
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
   const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
   const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
+  const metodosPago = store.getMetodosPago(false);
 
   let usuarioEmail = 'Licencia Local';
   let diasRestantesText = '';
@@ -194,6 +195,67 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
+      <!-- Métodos de Pago Aceptados -->
+      <div class="card full-width">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title">💳 Métodos de Pago Aceptados</h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Administra las formas de cobro disponibles en el Punto de Venta, Arqueo de Caja y Reportes.
+            </p>
+          </div>
+          <button class="btn btn-sm btn-primary" id="btn-add-metodo-pago">
+            + Anexar Método de Pago
+          </button>
+        </div>
+        <div class="table-container mt-md">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width: 40%;">Método de Pago</th>
+                <th style="width: 25%;">Moneda de Recepción</th>
+                <th style="width: 15%;">Tipo</th>
+                <th style="width: 20%; text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="metodos-pago-tbody">
+              ${metodosPago.map(m => `
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span style="font-size: 20px;">${m.icon || '💳'}</span>
+                      <span class="font-semibold" style="font-size: 14px;">${Utils.escapeHtml(m.label)}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge ${m.moneda === 'USD' ? 'badge-success' : 'badge-info'}" style="font-size: 11px; padding: 4px 9px;">
+                      ${m.moneda === 'USD' ? '💵 Dólares (USD)' : '💴 Bolívares (Bs)'}
+                    </span>
+                  </td>
+                  <td>
+                    ${m.isCustom ? `
+                      <span class="badge badge-secondary" style="font-size: 11px; padding: 3px 8px;">Personalizado</span>
+                    ` : `
+                      <span class="badge" style="font-size: 11px; padding: 3px 8px; background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1;">Por Defecto</span>
+                    `}
+                  </td>
+                  <td style="text-align: right;">
+                    ${m.isCustom ? `
+                      <div class="flex gap-sm" style="justify-content: flex-end;">
+                        <button class="btn btn-sm btn-secondary btn-edit-metodo-pago" data-id="${m.id}">✏️ Editar</button>
+                        <button class="btn btn-sm btn-secondary btn-delete-metodo-pago" data-id="${m.id}">🗑️</button>
+                      </div>
+                    ` : `
+                      <span class="text-muted" style="font-size: 12px; font-style: italic;">Predeterminado</span>
+                    `}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Delivery Config -->
       <div class="card">
         <div class="card-header">
@@ -205,6 +267,61 @@ export function renderConfiguracion(container) {
           <div style="display:flex; gap:10px;">
             <input type="number" id="input-config-delivery" class="form-control" step="0.01" value="${store.getConfig('precioDelivery') ?? '0.50'}" />
             <button class="btn btn-primary" id="btn-save-delivery">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zonas y Urbanizaciones de Clientes -->
+      <div class="card full-width" style="border-left: 4px solid #3B82F6;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>📍</span> Zonas y Urbanizaciones de Clientes
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Personaliza los municipios y sectores frecuentes de tu tienda para autocompletar rápidamente al registrar clientes.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btn-preset-zonas-este" class="btn btn-xs btn-secondary" style="font-size: 11px; font-weight: 600;" title="Cargar zonas de La California, Sucre y Caracas Este">
+              📍 Plantilla: La California / Sucre
+            </button>
+            <button type="button" id="btn-preset-zonas-oeste" class="btn btn-xs btn-secondary" style="font-size: 11px; font-weight: 600;" title="Cargar zonas de El Paraíso y Caracas Oeste">
+              📍 Plantilla: El Paraíso / Libertador
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body mt-md">
+          <div class="form-row" style="align-items: flex-start; gap: 20px;">
+            <!-- Municipios -->
+            <div class="form-group" style="flex: 1; min-width: 250px;">
+              <label class="form-label" style="font-weight: 700;">🏙️ Municipios / Zonas Activas</label>
+              <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <input type="text" id="input-nuevo-municipio" class="form-control" placeholder="Ej: Sucre, Chacao..." style="font-size: 13px;" />
+                <button type="button" id="btn-add-municipio" class="btn btn-secondary btn-sm" style="white-space: nowrap;">+ Agregar</button>
+              </div>
+              <div id="container-tags-municipios" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto; padding: 10px; background: var(--color-bg-body, #f8fafc); border: 1px solid var(--color-border); border-radius: 8px;"></div>
+            </div>
+
+            <!-- Urbanizaciones -->
+            <div class="form-group" style="flex: 2; min-width: 300px;">
+              <label class="form-label" style="font-weight: 700;">🏘️ Urbanizaciones / Sectores de esta Tienda</label>
+              <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <input type="text" id="input-nueva-urbanizacion" class="form-control" placeholder="Ej: La California Sur, Macaracuay..." style="font-size: 13px;" />
+                <button type="button" id="btn-add-urbanizacion" class="btn btn-primary btn-sm" style="white-space: nowrap;">+ Agregar Sector</button>
+              </div>
+              <div id="container-tags-urbanizaciones" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto; padding: 10px; background: var(--color-bg-body, #f8fafc); border: 1px solid var(--color-border); border-radius: 8px;"></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--color-border); padding-top: 12px;">
+            <span style="font-size: 12px; color: var(--color-text-secondary);">
+              💡 <em>Al crear o editar clientes también podrás usar la opción <strong>➕ Otra (Personalizada)</strong> en cualquier momento.</em>
+            </span>
+            <button type="button" id="btn-guardar-zonas-config" class="btn btn-primary">
+              💾 Guardar Zonas de la Tienda
+            </button>
           </div>
         </div>
       </div>
@@ -405,6 +522,123 @@ export function renderConfiguracion(container) {
     });
   }
 
+  // ---- Lógica de Zonas y Urbanizaciones ----
+  let currentMunicipios = [...store.getZonasMunicipios()];
+  let currentUrbanizaciones = [...store.getZonasUrbanizaciones()];
+
+  function renderZonasTags() {
+    const contMuni = container.querySelector('#container-tags-municipios');
+    const contUrb = container.querySelector('#container-tags-urbanizaciones');
+    if (!contMuni || !contUrb) return;
+
+    contMuni.innerHTML = currentMunicipios.map((m, idx) => `
+      <span class="badge" style="background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; font-size: 12px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+        ${Utils.escapeHtml(m)}
+        <button type="button" class="btn-del-muni-tag" data-idx="${idx}" style="background:none; border:none; color:#EF4444; font-size:14px; font-weight:bold; cursor:pointer; padding:0; line-height:1;" title="Quitar">×</button>
+      </span>
+    `).join('') || '<span style="font-size:12px; color:var(--color-text-secondary);">No hay municipios registrados</span>';
+
+    contUrb.innerHTML = currentUrbanizaciones.map((u, idx) => `
+      <span class="badge" style="background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; font-size: 12px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+        ${Utils.escapeHtml(u)}
+        <button type="button" class="btn-del-urb-tag" data-idx="${idx}" style="background:none; border:none; color:#EF4444; font-size:14px; font-weight:bold; cursor:pointer; padding:0; line-height:1;" title="Quitar">×</button>
+      </span>
+    `).join('') || '<span style="font-size:12px; color:var(--color-text-secondary);">No hay urbanizaciones registradas</span>';
+
+    contMuni.querySelectorAll('.btn-del-muni-tag').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = parseInt(b.dataset.idx);
+        currentMunicipios.splice(i, 1);
+        renderZonasTags();
+      });
+    });
+
+    contUrb.querySelectorAll('.btn-del-urb-tag').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = parseInt(b.dataset.idx);
+        currentUrbanizaciones.splice(i, 1);
+        renderZonasTags();
+      });
+    });
+  }
+
+  renderZonasTags();
+
+  const btnAddMuni = container.querySelector('#btn-add-municipio');
+  const inputMuni = container.querySelector('#input-nuevo-municipio');
+  if (btnAddMuni && inputMuni) {
+    const handleAddMuni = () => {
+      const val = inputMuni.value.trim();
+      if (!val) return;
+      if (!currentMunicipios.some(m => m.toLowerCase() === val.toLowerCase())) {
+        currentMunicipios.push(val);
+        renderZonasTags();
+      }
+      inputMuni.value = '';
+    };
+    btnAddMuni.addEventListener('click', handleAddMuni);
+    inputMuni.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMuni(); } });
+  }
+
+  const btnAddUrb = container.querySelector('#btn-add-urbanizacion');
+  const inputUrb = container.querySelector('#input-nueva-urbanizacion');
+  if (btnAddUrb && inputUrb) {
+    const handleAddUrb = () => {
+      const val = inputUrb.value.trim();
+      if (!val) return;
+      if (!currentUrbanizaciones.some(u => u.toLowerCase() === val.toLowerCase())) {
+        currentUrbanizaciones.push(val);
+        renderZonasTags();
+      }
+      inputUrb.value = '';
+    };
+    btnAddUrb.addEventListener('click', handleAddUrb);
+    inputUrb.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrb(); } });
+  }
+
+  const btnPresetEste = container.querySelector('#btn-preset-zonas-este');
+  if (btnPresetEste) {
+    btnPresetEste.addEventListener('click', () => {
+      const presets = store.getZonasPresets();
+      currentMunicipios = [...presets.este.municipios];
+      currentUrbanizaciones = [...presets.este.urbanizaciones];
+      renderZonasTags();
+      showToast('Cargada plantilla de La California / Sucre. Haz clic en "Guardar Zonas" para confirmar.', 'info');
+    });
+  }
+
+  const btnPresetOeste = container.querySelector('#btn-preset-zonas-oeste');
+  if (btnPresetOeste) {
+    btnPresetOeste.addEventListener('click', () => {
+      const presets = store.getZonasPresets();
+      currentMunicipios = [...presets.oeste.municipios];
+      currentUrbanizaciones = [...presets.oeste.urbanizaciones];
+      renderZonasTags();
+      showToast('Cargada plantilla de El Paraíso / Libertador. Haz clic en "Guardar Zonas" para confirmar.', 'info');
+    });
+  }
+
+  const btnGuardarZonas = container.querySelector('#btn-guardar-zonas-config');
+  if (btnGuardarZonas) {
+    btnGuardarZonas.addEventListener('click', () => {
+      if (currentMunicipios.length === 0) {
+        showToast('Debe existir al menos un municipio', 'warning');
+        return;
+      }
+      if (currentUrbanizaciones.length === 0) {
+        showToast('Debe existir al menos una urbanización o sector', 'warning');
+        return;
+      }
+      store.setConfig('zonasMunicipios', currentMunicipios);
+      store.setConfig('zonasUrbanizaciones', currentUrbanizaciones);
+      showToast('Zonas y urbanizaciones de la tienda guardadas correctamente', 'success');
+      if (typeof syncToCloud === 'function') syncToCloud();
+    });
+  }
+
+
   const btnSavePassword = container.querySelector('#btn-save-password');
   if (btnSavePassword) {
     btnSavePassword.addEventListener('click', () => {
@@ -497,6 +731,40 @@ export function renderConfiguracion(container) {
           closeModal();
           renderConfiguracion(container);
           showToast('Repartidor eliminado', 'success');
+        }
+      });
+    });
+  });
+
+  // Métodos de Pago events
+  const btnAddMetodo = container.querySelector('#btn-add-metodo-pago');
+  if (btnAddMetodo) {
+    btnAddMetodo.addEventListener('click', () => {
+      openMetodoPagoModal();
+    });
+  }
+
+  container.querySelectorAll('.btn-edit-metodo-pago').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openMetodoPagoModal(btn.dataset.id);
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-metodo-pago').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const allM = store.getMetodosPago(false);
+      const met = allM.find(m => m.id === id);
+      openModal({
+        title: 'Confirmar Eliminación',
+        content: `<p>¿Estás seguro de eliminar el método de pago personalizado <strong>"${met?.label}"</strong>?</p>`,
+        saveLabel: 'Eliminar',
+        onSave: () => {
+          store.deleteMetodoPago(id);
+          closeModal();
+          renderConfiguracion(container);
+          showToast('Método de pago eliminado', 'success');
+          if (typeof syncToCloud === 'function') syncToCloud();
         }
       });
     });
@@ -662,6 +930,82 @@ function openTipoModal(id = null) {
       closeModal();
       renderConfiguracion(document.querySelector('.main-content'));
       showToast('Guardado correctamente', 'success');
+    }
+  });
+}
+
+function openMetodoPagoModal(id = null) {
+  const isEdit = !!id;
+  const allMethods = store.getMetodosPago(false);
+  const metodo = isEdit ? (allMethods.find(m => m.id === id) || {}) : {};
+  const currentMoneda = metodo.moneda || 'Bs';
+  const currentIcon = metodo.icon || '💳';
+
+  const icons = ['💳', '💵', '📱', '🏦', '🌐', '🪙', '📲', '🤝', '⭐', '🛒', '⚡'];
+
+  const content = `
+    <form id="form-metodo-pago" style="padding: 10px 0;">
+      <div class="form-group mb-md">
+        <label class="form-label" style="font-weight: 700;">Nombre del Método de Pago</label>
+        <input type="text" class="form-control" name="label" id="input-metodo-label" value="${Utils.escapeHtml(metodo.label || '')}" placeholder="Ej: Punto de venta (B), Zelle, Banesco Panamá" required style="font-size: 15px; font-weight: 600;" />
+        <small class="text-muted" style="font-size: 11px; margin-top: 4px; display: block;">Este nombre se mostrará en el Punto de Venta, Arqueo de Caja y Reportes.</small>
+      </div>
+
+      <div class="form-row mb-md" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="font-weight: 700;">Moneda de Recepción</label>
+          <select class="form-control" name="moneda" id="select-metodo-moneda" style="height: 38px; font-weight: 600;">
+            <option value="Bs" ${currentMoneda === 'Bs' ? 'selected' : ''}>💴 Bolívares (Bs)</option>
+            <option value="USD" ${currentMoneda === 'USD' ? 'selected' : ''}>💵 Dólares ($ / USD)</option>
+          </select>
+          <small class="text-muted" style="font-size: 11px; margin-top: 4px; display: block;">Determina si se calcula con la tasa oficial o en $ directo.</small>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="font-weight: 700;">Ícono / Emoji</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" class="form-control" name="icon" id="input-metodo-icon" value="${currentIcon}" style="width: 55px; text-align: center; font-size: 20px;" maxlength="4" />
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              ${icons.map(ic => `<button type="button" class="btn btn-xs btn-secondary btn-pick-icon" data-icon="${ic}" style="padding: 3px 6px; font-size: 14px;">${ic}</button>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  `;
+
+  openModal({
+    title: isEdit ? '✏️ Editar Método de Pago' : '💳 Anexar Nuevo Método de Pago',
+    content,
+    onOpen: (overlay) => {
+      overlay.querySelectorAll('.btn-pick-icon').forEach(btn => {
+        btn.addEventListener('click', () => {
+          overlay.querySelector('#input-metodo-icon').value = btn.dataset.icon;
+        });
+      });
+    },
+    onSave: (overlay) => {
+      const form = overlay.querySelector('#form-metodo-pago');
+      const label = form.querySelector('#input-metodo-label').value.trim();
+      const moneda = form.querySelector('#select-metodo-moneda').value;
+      const icon = form.querySelector('#input-metodo-icon').value.trim() || '💳';
+
+      if (!label) {
+        showToast('Debe ingresar un nombre para el método de pago', 'warning');
+        return;
+      }
+
+      store.saveMetodoPago({
+        id: isEdit ? id : null,
+        label,
+        moneda,
+        icon
+      });
+
+      closeModal();
+      renderConfiguracion(document.querySelector('.main-content'));
+      showToast(isEdit ? 'Método de pago actualizado' : 'Método de pago anexado con éxito', 'success');
+      if (typeof syncToCloud === 'function') syncToCloud();
     }
   });
 }
