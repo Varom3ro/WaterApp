@@ -4,9 +4,11 @@
 // Soporta tanto ejecuciones Web independientes como integración Android WebView
 // ============================================
 
+import { Utils } from './utils.js';
+
 const DB_NAME = 'TuEmpresaDB';
-const DB_VERSION = 2;
-const COLLECTIONS = ['clientes', 'ventas', 'abonos', 'configuracion', 'cisternas', 'mermas'];
+const DB_VERSION = 3;
+const COLLECTIONS = ['clientes', 'ventas', 'abonos', 'configuracion', 'cisternas', 'mermas', 'propinas'];
 
 class Store {
     constructor() {
@@ -57,28 +59,45 @@ class Store {
 
     _getAllDB(storeName) {
         return new Promise((resolve) => {
-            const tx = this.db.transaction(storeName, 'readonly');
-            const req = tx.objectStore(storeName).getAll();
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => resolve([]);
+            if (!this.db || !this.db.objectStoreNames.contains(storeName)) {
+                return resolve([]);
+            }
+            try {
+                const tx = this.db.transaction(storeName, 'readonly');
+                const req = tx.objectStore(storeName).getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => resolve([]);
+            } catch (e) {
+                resolve([]);
+            }
         });
     }
 
     _putDB(storeName, item) {
+        if (!this.db || !this.db.objectStoreNames.contains(storeName)) return Promise.resolve(true);
         return new Promise((resolve) => {
-            const tx = this.db.transaction(storeName, 'readwrite');
-            const req = tx.objectStore(storeName).put(item);
-            req.onsuccess = () => resolve(true);
-            req.onerror = () => resolve(false);
+            try {
+                const tx = this.db.transaction(storeName, 'readwrite');
+                const req = tx.objectStore(storeName).put(item);
+                req.onsuccess = () => resolve(true);
+                req.onerror = () => resolve(false);
+            } catch (e) {
+                resolve(false);
+            }
         });
     }
 
     _deleteDB(storeName, id) {
+        if (!this.db || !this.db.objectStoreNames.contains(storeName)) return Promise.resolve(true);
         return new Promise((resolve) => {
-            const tx = this.db.transaction(storeName, 'readwrite');
-            const req = tx.objectStore(storeName).delete(id);
-            req.onsuccess = () => resolve(true);
-            req.onerror = () => resolve(false);
+            try {
+                const tx = this.db.transaction(storeName, 'readwrite');
+                const req = tx.objectStore(storeName).delete(id);
+                req.onsuccess = () => resolve(true);
+                req.onerror = () => resolve(false);
+            } catch (e) {
+                resolve(false);
+            }
         });
     }
 
@@ -150,6 +169,77 @@ class Store {
         } else {
             this.save('configuracion', { id: key, value });
         }
+    }
+
+    // ---- Zonas y Ubicaciones de Clientes ----
+
+    getZonasPresets() {
+        return {
+            oeste: {
+                nombre: 'Caracas Oeste (El Paraíso / Libertador)',
+                municipios: ['Libertador', 'Chacao', 'Baruta', 'Sucre', 'El Hatillo'],
+                urbanizaciones: [
+                    'El Paraíso',
+                    'Montalbán',
+                    'Vista Alegre',
+                    'La Quebradita',
+                    'Bella Vista',
+                    'San Martín',
+                    'Juan Pablo II'
+                ]
+            },
+            este: {
+                nombre: 'Caracas Este (La California / Sucre / Chacao)',
+                municipios: ['Sucre', 'Chacao', 'Baruta', 'Libertador', 'El Hatillo'],
+                urbanizaciones: [
+                    'La California Sur',
+                    'La California Norte',
+                    'Macaracuay',
+                    'Los Ruices',
+                    'Los Cortijos',
+                    'El Llanito',
+                    'La Urbina',
+                    'Boleíta Sur',
+                    'Boleíta Norte',
+                    'Montecristo',
+                    'Campo Claro',
+                    'Los Dos Caminos',
+                    'Palo Verde',
+                    'Petare',
+                    'Terrazas del Ávila',
+                    'Lomas del Ávila',
+                    'Santa Cecilia',
+                    'Sebucán',
+                    'Chacao',
+                    'Los Palos Grandes',
+                    'Altamira'
+                ]
+            }
+        };
+    }
+
+    getZonasMunicipios() {
+        const conf = this.getConfig('zonasMunicipios');
+        if (Array.isArray(conf) && conf.length > 0) {
+            return conf;
+        }
+        return ['Libertador', 'Chacao', 'Baruta', 'Sucre', 'El Hatillo'];
+    }
+
+    getZonasUrbanizaciones() {
+        const conf = this.getConfig('zonasUrbanizaciones');
+        if (Array.isArray(conf) && conf.length > 0) {
+            return conf;
+        }
+        return [
+            'El Paraíso',
+            'Montalbán',
+            'Vista Alegre',
+            'La Quebradita',
+            'Bella Vista',
+            'San Martín',
+            'Juan Pablo II'
+        ];
     }
 
     // ---- Security / Password ----
@@ -226,12 +316,7 @@ class Store {
         const cliente = this.getById('clientes', clienteId);
         if (!cliente) return 'al_dia';
 
-        const ventas = this.getAll('ventas').filter(v => v.clienteId === clienteId && v.tipo === 'credito');
-        const abonos = this.getAll('abonos').filter(a => a.clienteId === clienteId);
-
-        const totalDeuda = ventas.reduce((sum, v) => sum + v.total, 0);
-        const totalAbonos = abonos.reduce((sum, a) => sum + a.monto, 0);
-        const saldo = totalDeuda - totalAbonos;
+        const saldo = this.getSaldoNetoCliente(clienteId);
 
         if (saldo < 0) return 'con_abono';
         if (saldo === 0) return 'al_dia';
@@ -240,12 +325,15 @@ class Store {
         const limDias = cliente.limiteDias || Infinity;
         const limConsumo = cliente.limiteConsumo || Infinity;
 
-        const ultimaVentaCredito = ventas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+        const ventasCredito = this.getAll('ventas').filter(v => v.clienteId === clienteId && v.tipo === 'credito');
+        const abonos = this.getAll('abonos').filter(a => a.clienteId === clienteId);
+
+        const ultimaVentaCredito = ventasCredito.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
         const ultimoAbono = abonos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
         const ultimaFecha = ultimoAbono ? ultimoAbono.fecha : (ultimaVentaCredito ? ultimaVentaCredito.fecha : null);
         const diasSinAbono = ultimaFecha ? Math.floor((Date.now() - new Date(ultimaFecha)) / (1000 * 60 * 60 * 24)) : 0;
 
-        const botellonesCredito = ventas.reduce((sum, v) => sum + v.botellones, 0);
+        const botellonesCredito = ventasCredito.reduce((sum, v) => sum + v.botellones, 0);
 
         if (saldo > limMonto || diasSinAbono > limDias || botellonesCredito > limConsumo) {
             return 'moroso';
@@ -254,11 +342,28 @@ class Store {
     }
 
     getDeudaCliente(clienteId) {
-        const ventas = this.getAll('ventas').filter(v => v.clienteId === clienteId && v.tipo === 'credito');
+        const saldo = this.getSaldoNetoCliente(clienteId);
+        return Math.max(0, saldo);
+    }
+
+    getSaldoNetoCliente(clienteId) {
+        const ventas = this.getAll('ventas').filter(v => v.clienteId === clienteId);
         const abonos = this.getAll('abonos').filter(a => a.clienteId === clienteId);
-        const totalDeuda = ventas.reduce((sum, v) => sum + v.total, 0);
-        const totalAbonos = abonos.reduce((sum, a) => sum + a.monto, 0);
-        return Math.max(0, totalDeuda - totalAbonos);
+        
+        let totalDeuda = 0;
+        for (const v of ventas) {
+            if (v.tipo === 'credito') {
+                totalDeuda += (v.total || 0);
+            } else if (v.pagos && Array.isArray(v.pagos)) {
+                for (const p of v.pagos) {
+                    if (p.metodo === 'saldo_favor') {
+                        totalDeuda += (parseFloat(p.monto) || 0);
+                    }
+                }
+            }
+        }
+        const totalAbonos = abonos.reduce((sum, a) => sum + (parseFloat(a.monto) || 0), 0);
+        return totalDeuda - totalAbonos;
     }
 
     // ---- Dashboard Stats ----
@@ -344,15 +449,74 @@ class Store {
         localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
     }
 
-    getCierreCaja(fecha) {
-        let day;
-        if (typeof fecha === 'string' && fecha.includes('-')) {
-            const parts = fecha.split('T')[0].split('-');
-            day = new Date(parts[0], parts[1] - 1, parts[2]);
-        } else {
-            day = new Date(fecha || Date.now());
+    // ---- Métodos de Pago Personalizados ----
+
+    getMetodosPago(onlyActivos = false) {
+        const baseMethods = (Utils && Utils.paymentMethods) ? Utils.paymentMethods : [
+            { id: 'efectivo_usd', label: 'Efectivo (USD)', icon: '💵', moneda: 'USD', color: '#2D6A4F', isCustom: false },
+            { id: 'efectivo_bs', label: 'Efectivo (Bs)', icon: '💴', moneda: 'Bs', color: '#40916C', isCustom: false },
+            { id: 'punto', label: 'Punto de Venta', icon: '💳', moneda: 'Bs', color: '#52B788', isCustom: false },
+            { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', moneda: 'Bs', color: '#74C69D', isCustom: false },
+            { id: 'transferencia', label: 'Transferencia', icon: '🏦', moneda: 'Bs', color: '#95D5B2', isCustom: false }
+        ];
+
+        const customMethods = this.getConfig('metodosPagoPersonalizados') || [];
+        const allMethods = [...baseMethods, ...customMethods];
+
+        if (onlyActivos) {
+            return allMethods.filter(m => m.activo !== false);
         }
-        day.setHours(0, 0, 0, 0);
+        return allMethods;
+    }
+
+    saveMetodoPago(data) {
+        const customMethods = this.getConfig('metodosPagoPersonalizados') || [];
+        const isEditing = data.id && customMethods.some(m => m.id === data.id);
+
+        if (isEditing) {
+            const updated = customMethods.map(m => {
+                if (m.id === data.id) {
+                    return {
+                        ...m,
+                        label: data.label.trim(),
+                        icon: data.icon || '💳',
+                        moneda: data.moneda || 'Bs',
+                        activo: data.activo !== undefined ? data.activo : true,
+                        updatedAt: new Date().toISOString()
+                    };
+                }
+                return m;
+            });
+            this.setConfig('metodosPagoPersonalizados', updated);
+            return updated.find(m => m.id === data.id);
+        } else {
+            const newMethod = {
+                id: 'custom_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+                label: data.label.trim(),
+                icon: data.icon || '💳',
+                moneda: data.moneda || 'Bs',
+                color: data.moneda === 'USD' ? '#2D6A4F' : '#3B82F6',
+                activo: true,
+                isCustom: true,
+                createdAt: new Date().toISOString()
+            };
+            customMethods.push(newMethod);
+            this.setConfig('metodosPagoPersonalizados', customMethods);
+            return newMethod;
+        }
+    }
+
+    deleteMetodoPago(id) {
+        const customMethods = this.getConfig('metodosPagoPersonalizados') || [];
+        const filtered = customMethods.filter(m => m.id !== id);
+        this.setConfig('metodosPagoPersonalizados', filtered);
+        return true;
+    }
+
+    // ---- Cierre de Caja y Arqueo ----
+
+    getCierreCaja(fecha) {
+        const day = new Date(fecha + 'T00:00:00');
         const nextDay = new Date(day);
         nextDay.setDate(nextDay.getDate() + 1);
 
@@ -366,56 +530,127 @@ class Store {
             return d >= day && d < nextDay;
         });
 
+        const allMethods = this.getMetodosPago(false);
+
         const cierre = {
-            efectivo_usd: 0, efectivo_bs: 0, punto: 0, pago_movil: 0, transferencia: 0, 
             credito: 0, total: 0, botellones: 0, cantidadVentas: ventas.length,
             cobros_credito: 0, // Suma de todos los abonos cobrados hoy
             real_ingresado: 0, // Dinero real que entró (Ventas Contado + Cobros de Crédito)
-            bs: { efectivo_usd: 0, efectivo_bs: 0, punto: 0, pago_movil: 0, transferencia: 0, credito: 0, total: 0, cobros_credito: 0, real_ingresado: 0 }
+            bs: { credito: 0, total: 0, cobros_credito: 0, real_ingresado: 0 }
         };
+
+        // Inicializar claves para todos los métodos de pago
+        allMethods.forEach(m => {
+            cierre[m.id] = 0;
+            cierre.bs[m.id] = 0;
+        });
 
         const currentTasa = this.getConfig('tasaCambio') || 40.00;
 
         // Procesar ventas del día
         for (const v of ventas) {
-            cierre.botellones += v.botellones;
-            cierre.total += v.total;
+            cierre.botellones += (v.botellones || 0);
+            cierre.total += (v.total || 0);
             
             const tasa = v.tasa || currentTasa;
-            cierre.bs.total += v.total * tasa;
+            cierre.bs.total += (v.total || 0) * tasa;
 
             if (v.tipo === 'credito') {
-                cierre.credito += v.total;
-                cierre.bs.credito += v.total * tasa;
-            } else if (v.pagos) {
+                cierre.credito += (v.total || 0);
+                cierre.bs.credito += (v.total || 0) * tasa;
+            } else if (v.pagos && Array.isArray(v.pagos)) {
                 for (const p of v.pagos) {
-                    if (cierre.hasOwnProperty(p.metodo)) {
-                        cierre[p.metodo] += p.monto;
-                        cierre.real_ingresado += p.monto;
-                        
-                        cierre.bs[p.metodo] += p.monto * tasa;
-                        cierre.bs.real_ingresado += p.monto * tasa;
+                    const mId = p.metodo;
+                    const monto = parseFloat(p.monto) || 0;
+                    if (cierre[mId] === undefined) {
+                        cierre[mId] = 0;
+                        cierre.bs[mId] = 0;
                     }
+                    cierre[mId] += monto;
+                    cierre.bs[mId] += monto * tasa;
+
+                    if (mId !== 'saldo_favor') {
+                        cierre.real_ingresado += monto;
+                        cierre.bs.real_ingresado += monto * tasa;
+                    }
+                }
+            } else if (v.metodoPago) {
+                const mId = v.metodoPago;
+                const monto = parseFloat(v.total) || 0;
+                if (cierre[mId] === undefined) {
+                    cierre[mId] = 0;
+                    cierre.bs[mId] = 0;
+                }
+                cierre[mId] += monto;
+                cierre.bs[mId] += monto * tasa;
+
+                if (mId !== 'saldo_favor') {
+                    cierre.real_ingresado += monto;
+                    cierre.bs.real_ingresado += monto * tasa;
                 }
             }
         }
 
         // Procesar cobros de créditos (abonos) realizados hoy
         for (const a of abonos) {
-            cierre.cobros_credito += a.monto;
-            cierre.real_ingresado += a.monto;
+            const monto = parseFloat(a.monto) || 0;
+            cierre.cobros_credito += monto;
+            cierre.real_ingresado += monto;
             
             const tasa = a.tasa || currentTasa;
-            cierre.bs.cobros_credito += a.monto * tasa;
-            cierre.bs.real_ingresado += a.monto * tasa;
+            cierre.bs.cobros_credito += monto * tasa;
+            cierre.bs.real_ingresado += monto * tasa;
 
-            if (cierre.hasOwnProperty(a.metodo)) {
-                cierre[a.metodo] += a.monto;
-                cierre.bs[a.metodo] += a.monto * tasa;
+            const mId = a.metodo;
+            if (cierre[mId] === undefined) {
+                cierre[mId] = 0;
+                cierre.bs[mId] = 0;
             }
+            cierre[mId] += monto;
+            cierre.bs[mId] += monto * tasa;
         }
+
+        // Procesar propinas digitales / bancarias recibidas hoy (Punto de venta, Pago móvil, etc.)
+        const propinas = this.getAll('propinas').filter(p => {
+            const d = new Date(p.fecha);
+            return d >= day && d < nextDay;
+        });
+
+        let totalPropinasUSD = 0;
+        let totalPropinasBs = 0;
+        for (const prop of propinas) {
+            const tasa = prop.tasa || currentTasa;
+            let montoUSD = 0;
+            let montoBs = 0;
+
+            if (prop.moneda === 'Bs' || prop.moneda === 'VES') {
+                montoBs = parseFloat(prop.monto) || 0;
+                montoUSD = tasa > 0 ? montoBs / tasa : 0;
+            } else {
+                montoUSD = parseFloat(prop.monto) || 0;
+                montoBs = montoUSD * tasa;
+            }
+
+            totalPropinasUSD += montoUSD;
+            totalPropinasBs += montoBs;
+
+            const mId = prop.metodo || 'punto';
+            if (cierre[mId] === undefined) {
+                cierre[mId] = 0;
+                cierre.bs[mId] = 0;
+            }
+            cierre[mId] += montoUSD;
+            cierre.bs[mId] += montoBs;
+
+            cierre.real_ingresado += montoUSD;
+            cierre.bs.real_ingresado += montoBs;
+        }
+
         cierre.ventasDetalle = ventas;
         cierre.abonosDetalle = abonos;
+        cierre.propinasDetalle = propinas;
+        cierre.totalPropinasUSD = totalPropinasUSD;
+        cierre.totalPropinasBs = totalPropinasBs;
 
         return cierre;
     }

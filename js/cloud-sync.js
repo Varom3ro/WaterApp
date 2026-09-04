@@ -136,7 +136,11 @@ export async function syncToCloud(isManual = false) {
       if (v.tipo === 'credito') metodoLabel = '📋 Crédito';
       else if (v.pagos && v.pagos[0]) {
         const m = v.pagos[0].metodo;
-        if (m === 'pago_movil') metodoLabel = '📱 Pago Móvil';
+        const allM = store.getMetodosPago(false);
+        const found = allM.find(item => item.id === m);
+        if (found) {
+          metodoLabel = `${found.icon || '💳'} ${found.label}`;
+        } else if (m === 'pago_movil') metodoLabel = '📱 Pago Móvil';
         else if (m === 'punto_venta' || m === 'punto') metodoLabel = '💳 Punto Venta';
         else if (m === 'transferencia') metodoLabel = '🏦 Transferencia';
         else if (m === 'efectivo_usd') metodoLabel = '💵 Efectivo $';
