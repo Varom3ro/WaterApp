@@ -5,6 +5,24 @@
 import { store } from '../store.js';
 import { Utils } from '../utils.js';
 
+function sortProductosResumen(entries) {
+  return entries.sort(([nameA, infoA], [nameB, infoB]) => {
+    const isProdA = infoA.categoria === 'producto';
+    const isProdB = infoB.categoria === 'producto';
+    if (isProdA !== isProdB) return isProdA ? 1 : -1;
+    if (!isProdA) {
+      const capA = infoA.litrosCap !== undefined ? infoA.litrosCap : (infoA.litros || 0);
+      const capB = infoB.litrosCap !== undefined ? infoB.litrosCap : (infoB.litros || 0);
+      if (capB !== capA) return capB - capA;
+    }
+    return nameA.localeCompare(nameB, 'es', { numeric: true });
+  });
+}
+
+function isOperacionSinCobro(tipo) {
+  return tipo === 'convenio' || tipo === 'garantia' || tipo === 'cortesia';
+}
+
 export function renderReportes(container) {
   const today = Utils.todayISO();
 
@@ -183,51 +201,125 @@ function renderVentasYCisternas(content, range) {
     return f >= range.inicio && f <= range.fin;
   }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-  // Consolidado por producto
+  // Consolidado por producto y control de salidas sin cobro
   const productoResumen = {};
   let totalDeliveriesCant = 0;
   let totalDeliveriesMonto = 0;
 
+  const salidasSinCobro = {
+    convenio: { label: 'Convenios Institucionales', icon: '🤝', botellones: 0, litros: 0 },
+    garantia: { label: 'Garantías (Agua Sucia / Reclamo)', icon: '🔄', botellones: 0, litros: 0 },
+    cortesia: { label: 'Cortesías / Promociones', icon: '🎁', botellones: 0, litros: 0 }
+  };
+  let totalBotellonesSinCobro = 0;
+  let totalLitrosSinCobro = 0;
+
   ventasFiltradas.forEach(v => {
+    const isSinCobro = isOperacionSinCobro(v.tipo);
+
     if (v.detalles && Array.isArray(v.detalles)) {
       v.detalles.forEach(d => {
         const prod = tipos.find(t => t.id === d.tipoBotellonId);
-        const prodName = d.nombre || (prod ? prod.nombre : 'Producto');
+        const prodName = prod ? prod.nombre : (d.nombre || 'Producto');
+        const cap = prod ? (parseFloat(prod.litros) || 20) : (parseFloat(d.capacidad) || 20);
+        const cat = prod ? (prod.categoria || 'recarga') : (d.categoria || 'recarga');
+        const cant = (d.cantidad || 1);
+        const itemSinCobro = isSinCobro || !!d.esCortesia || (d.subtotal === 0);
+
         if (!productoResumen[prodName]) {
-          productoResumen[prodName] = { cantidad: 0, monto: 0 };
+          productoResumen[prodName] = { 
+            cantidad: 0, 
+            cantidadVendida: 0, 
+            cantidadSinCobro: 0, 
+            monto: 0, 
+            litrosCap: cap, 
+            categoria: cat 
+          };
         }
-        productoResumen[prodName].cantidad += (d.cantidad || 1);
-        productoResumen[prodName].monto += (d.subtotal || 0);
+        productoResumen[prodName].cantidad += cant;
+        if (itemSinCobro) {
+          productoResumen[prodName].cantidadSinCobro += cant;
+        } else {
+          productoResumen[prodName].cantidadVendida += cant;
+          productoResumen[prodName].monto += (d.subtotal || 0);
+        }
       });
     } else if (v.botellones) {
       const prodName = 'Botellón (General)';
-      if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0 };
+      if (!productoResumen[prodName]) {
+        productoResumen[prodName] = { cantidad: 0, cantidadVendida: 0, cantidadSinCobro: 0, monto: 0, litrosCap: 20, categoria: 'recarga' };
+      }
       productoResumen[prodName].cantidad += v.botellones;
-      productoResumen[prodName].monto += v.total;
+      if (isSinCobro) {
+        productoResumen[prodName].cantidadSinCobro += v.botellones;
+      } else {
+        productoResumen[prodName].cantidadVendida += v.botellones;
+        productoResumen[prodName].monto += (v.total || 0);
+      }
     }
 
-    if (v.delivery > 0) {
+    if (isSinCobro) {
+      const bot = v.botellones || (v.detalles ? v.detalles.reduce((a, b) => a + (b.cantidad || 1), 0) : 1);
+      const lit = v.litrosTotales || (bot * 20);
+      const mot = v.tipo || 'convenio';
+      if (salidasSinCobro[mot]) {
+        salidasSinCobro[mot].botellones += bot;
+        salidasSinCobro[mot].litros += lit;
+      }
+      totalBotellonesSinCobro += bot;
+      totalLitrosSinCobro += lit;
+    } else if (v.detalles && Array.isArray(v.detalles)) {
+      v.detalles.forEach(d => {
+        if (d.esCortesia || (d.esBotellonFisico && d.aguaCortesia)) {
+          const bot = d.cantidad || 1;
+          const lit = d.litros || (bot * (d.litrosAguaPorUnidad || 20));
+          salidasSinCobro.cortesia.botellones += bot;
+          salidasSinCobro.cortesia.litros += lit;
+          totalBotellonesSinCobro += bot;
+          totalLitrosSinCobro += lit;
+        }
+      });
+    }
+
+    if (v.delivery > 0 && !isSinCobro) {
       totalDeliveriesCant += (v.deliveryCant || 1);
       totalDeliveriesMonto += v.delivery;
     }
   });
 
-  const listProdResumen = Object.entries(productoResumen);
+  const listProdResumen = sortProductosResumen(Object.entries(productoResumen));
 
-  const totalVentasMonto = ventasFiltradas.reduce((s, v) => s + v.total, 0);
+  // Ventas recaudadas reales (cobradas en caja y bancos)
+  const ventasComerciales = ventasFiltradas.filter(v => !isOperacionSinCobro(v.tipo));
+  const totalVentasCobradoMonto = ventasComerciales.filter(v => v.tipo !== 'credito').reduce((s, v) => s + (v.total || 0), 0);
+  const totalCreditoMonto = ventasComerciales.filter(v => v.tipo === 'credito').reduce((s, v) => s + (v.total || 0), 0);
+
+  const allAbonos = store.getAll('abonos') || [];
+  const abonosFiltrados = allAbonos.filter(a => {
+    const f = new Date(a.fecha);
+    return f >= range.inicio && f <= range.fin;
+  });
+  const totalAbonosMonto = abonosFiltrados.reduce((s, a) => s + (parseFloat(a.monto) || 0), 0);
+  const totalRecaudadoReal = totalVentasCobradoMonto + totalAbonosMonto;
+
   const totalLitrosCisternas = cisternasFiltradas.reduce((s, c) => s + c.capacidad, 0);
 
   content.innerHTML = `
-    <div class="metrics-grid mb-lg" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="metrics-grid mb-lg" style="grid-template-columns: repeat(4, 1fr);">
       <div class="metric-card">
         <div class="metric-label">Ventas Recaudadas ($)</div>
-        <div class="metric-value text-success">${Utils.formatCurrency(totalVentasMonto)}</div>
-        <div class="metric-change">En el período seleccionado</div>
+        <div class="metric-value text-success">${Utils.formatCurrency(totalRecaudadoReal)}</div>
+        <div class="metric-change">${totalAbonosMonto > 0 ? `Contado: ${Utils.formatCurrency(totalVentasCobradoMonto)} + Cobros: ${Utils.formatCurrency(totalAbonosMonto)}` : 'Cobrado en caja y bancos'}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Transacciones / Facturas</div>
-        <div class="metric-value">${ventasFiltradas.length}</div>
-        <div class="metric-change">Ventas procesadas</div>
+        <div class="metric-label">Ventas Comerciales</div>
+        <div class="metric-value">${ventasComerciales.length}</div>
+        <div class="metric-change">${totalCreditoMonto > 0 ? `Créditos: ${Utils.formatCurrency(totalCreditoMonto)}` : 'Operaciones con cobro'}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Salidas sin Cobro</div>
+        <div class="metric-value" style="color: #0284C7;">${totalBotellonesSinCobro} <small style="font-size:13px;">unid.</small></div>
+        <div class="metric-change">${Utils.formatNumber(totalLitrosSinCobro)} L de agua entregados</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Agua Comprada</div>
@@ -235,6 +327,35 @@ function renderVentasYCisternas(content, range) {
         <div class="metric-change">${cisternasFiltradas.length} cisternas ingresadas</div>
       </div>
     </div>
+
+    <!-- Bloque Salidas Especiales sin Cobro -->
+    ${totalBotellonesSinCobro > 0 ? `
+      <div class="card mb-lg" style="background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 1.5px solid #BFDBFE;">
+        <div class="card-header" style="border-bottom: 1px solid #DBEAFE; padding-bottom: 10px;">
+          <h3 class="card-title" style="color: #1E40AF; display: flex; align-items: center; gap: 8px;">
+            <span>💧</span> Salidas Especiales de Agua (Sin Cobro en Caja)
+          </h3>
+          <span style="font-size: 12px; color: #2563EB; font-weight: 600;">Descontadas del tanque de agua (${Utils.formatNumber(totalLitrosSinCobro)} Litros)</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 15px 0 5px 0;">
+          <div style="background: #fff; border: 1px solid #E2E8F0; padding: 12px 16px; border-radius: 8px;">
+            <div style="font-size: 12px; color: var(--color-text-secondary); font-weight: 600;">🤝 Convenios Institucionales</div>
+            <div style="font-size: 20px; font-weight: 700; color: #0284C7; margin-top: 4px;">${salidasSinCobro.convenio.botellones} <small style="font-size:12px; font-weight:normal;">unid.</small></div>
+            <div style="font-size: 11px; color: var(--color-text-secondary);">${Utils.formatNumber(salidasSinCobro.convenio.litros)} Litros de agua</div>
+          </div>
+          <div style="background: #fff; border: 1px solid #E2E8F0; padding: 12px 16px; border-radius: 8px;">
+            <div style="font-size: 12px; color: var(--color-text-secondary); font-weight: 600;">🔄 Garantías (Agua Sucia/Reclamo)</div>
+            <div style="font-size: 20px; font-weight: 700; color: #DC2626; margin-top: 4px;">${salidasSinCobro.garantia.botellones} <small style="font-size:12px; font-weight:normal;">unid.</small></div>
+            <div style="font-size: 11px; color: var(--color-text-secondary);">${Utils.formatNumber(salidasSinCobro.garantia.litros)} Litros de agua</div>
+          </div>
+          <div style="background: #fff; border: 1px solid #E2E8F0; padding: 12px 16px; border-radius: 8px;">
+            <div style="font-size: 12px; color: var(--color-text-secondary); font-weight: 600;">🎁 Cortesías / Promociones</div>
+            <div style="font-size: 20px; font-weight: 700; color: #7C3AED; margin-top: 4px;">${salidasSinCobro.cortesia.botellones} <small style="font-size:12px; font-weight:normal;">unid.</small></div>
+            <div style="font-size: 11px; color: var(--color-text-secondary);">${Utils.formatNumber(salidasSinCobro.cortesia.litros)} Litros de agua</div>
+          </div>
+        </div>
+      </div>
+    ` : ''}
 
     <!-- Resumen Consolidado por Producto -->
     ${listProdResumen.length > 0 ? `
@@ -247,7 +368,8 @@ function renderVentasYCisternas(content, range) {
             <thead>
               <tr>
                 <th>Producto / Servicio</th>
-                <th style="text-align:center;">Unidades / Cantidad</th>
+                <th style="text-align:center;">Unid. Facturadas</th>
+                <th style="text-align:center;">Sin Cobro</th>
                 <th style="text-align:right;">Monto Total ($)</th>
               </tr>
             </thead>
@@ -255,7 +377,16 @@ function renderVentasYCisternas(content, range) {
               ${listProdResumen.map(([nombre, info]) => `
                 <tr>
                   <td class="font-semibold">${Utils.escapeHtml(nombre)}</td>
-                  <td style="text-align:center;"><span class="badge badge-info">${info.cantidad} unid.</span></td>
+                  <td style="text-align:center;">
+                    ${info.cantidadVendida > 0 ? `<span class="badge badge-info">${info.cantidadVendida} vend.</span>` : '<span style="color:#94A3B8; font-weight:500;">-</span>'}
+                  </td>
+                  <td style="text-align:center;">
+                    ${info.cantidadSinCobro > 0 ? `
+                      <span class="badge" style="background:#EDE9FE; color:#6D28D9; border:1px solid #DDD6FE; font-size:11px; font-weight:600;" title="Entregados en Convenio / Garantía / Cortesía">
+                        ${info.cantidadSinCobro} sin cobro
+                      </span>
+                    ` : '<span style="color:#94A3B8; font-weight:500;">-</span>'}
+                  </td>
                   <td style="text-align:right;" class="font-semibold text-success">${Utils.formatCurrency(info.monto)}</td>
                 </tr>
               `).join('')}
@@ -263,6 +394,7 @@ function renderVentasYCisternas(content, range) {
                 <tr>
                   <td class="font-semibold">🛵 Servicios de Delivery</td>
                   <td style="text-align:center;"><span class="badge badge-info">${totalDeliveriesCant} viaje(s)</span></td>
+                  <td style="text-align:center;"><span style="color:#94A3B8; font-weight:500;">-</span></td>
                   <td style="text-align:right;" class="font-semibold text-success">${Utils.formatCurrency(totalDeliveriesMonto)}</td>
                 </tr>
               ` : ''}
@@ -298,10 +430,17 @@ function renderVentasYCisternas(content, range) {
               const nombre = cliente ? cliente.nombre : 'Cliente General';
               
               let pagosStr = '-';
+              const isSinCobro = isOperacionSinCobro(v.tipo);
+              const totalDisplay = isSinCobro ? 0 : (v.total || 0);
+
               if (v.tipo === 'credito') {
                 pagosStr = '<span class="badge badge-warning" style="font-size: 0.75em;">A Crédito</span>';
               } else if (v.tipo === 'convenio') {
-                pagosStr = '<span class="badge badge-info" style="font-size: 0.75em;">Convenio</span>';
+                pagosStr = '<span class="badge" style="font-size: 0.75em; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">Convenio</span>';
+              } else if (v.tipo === 'garantia') {
+                pagosStr = '<span class="badge" style="font-size: 0.75em; background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">Garantía</span>';
+              } else if (v.tipo === 'cortesia') {
+                pagosStr = '<span class="badge" style="font-size: 0.75em; background: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;">Cortesía</span>';
               } else if (v.pagos && v.pagos.length > 0) {
                 pagosStr = v.pagos.map(p => {
                   const allMethods = store.getMetodosPago ? store.getMetodosPago(false) : (Utils.paymentMethods || []);
@@ -316,34 +455,41 @@ function renderVentasYCisternas(content, range) {
               if (v.detalles && v.detalles.length > 0) {
                 detallesHTML = v.detalles.map(d => {
                   const prod = tipos.find(t => t.id === d.tipoBotellonId);
-                  const prodName = d.nombre || (prod ? prod.nombre : 'Prod.');
-                  return `<div style="font-size: 0.9em; margin-bottom: 2px;">${d.cantidad}x ${Utils.formatCurrency(d.precioUnitario)} ${prodName}</div>`;
+                  const prodName = prod ? prod.nombre : (d.nombre || 'Prod.');
+                  const cortBadge = d.esCortesia 
+                    ? ' <span class="badge" style="font-size:0.7em; background:#fce7f3; color:#9d174d;">Cortesía</span>' 
+                    : ((d.esBotellonFisico && d.aguaCortesia) ? ' <span class="badge" style="font-size:0.7em; background:#EDE9FE; color:#6D28D9; border: 1px solid #DDD6FE;">+ Agua Cortesía</span>' : '');
+                  const precioItem = (isSinCobro || d.esCortesia) ? 0 : d.precioUnitario;
+                  return `<div style="font-size: 0.9em; margin-bottom: 2px;">${d.cantidad}x ${Utils.formatCurrency(precioItem)} ${prodName}${cortBadge}</div>`;
                 }).join('');
               } else {
                 detallesHTML = `<div style="font-size: 0.9em;">${v.botellones || 0} botellones</div>`;
               }
 
-              const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
-              const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
+              const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + (d.esCortesia || isSinCobro ? 0 : d.subtotal), 0) : totalDisplay;
+              const delivery = v.delivery !== undefined ? v.delivery : (totalDisplay - sumaSubtotal > 0.01 ? totalDisplay - sumaSubtotal : 0);
               
-              if (delivery > 0) {
+              if (delivery > 0 && !isSinCobro) {
                 const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
                 detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
               }
+
+              let tipoBadge = '<span class="badge badge-success">Contado</span>';
+              if (v.tipo === 'credito') tipoBadge = '<span class="badge badge-warning">Crédito</span>';
+              else if (v.tipo === 'convenio') tipoBadge = '<span class="badge" style="background:#e0f2fe; color:#0369a1; border: 1px solid #bae6fd;">🤝 Convenio</span>';
+              else if (v.tipo === 'garantia') tipoBadge = '<span class="badge" style="background:#fef3c7; color:#92400e; border: 1px solid #fde68a;">🔄 Garantía</span>';
+              else if (v.tipo === 'cortesia') tipoBadge = '<span class="badge" style="background:#fce7f3; color:#9d174d; border: 1px solid #fbcfe8;">🎁 Cortesía</span>';
 
               return `
                 <tr>
                   <td>${Utils.formatDateTime(v.fecha)}</td>
                   <td class="font-semibold">${Utils.escapeHtml(nombre)}</td>
                   <td style="line-height: 1.2;">${detallesHTML}</td>
-                  <td class="font-semibold" style="line-height: 1.2;">${Utils.formatCurrency(v.total)}
-                    ${v.tasa ? `<br><small style="font-size: 0.8em; color: var(--color-text-secondary);">Bs ${Utils.formatNumber(v.total * v.tasa, true)}</small>` : ''}
+                  <td class="font-semibold" style="line-height: 1.2;">
+                    ${isSinCobro ? '<span style="color: #0284C7; font-weight: bold;">$0.00</span>' : Utils.formatCurrency(totalDisplay)}
+                    ${(!isSinCobro && v.tasa) ? `<br><small style="font-size: 0.8em; color: var(--color-text-secondary);">Bs ${Utils.formatNumber(totalDisplay * v.tasa, true)}</small>` : ''}
                   </td>
-                  <td>
-                    <span class="badge ${v.tipo === 'credito' ? 'badge-warning' : (v.tipo === 'convenio' ? 'badge-info' : 'badge-success')}">
-                      ${v.tipo === 'credito' ? 'Crédito' : (v.tipo === 'convenio' ? 'Convenio' : 'Contado')}
-                    </span>
-                  </td>
+                  <td>${tipoBadge}</td>
                   <td>${pagosStr}</td>
                   <td>
                     <span class="badge ${(v.estadoEntrega === 'pendiente') ? 'badge-warning' : 'badge-success'}" style="font-size: 0.75em;">
@@ -826,34 +972,86 @@ function getConsolidatedReportHTML(range, periodoLabel) {
   let totalDeliveriesCant = 0;
   let totalDeliveriesMonto = 0;
 
+  // Salidas sin cobro consolidadas
+  const salidasSinCobro = {
+    convenio: { botellones: 0, litros: 0 },
+    garantia: { botellones: 0, litros: 0 },
+    cortesia: { botellones: 0, litros: 0 }
+  };
+  let totalBotellonesSinCobro = 0;
+  let totalLitrosSinCobro = 0;
+
   ventas.forEach(v => {
-    totalVentasMonto += v.total;
-    const tasa = v.tasa || currentTasa;
-    totalVentasBs += v.total * tasa;
+    const isSinCobro = isOperacionSinCobro(v.tipo);
+    if (!isSinCobro) {
+      totalVentasMonto += (v.total || 0);
+      const tasa = v.tasa || currentTasa;
+      totalVentasBs += (v.total || 0) * tasa;
+    }
 
     if (v.detalles && Array.isArray(v.detalles)) {
       v.detalles.forEach(d => {
         const prod = tipos.find(t => t.id === d.tipoBotellonId);
-        const prodName = d.nombre || (prod ? prod.nombre : 'Producto');
-        const cap = d.capacidad || (prod ? prod.capacidad : 20);
+        const prodName = prod ? prod.nombre : (d.nombre || 'Producto');
+        const cap = prod ? (parseFloat(prod.litros) || 20) : (parseFloat(d.capacidad) || 20);
+        const cat = prod ? (prod.categoria || 'recarga') : (d.categoria || 'recarga');
         if (!productoResumen[prodName]) {
-          productoResumen[prodName] = { cantidad: 0, monto: 0, litros: 0 };
+          productoResumen[prodName] = { cantidadVendida: 0, cantidadSinCobro: 0, monto: 0, litros: 0, litrosCap: cap, categoria: cat };
         }
-        productoResumen[prodName].cantidad += (d.cantidad || 1);
-        productoResumen[prodName].monto += (d.subtotal || 0);
-        productoResumen[prodName].litros += (d.cantidad || 1) * cap;
-        totalLitrosVendidos += (d.cantidad || 1) * cap;
+        const cant = (d.cantidad || 1);
+        const itemSinCobro = isSinCobro || d.esCortesia;
+        if (itemSinCobro) {
+          productoResumen[prodName].cantidadSinCobro += cant;
+        } else {
+          productoResumen[prodName].cantidadVendida += cant;
+          productoResumen[prodName].monto += (d.subtotal || 0);
+        }
+        productoResumen[prodName].litros += cant * cap;
+        totalLitrosVendidos += cant * cap;
       });
     } else if (v.botellones) {
       const prodName = 'Botellón (20L)';
-      if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0, litros: 0 };
-      productoResumen[prodName].cantidad += v.botellones;
-      productoResumen[prodName].monto += v.total;
+      if (!productoResumen[prodName]) {
+        productoResumen[prodName] = { cantidadVendida: 0, cantidadSinCobro: 0, monto: 0, litros: 0, litrosCap: 20, categoria: 'recarga' };
+      }
+      if (isSinCobro) {
+        productoResumen[prodName].cantidadSinCobro += v.botellones;
+      } else {
+        productoResumen[prodName].cantidadVendida += v.botellones;
+        productoResumen[prodName].monto += (v.total || 0);
+      }
       productoResumen[prodName].litros += v.botellones * 20;
       totalLitrosVendidos += v.botellones * 20;
     }
 
-    if (v.delivery > 0) {
+    // Clasificar salidas sin cobro
+    if (isSinCobro) {
+      const bot = v.botellones || (v.detalles ? v.detalles.reduce((acc, d) => acc + (d.cantidad || 0), 0) : 1);
+      const lit = v.litros || (v.detalles ? v.detalles.reduce((acc, d) => {
+        const prod = tipos.find(t => t.id === d.tipoBotellonId);
+        const cap = prod ? (parseFloat(prod.litros) || 20) : 20;
+        return acc + (d.cantidad || 1) * cap;
+      }, 0) : bot * 20);
+      if (salidasSinCobro[v.tipo]) {
+        salidasSinCobro[v.tipo].botellones += bot;
+        salidasSinCobro[v.tipo].litros += lit;
+      }
+      totalBotellonesSinCobro += bot;
+      totalLitrosSinCobro += lit;
+    } else if (v.detalles && Array.isArray(v.detalles)) {
+      v.detalles.forEach(d => {
+        if (d.esCortesia || (d.esBotellonFisico && d.aguaCortesia)) {
+          const bot = d.cantidad || 1;
+          const lit = d.litros || (bot * (d.litrosAguaPorUnidad || 20));
+          salidasSinCobro.cortesia.botellones += bot;
+          salidasSinCobro.cortesia.litros += lit;
+          totalBotellonesSinCobro += bot;
+          totalLitrosSinCobro += lit;
+        }
+      });
+    }
+
+    if (v.delivery > 0 && !isSinCobro) {
       totalDeliveriesCant += (v.deliveryCant || 1);
       totalDeliveriesMonto += v.delivery;
     }
@@ -896,7 +1094,7 @@ function getConsolidatedReportHTML(range, periodoLabel) {
   const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
   const eficiencia = totalCompradoAgua > 0 ? Math.round((totalLitrosVendidos / totalCompradoAgua) * 100) : 0;
 
-  const listProdResumen = Object.entries(productoResumen);
+  const listProdResumen = sortProductosResumen(Object.entries(productoResumen));
 
   return `
     <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; line-height: 1.4; font-size: 12px; max-width: 900px; margin: 0 auto; background: #fff;">
@@ -940,6 +1138,21 @@ function getConsolidatedReportHTML(range, periodoLabel) {
         </div>
       </div>
 
+      <!-- Bloque Resumen Salidas sin Cobro en Reporte Impreso -->
+      ${totalBotellonesSinCobro > 0 ? `
+      <div style="background: #F0F9FF; border: 1.5px solid #BAE6FD; border-radius: 6px; padding: 12px 16px; margin-bottom: 25px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #BAE6FD; padding-bottom: 6px; margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: bold; color: #0369A1;">💧 SALIDAS ESPECIALES DE AGUA (SIN COBRO EN CAJA)</div>
+          <div style="font-size: 11px; font-weight: bold; color: #0284C7;">Total: ${totalBotellonesSinCobro} unid. / ${Utils.formatNumber(totalLitrosSinCobro)} Litros</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 11px;">
+          <div><strong>🤝 Convenios:</strong> ${salidasSinCobro.convenio.botellones} unid. (${Utils.formatNumber(salidasSinCobro.convenio.litros)} L)</div>
+          <div><strong>🔄 Garantías:</strong> ${salidasSinCobro.garantia.botellones} unid. (${Utils.formatNumber(salidasSinCobro.garantia.litros)} L)</div>
+          <div><strong>🎁 Cortesías:</strong> ${salidasSinCobro.cortesia.botellones} unid. (${Utils.formatNumber(salidasSinCobro.cortesia.litros)} L)</div>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- SECCIÓN 1: RESUMEN DE PRODUCTOS VENDIDOS -->
       <div style="margin-bottom: 25px;">
         <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #1B4332; border-bottom: 1.5px solid #1B4332; padding-bottom: 4px;">
@@ -949,18 +1162,20 @@ function getConsolidatedReportHTML(range, periodoLabel) {
           <thead>
             <tr style="background: #F3F4F6; border-bottom: 1px solid #D1D5DB;">
               <th style="text-align: left; padding: 6px 8px;">Producto / Servicio</th>
-              <th style="text-align: center; padding: 6px 8px;">Unidades Vendidas</th>
+              <th style="text-align: center; padding: 6px 8px;">Unidades Facturadas</th>
+              <th style="text-align: center; padding: 6px 8px;">Sin Cobro</th>
               <th style="text-align: right; padding: 6px 8px;">Litros Totales</th>
               <th style="text-align: right; padding: 6px 8px;">Monto Total ($)</th>
             </tr>
           </thead>
           <tbody>
             ${listProdResumen.length === 0 ? `
-              <tr><td colspan="4" style="text-align:center; padding:10px; color:#6B7280;">No hay ventas registradas en este período.</td></tr>
+              <tr><td colspan="5" style="text-align:center; padding:10px; color:#6B7280;">No hay ventas registradas en este período.</td></tr>
             ` : listProdResumen.map(([nombre, info]) => `
               <tr style="border-bottom: 1px solid #E5E7EB;">
                 <td style="padding: 6px 8px; font-weight: bold;">${Utils.escapeHtml(nombre)}</td>
-                <td style="text-align: center; padding: 6px 8px;">${info.cantidad} unid.</td>
+                <td style="text-align: center; padding: 6px 8px;">${info.cantidadVendida || 0} unid.</td>
+                <td style="text-align: center; padding: 6px 8px; color: #0284C7; font-weight: 600;">${(info.cantidadSinCobro || 0) > 0 ? `${info.cantidadSinCobro} unid.` : '-'}</td>
                 <td style="text-align: right; padding: 6px 8px;">${Utils.formatNumber(info.litros)} L</td>
                 <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #15803D;">${Utils.formatCurrency(info.monto)}</td>
               </tr>
@@ -991,21 +1206,36 @@ function getConsolidatedReportHTML(range, periodoLabel) {
             ` : ventas.map(v => {
               const cli = clientes.find(c => c.id === v.clienteId);
               const cliNombre = cli ? cli.nombre : (v.clienteNombre || 'Cliente General');
+              const isSinCobro = isOperacionSinCobro(v.tipo);
+              const totalUsd = isSinCobro ? 0 : (v.total || 0);
+
               let prodsStr = '';
               if (v.detalles && Array.isArray(v.detalles)) {
-                prodsStr = v.detalles.map(d => `${d.cantidad}x ${d.nombre || 'Prod'}`).join(', ');
+                prodsStr = v.detalles.map(d => {
+                  const prod = tipos.find(t => t.id === d.tipoBotellonId);
+                  const cort = d.esCortesia ? ' [Cortesía]' : ((d.esBotellonFisico && d.aguaCortesia) ? ' [+Agua Cortesía]' : '');
+                  return `${d.cantidad}x ${prod ? prod.nombre : (d.nombre || 'Prod')}${cort}`;
+                }).join(', ');
               } else {
                 prodsStr = `${v.botellones}x Botellón`;
               }
-              if (v.delivery > 0) prodsStr += ` + Deliv ($${Utils.formatNumber(v.delivery, true)})`;
-              const metodoStr = v.tipo === 'credito' ? 'Crédito' : (v.pagos && v.pagos.length > 1 ? 'Mixto' : (v.pagos && v.pagos[0] ? v.pagos[0].metodo : 'Contado'));
+              if (v.delivery > 0 && !isSinCobro) prodsStr += ` + Deliv ($${Utils.formatNumber(v.delivery, true)})`;
+              
+              let metodoStr = 'Contado';
+              if (v.tipo === 'credito') metodoStr = 'Crédito';
+              else if (v.tipo === 'convenio') metodoStr = '🤝 Convenio';
+              else if (v.tipo === 'garantia') metodoStr = '🔄 Garantía';
+              else if (v.tipo === 'cortesia') metodoStr = '🎁 Cortesía';
+              else if (v.pagos && v.pagos.length > 1) metodoStr = 'Mixto';
+              else if (v.pagos && v.pagos[0]) metodoStr = v.pagos[0].metodo;
+
               const entregaStr = v.estadoEntrega === 'pendiente' ? '⏳ Pendiente' : '✅ Entregado';
               return `
                 <tr style="border-bottom: 1px solid #E5E7EB;">
                   <td style="padding: 4px 6px; color: #4B5563;">${new Date(v.fecha).toLocaleDateString('es-VE')} ${new Date(v.fecha).toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit', hour12:true})}</td>
                   <td style="padding: 4px 6px; font-weight: bold;">${Utils.escapeHtml(cliNombre)}</td>
                   <td style="padding: 4px 6px;">${Utils.escapeHtml(prodsStr)}</td>
-                  <td style="padding: 4px 6px; text-align: right; font-weight: bold; color: #15803D;">${Utils.formatCurrency(v.total)}</td>
+                  <td style="padding: 4px 6px; text-align: right; font-weight: bold; color: ${isSinCobro ? '#0284C7' : '#15803D'};">${isSinCobro ? '$0.00' : Utils.formatCurrency(totalUsd)}</td>
                   <td style="padding: 4px 6px; text-align: center; text-transform: capitalize;">${metodoStr}</td>
                   <td style="padding: 4px 6px; text-align: center;">${entregaStr}</td>
                 </tr>
@@ -1104,6 +1334,13 @@ function getConsolidatedReportHTML(range, periodoLabel) {
               <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #16A34A;">${Utils.formatNumber(totalLitrosVendidos)} L</td>
               <td style="text-align: right; padding: 6px 8px;">${ventas.length} ventas procesadas</td>
             </tr>
+            ${totalLitrosSinCobro > 0 ? `
+            <tr style="border-bottom: 1px solid #E5E7EB;">
+              <td style="padding: 6px 8px; font-weight: bold;">Salidas Especiales sin Cobro</td>
+              <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #0284C7;">${Utils.formatNumber(totalLitrosSinCobro)} L</td>
+              <td style="text-align: right; padding: 6px 8px;">Convenios, garantías y cortesías (${totalBotellonesSinCobro} unid.)</td>
+            </tr>
+            ` : ''}
             <tr style="border-bottom: 1px solid #E5E7EB;">
               <td style="padding: 6px 8px; font-weight: bold;">Merma Registrada (Lavado de botellones)</td>
               <td style="text-align: right; padding: 6px 8px; font-weight: bold; color: #D97706;">${Utils.formatNumber(totalMerma)} L</td>
@@ -1164,32 +1401,50 @@ function exportConsolidatedCSV(range, periodoLabel) {
 
   // SECCION 1: PRODUCTOS VENDIDOS
   csv += `=== 1. RESUMEN DE VENTAS POR PRODUCTO ===\n`;
-  csv += `Producto;Cantidad Vendida;Monto Total ($)\n`;
+  csv += `Producto;Cantidad Facturada;Cantidad Sin Cobro;Litros Totales;Monto Total ($)\n`;
 
   const productoResumen = {};
   let totalLitrosVendidos = 0;
   ventas.forEach(v => {
+    const isSinCobro = isOperacionSinCobro(v.tipo);
     if (v.detalles && Array.isArray(v.detalles)) {
       v.detalles.forEach(d => {
         const prod = tipos.find(t => t.id === d.tipoBotellonId);
-        const prodName = d.nombre || (prod ? prod.nombre : 'Producto');
-        const cap = d.capacidad || (prod ? prod.capacidad : 20);
-        if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0 };
-        productoResumen[prodName].cantidad += (d.cantidad || 1);
-        productoResumen[prodName].monto += (d.subtotal || 0);
-        totalLitrosVendidos += (d.cantidad || 1) * cap;
+        const prodName = prod ? prod.nombre : (d.nombre || 'Producto');
+        const cap = prod ? (parseFloat(prod.litros) || 20) : (parseFloat(d.capacidad) || 20);
+        const cat = prod ? (prod.categoria || 'recarga') : (d.categoria || 'recarga');
+        if (!productoResumen[prodName]) {
+          productoResumen[prodName] = { cantidadVendida: 0, cantidadSinCobro: 0, monto: 0, litros: 0, litrosCap: cap, categoria: cat };
+        }
+        const cant = (d.cantidad || 1);
+        const itemSinCobro = isSinCobro || d.esCortesia;
+        if (itemSinCobro) {
+          productoResumen[prodName].cantidadSinCobro += cant;
+        } else {
+          productoResumen[prodName].cantidadVendida += cant;
+          productoResumen[prodName].monto += (d.subtotal || 0);
+        }
+        productoResumen[prodName].litros += cant * cap;
+        totalLitrosVendidos += cant * cap;
       });
     } else if (v.botellones) {
       const prodName = 'Botellón (20L)';
-      if (!productoResumen[prodName]) productoResumen[prodName] = { cantidad: 0, monto: 0 };
-      productoResumen[prodName].cantidad += v.botellones;
-      productoResumen[prodName].monto += v.total;
+      if (!productoResumen[prodName]) {
+        productoResumen[prodName] = { cantidadVendida: 0, cantidadSinCobro: 0, monto: 0, litros: 0, litrosCap: 20, categoria: 'recarga' };
+      }
+      if (isSinCobro) {
+        productoResumen[prodName].cantidadSinCobro += v.botellones;
+      } else {
+        productoResumen[prodName].cantidadVendida += v.botellones;
+        productoResumen[prodName].monto += (v.total || 0);
+      }
+      productoResumen[prodName].litros += v.botellones * 20;
       totalLitrosVendidos += v.botellones * 20;
     }
   });
 
-  Object.entries(productoResumen).forEach(([prod, info]) => {
-    csv += `"${prod}";${info.cantidad};${info.monto.toFixed(2).replace('.', ',')}\n`;
+  sortProductosResumen(Object.entries(productoResumen)).forEach(([prod, info]) => {
+    csv += `"${prod}";${info.cantidadVendida || 0};${info.cantidadSinCobro || 0};${info.litros || 0};${info.monto.toFixed(2).replace('.', ',')}\n`;
   });
   csv += `\n`;
 
@@ -1204,19 +1459,32 @@ function exportConsolidatedCSV(range, periodoLabel) {
     const cli = clientes.find(c => c.id === v.clienteId);
     const cliNombre = cli ? cli.nombre : (v.clienteNombre || 'Cliente General');
     const cliTlf = cli ? (cli.telefono || '-') : '-';
+    const isSinCobro = isOperacionSinCobro(v.tipo);
     
     let prodsStr = '';
     if (v.detalles && Array.isArray(v.detalles)) {
-      prodsStr = v.detalles.map(det => `${det.cantidad}x ${det.nombre || 'Prod'}`).join(', ');
+      prodsStr = v.detalles.map(det => {
+        const prod = tipos.find(t => t.id === det.tipoBotellonId);
+        const cort = det.esCortesia ? ' [Cortesía]' : ((det.esBotellonFisico && det.aguaCortesia) ? ' [+Agua Cortesía]' : '');
+        return `${det.cantidad}x ${prod ? prod.nombre : (det.nombre || 'Prod')}${cort}`;
+      }).join(', ');
     } else {
       prodsStr = `${v.botellones}x Botellón`;
     }
-    if (v.delivery > 0) prodsStr += ` + Delivery ($${v.delivery.toFixed(2)})`;
+    if (v.delivery > 0 && !isSinCobro) prodsStr += ` + Delivery ($${v.delivery.toFixed(2)})`;
 
     const tasa = v.tasa || currentTasa;
-    const totalBs = (v.total * tasa).toFixed(2).replace('.', ',');
-    const totalUsd = v.total.toFixed(2).replace('.', ',');
-    const metodo = v.tipo === 'credito' ? 'Crédito' : (v.pagos && v.pagos.length > 1 ? 'Mixto' : (v.pagos && v.pagos[0] ? v.pagos[0].metodo : 'Contado'));
+    const totalUsdNum = isSinCobro ? 0 : (v.total || 0);
+    const totalBsNum = isSinCobro ? 0 : (totalUsdNum * tasa);
+    const totalBs = totalBsNum.toFixed(2).replace('.', ',');
+    const totalUsd = totalUsdNum.toFixed(2).replace('.', ',');
+    let metodo = 'Contado';
+    if (v.tipo === 'credito') metodo = 'Crédito';
+    else if (v.tipo === 'convenio') metodo = 'Convenio (Sin Cobro)';
+    else if (v.tipo === 'garantia') metodo = 'Garantía (Sin Cobro)';
+    else if (v.tipo === 'cortesia') metodo = 'Cortesía (Sin Cobro)';
+    else if (v.pagos && v.pagos.length > 1) metodo = 'Mixto';
+    else if (v.pagos && v.pagos[0]) metodo = v.pagos[0].metodo;
     const entrega = v.estadoEntrega === 'pendiente' ? 'Pendiente' : 'Entregado';
 
     csv += `"${fechaFmt}";"${horaFmt}";"${cliNombre.replace(/"/g, '""')}";"${cliTlf}";"${prodsStr.replace(/"/g, '""')}";${totalUsd};${totalBs};"${metodo}";"${entrega}"\n`;

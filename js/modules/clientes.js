@@ -491,7 +491,7 @@ function viewClienteDetail(id) {
     ${abonos.length > 0 ? `
       <div class="table-container">
         <table class="table">
-          <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th><th style="text-align: center; width: 60px;">Acción</th></tr></thead>
           <tbody>
             ${abonos.slice(0, 10).map(a => {
               const allM = store.getMetodosPago ? store.getMetodosPago(false) : (Utils.paymentMethods || []);
@@ -502,6 +502,9 @@ function viewClienteDetail(id) {
                   <td>${Utils.formatDateTime(a.fecha)}</td>
                   <td class="text-success font-semibold">${Utils.formatCurrency(a.monto)}</td>
                   <td>${mLabel}</td>
+                  <td style="text-align: center;">
+                    <button class="btn btn-sm btn-danger btn-delete-abono-cliente" data-id="${a.id}" data-monto="${a.monto}" title="Anular este abono" style="padding: 2px 7px; font-size: 11px;">🗑️</button>
+                  </td>
                 </tr>
               `;
             }).join('')}
@@ -532,6 +535,28 @@ function viewClienteDetail(id) {
         openAbonoClienteDirecto(id);
       });
     }
+
+    overlay.querySelectorAll('.btn-delete-abono-cliente').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const abonoId = btn.dataset.id;
+        const montoVal = parseFloat(btn.dataset.monto) || 0;
+        openModal({
+          title: 'Anular Abono',
+          content: `<p>¿Está seguro de anular este abono de <strong>${Utils.formatCurrency(montoVal)}</strong>? El saldo y la deuda del cliente se recalcularán automáticamente.</p>`,
+          saveLabel: 'Sí, Anular Abono',
+          onSave: () => {
+            store.delete('abonos', abonoId);
+            if (typeof syncToCloud === 'function') syncToCloud();
+            closeModal();
+            showToast('Abono anulado con éxito', 'success');
+            openDetalleClienteModal(id);
+            const container = document.querySelector('.main-content');
+            if (container) renderClientes(container);
+          }
+        });
+      });
+    });
   }
 }
 

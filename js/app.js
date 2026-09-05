@@ -134,11 +134,24 @@ class App {
 
     renderLayout() {
         const app = document.getElementById('app');
+        const isCollapsed = localStorage.getItem('waterapp_sidebar_collapsed') === 'true';
         app.innerHTML = `
-          <div class="app-layout">
+          <div class="app-layout ${isCollapsed ? 'sidebar-collapsed' : ''}" id="app-layout">
             ${renderSidebar()}
-            <main class="main-content" id="app-content" style="flex:1; overflow-y:auto; padding:var(--space-xl); height:100vh;">
-            </main>
+            <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+            <div class="main-wrapper">
+              <div id="sidebar-open-bar" class="sidebar-open-bar">
+                <button id="btn-open-sidebar" class="btn-open-sidebar-header" type="button" title="Mostrar barra lateral (Ctrl+B)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                  </svg>
+                  <span>Barra lateral</span>
+                </button>
+              </div>
+              <main class="main-content" id="app-content">
+              </main>
+            </div>
           </div>
         `;
         this.attachEvents();
@@ -158,6 +171,65 @@ class App {
                 }
             });
         }
+        this.setupSidebarToggle();
+    }
+
+    setupSidebarToggle() {
+        const appLayout = document.getElementById('app-layout');
+        const btnOpenSidebar = document.getElementById('btn-open-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+
+        const toggleSidebar = (collapse) => {
+            if (!appLayout) return;
+            const currentlyCollapsed = appLayout.classList.contains('sidebar-collapsed');
+            const shouldCollapse = collapse !== undefined ? collapse : !currentlyCollapsed;
+            if (shouldCollapse) {
+                appLayout.classList.add('sidebar-collapsed');
+                localStorage.setItem('waterapp_sidebar_collapsed', 'true');
+                if (backdrop) backdrop.style.display = 'none';
+            } else {
+                appLayout.classList.remove('sidebar-collapsed');
+                localStorage.setItem('waterapp_sidebar_collapsed', 'false');
+                if (window.innerWidth <= 768 && backdrop) {
+                    backdrop.style.display = 'block';
+                }
+            }
+        };
+
+        btnOpenSidebar?.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleSidebar(false);
+        });
+
+        document.querySelectorAll('.btn-sidebar-collapse, #btn-collapse-sidebar, #btn-sidebar-collapse-bottom, .btn-sidebar-icon-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleSidebar(true);
+            });
+        });
+
+        backdrop?.addEventListener('click', () => {
+            toggleSidebar(true);
+        });
+
+        // Atajo de teclado: Ctrl+B o Alt+M para alternar el menú
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey && e.key.toLowerCase() === 'b') || (e.altKey && e.key.toLowerCase() === 'm')) {
+                e.preventDefault();
+                toggleSidebar();
+            }
+        });
+
+        // En pantallas móviles, al pulsar un enlace del menú, ocultar el sidebar
+        document.querySelectorAll('.sidebar-nav-item').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && !link.id.includes('collapse')) {
+                    toggleSidebar(true);
+                }
+            });
+        });
     }
 
     registerRoutes() {
@@ -202,7 +274,9 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
         .then(reg => {
             console.log('[PWA] Service Worker registrado exitosamente:', reg.scope);
-            reg.update();
+            if (reg && typeof reg.update === 'function') {
+                reg.update().catch(err => console.warn('[PWA] Actualización de SW omitida o sin conexión:', err));
+            }
         })
         .catch(err => console.warn('[PWA] Error al registrar Service Worker:', err));
 }

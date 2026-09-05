@@ -20,7 +20,15 @@ export function renderSidebar() {
 
   return `
     <aside class="sidebar">
-      <div class="sidebar-logo" style="flex-direction: column; align-items: flex-start; padding: 14px 16px 12px 16px;">
+      <div class="sidebar-top-bar" style="display: flex; justify-content: flex-end; align-items: center; padding: 10px 14px 4px 14px;">
+        <button id="btn-collapse-sidebar" type="button" class="btn-sidebar-icon-toggle btn-sidebar-collapse" title="Cerrar barra lateral (Ctrl+B)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="sidebar-logo" style="flex-direction: column; align-items: flex-start; padding: 6px 16px 12px 16px;">
         <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin-bottom: 12px;">
           <img src="${empresaLogo}" alt="${Utils.escapeHtml(empresaNombre)}" class="logo-img" style="width: 100%; max-width: 100%; height: auto; max-height: 210px; object-fit: contain; display: block; border-radius: 6px;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
         </div>
@@ -28,7 +36,7 @@ export function renderSidebar() {
           ${Utils.escapeHtml(empresaNombre)}
         </h1>
         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 6px;">
-          <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px;" id="app-version">v2.6</span>
+          <span style="font-size: 11px; color: #888; font-weight: normal; padding: 2px 8px; background: #eee; border-radius: 10px;" id="app-version">v${Utils.VERSION}</span>
           ${diasRestantesText ? `
             <span style="font-size: 10px; color: #065F46; background: #DCFCE7; font-weight: 700; padding: 2px 6px; border-radius: 6px;">
               🟢 ${diasRestantesText}
@@ -43,7 +51,7 @@ export function renderSidebar() {
         </div>
       </div>
 
-      <span class="sidebar-section-title">Menú</span>
+      <span class="sidebar-section-title" style="padding: var(--space-md) var(--space-md) var(--space-sm) var(--space-md);">Menú</span>
       <nav class="sidebar-nav" id="main-nav">
         <a class="sidebar-nav-item active" data-route="/inicio" href="#/inicio">
           <span class="nav-icon">
@@ -126,6 +134,15 @@ export function renderSidebar() {
             </svg>
           </span>
           Salir
+        </a>
+        <a id="btn-sidebar-collapse-bottom" class="sidebar-nav-item btn-sidebar-collapse" style="cursor: pointer; color: var(--color-text-secondary); border-top: 1px solid var(--color-border); margin-top: var(--space-md);" title="Cerrar barra lateral (Ctrl+B)">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+          </span>
+          Cerrar barra lateral
         </a>
       </nav>
     </aside>

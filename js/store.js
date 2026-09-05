@@ -32,6 +32,7 @@ class Store {
         }
 
         this._initDefaults();
+        this.depurarAbonosInvalidos();
         this.isReady = true;
     }
 
@@ -157,12 +158,37 @@ class Store {
 
     // ---- Config ----
 
+    _sortTiposBotellon(tipos) {
+        if (!Array.isArray(tipos)) return [];
+        const recargas = tipos.filter(t => t.categoria !== 'producto').sort((a, b) => {
+            const litrosA = parseFloat(a.litros) || 0;
+            const litrosB = parseFloat(b.litros) || 0;
+            if (litrosB !== litrosA) {
+                return litrosB - litrosA; // De mayor a menor capacidad en litros
+            }
+            return (a.nombre || '').localeCompare(b.nombre || '', 'es', { numeric: true });
+        });
+
+        const prods = tipos.filter(t => t.categoria === 'producto').sort((a, b) => {
+            return (a.nombre || '').localeCompare(b.nombre || '', 'es', { numeric: true }); // A-Z
+        });
+
+        return [...recargas, ...prods];
+    }
+
     getConfig(key) {
         const conf = this.getById('configuracion', key);
-        return conf ? conf.value : null;
+        let val = conf ? conf.value : null;
+        if (key === 'tiposBotellon' && Array.isArray(val)) {
+            return this._sortTiposBotellon(val);
+        }
+        return val;
     }
 
     setConfig(key, value) {
+        if (key === 'tiposBotellon' && Array.isArray(value)) {
+            value = this._sortTiposBotellon(value);
+        }
         let conf = this.getById('configuracion', key);
         if (conf) {
             this.update('configuracion', key, { value });
@@ -550,15 +576,18 @@ class Store {
         // Procesar ventas del día
         for (const v of ventas) {
             cierre.botellones += (v.botellones || 0);
-            cierre.total += (v.total || 0);
+
+            const isSinCobro = (v.tipo === 'convenio' || v.tipo === 'garantia' || v.tipo === 'cortesia');
+            const totalVenta = isSinCobro ? 0 : (v.total || 0);
+            cierre.total += totalVenta;
             
             const tasa = v.tasa || currentTasa;
-            cierre.bs.total += (v.total || 0) * tasa;
+            cierre.bs.total += totalVenta * tasa;
 
             if (v.tipo === 'credito') {
                 cierre.credito += (v.total || 0);
                 cierre.bs.credito += (v.total || 0) * tasa;
-            } else if (v.pagos && Array.isArray(v.pagos)) {
+            } else if (!isSinCobro && v.pagos && Array.isArray(v.pagos)) {
                 for (const p of v.pagos) {
                     const mId = p.metodo;
                     const monto = parseFloat(p.monto) || 0;
@@ -574,7 +603,7 @@ class Store {
                         cierre.bs.real_ingresado += monto * tasa;
                     }
                 }
-            } else if (v.metodoPago) {
+            } else if (!isSinCobro && v.metodoPago) {
                 const mId = v.metodoPago;
                 const monto = parseFloat(v.total) || 0;
                 if (cierre[mId] === undefined) {
@@ -759,6 +788,19 @@ class Store {
         if (this.getConfig('unidadCaudalimetro') === undefined) {
             this.setConfig('unidadCaudalimetro', 'L');
         }
+    }
+
+    depurarAbonosInvalidos() {
+        const abonos = this.getAll('abonos');
+        const invalidos = abonos.filter(a => {
+            const m = parseFloat(a.monto);
+            return isNaN(m) || m <= 0.005;
+        });
+        if (invalidos.length > 0) {
+            invalidos.forEach(a => this.delete('abonos', a.id));
+            console.log(`[Store] Se depuraron ${invalidos.length} abonos residuales con monto $0.00`);
+        }
+        return invalidos.length;
     }
 }
 
