@@ -25,7 +25,7 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
       </div>
       <form id="form-arqueo">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-          ${methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').map(m => {
+          ${methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).map(m => {
             const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
             const defaultValue = (m.key === 'pago_movil' && cierre && cierre.bs && typeof cierre.bs.pago_movil === 'number')
               ? Utils.formatNumber(cierre.bs.pago_movil, true)
@@ -128,7 +128,7 @@ function renderFormularioArqueo(container, fecha, cierre, methods) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const declaracion = {};
-    methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').forEach(m => {
+    methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).forEach(m => {
       let rawVal = fd.get('arqueo_' + m.key) || '0';
       rawVal = rawVal.replace(/\./g, '').replace(',', '.'); // Quita puntos (miles) y pasa coma a punto
       declaracion[m.key] = parseFloat(rawVal) || 0;
@@ -156,7 +156,7 @@ function renderCuadreCajaWeb(arqueo, cierre, methods) {
   let totalDiferenciaUsd = 0;
   let totalDiferenciaBs = 0;
   
-  const filas = methods.filter(m => m.key !== 'credito' && m.key !== 'convenio').map(m => {
+  const filas = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).map(m => {
     const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
     const declarado = arqueo.declaracion[m.key] || 0;
     const sistema = isUsd ? (cierre[m.key] || 0) : (cierre.bs[m.key] || 0);
@@ -230,8 +230,7 @@ function renderCierreContent(fecha) {
       moneda: m.moneda || 'Bs',
       color: m.color || (m.moneda === 'USD' ? '#2D6A4F' : '#3B82F6')
     })),
-    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋', moneda: 'USD', color: '#E9A820' },
-    { key: 'convenio', label: 'Convenios', icon: '🤝', moneda: 'USD', color: '#0077B6' }
+    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋', moneda: 'USD', color: '#E9A820' }
   ];
 
   if (!arqueo) {
@@ -377,13 +376,33 @@ function renderCierreContent(fecha) {
     </div>
 
     <!-- Métricas Operativas -->
-    <div class="metrics-grid" style="grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
-      <div class="metric-card" style="padding: 12px 15px; border-radius: 8px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; background: var(--color-bg);">
-        <span class="metric-label" style="margin: 0;">Ventas del Día (Operaciones)</span>
-        <span class="metric-value" style="font-size: var(--font-size-md); font-weight: bold; margin: 0;">${cierre.cantidadVentas}</span>
+    ${(() => {
+      const conveniosCount = ventasDia.filter(v => v.tipo === 'convenio').length;
+      const garantiasCount = ventasDia.filter(v => v.tipo === 'garantia').length;
+      const cortesiasCount = ventasDia.filter(v => v.tipo === 'cortesia').length;
+      const totalSalidasSinCobro = conveniosCount + garantiasCount + cortesiasCount;
+      const ventasComerciales = cierre.cantidadVentas - totalSalidasSinCobro;
+      return `
+      <div class="metrics-grid" style="grid-template-columns: repeat(${totalSalidasSinCobro > 0 ? '2' : '1'}, 1fr); gap: 15px; margin-bottom: 20px;">
+        <div class="metric-card" style="padding: 12px 15px; border-radius: 8px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; background: var(--color-bg);">
+          <span class="metric-label" style="margin: 0;">Ventas Comerciales Facturadas</span>
+          <span class="metric-value" style="font-size: var(--font-size-md); font-weight: bold; margin: 0;">${ventasComerciales}</span>
+        </div>
+        ${totalSalidasSinCobro > 0 ? `
+        <div class="metric-card" style="padding: 12px 15px; border-radius: 8px; border: 1px solid #BFDBFE; display: flex; justify-content: space-between; align-items: center; background: #EFF6FF;">
+          <span class="metric-label" style="margin: 0; color: #1E40AF;">Salidas Especiales sin Cobro</span>
+          <span class="metric-value" style="font-size: var(--font-size-md); font-weight: bold; color: #0284C7; margin: 0;">
+            ${totalSalidasSinCobro} <small style="font-size: 11px; color: #64748B;">(${[
+              conveniosCount > 0 ? `${conveniosCount} conv.` : '',
+              garantiasCount > 0 ? `${garantiasCount} gar.` : '',
+              cortesiasCount > 0 ? `${cortesiasCount} cort.` : ''
+            ].filter(Boolean).join(', ')})</small>
+          </span>
+        </div>
+        ` : ''}
       </div>
-
-    </div>
+      `;
+    })()}
 
     <div class="card" style="margin-bottom: 20px;">
       <div class="card-header">
@@ -415,6 +434,7 @@ function renderCierreContent(fecha) {
                 <th>Monto Recibido</th>
                 <th>Método de Pago</th>
                 <th>Referencia</th>
+                <th style="text-align: center; width: 70px;">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -431,6 +451,9 @@ function renderCierreContent(fecha) {
                     <td class="font-bold text-success">${Utils.formatCurrency(a.monto)}</td>
                     <td>${metodoStr}</td>
                     <td class="text-muted">${Utils.escapeHtml(a.referencia || '-')}</td>
+                    <td style="text-align: center;">
+                      <button class="btn btn-sm btn-danger btn-delete-abono" data-id="${a.id}" data-monto="${a.monto}" data-cliente="${Utils.escapeHtml(nombreCliente)}" title="Anular este abono" style="padding: 2px 7px; font-size: 11px;">🗑️</button>
+                    </td>
                   </tr>
                 `;
               }).join('')}
@@ -515,6 +538,37 @@ function renderCierreContent(fecha) {
           closeModal();
           showToast('Registro de propina eliminado', 'info');
           renderCierreContent(fecha);
+        }
+      });
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-abono').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const abonoId = btn.dataset.id;
+      const montoVal = parseFloat(btn.dataset.monto) || 0;
+      const clienteNom = btn.dataset.cliente || 'Cliente';
+      openModal({
+        title: 'Anular / Eliminar Abono',
+        content: `
+          <p>¿Estás seguro de que deseas anular este abono de <strong>${Utils.formatCurrency(montoVal)}</strong> de <strong>${clienteNom}</strong>?</p>
+          <p class="text-muted" style="font-size: 13px; margin-top: 8px;">
+            ⚠️ Esta acción eliminará el abono del sistema, recalculará los montos del Cierre de Caja y ajustará la cuenta del cliente.
+          </p>
+        `,
+        saveLabel: 'Sí, Anular Abono',
+        onSave: () => {
+          store.delete('abonos', abonoId);
+          if (typeof syncToCloud === 'function') syncToCloud();
+          closeModal();
+          showToast('Abono anulado y caja recalculada con éxito', 'success');
+          const activeFecha = document.getElementById('cierre-fecha-home')?.value || fecha;
+          const contentDiv = document.getElementById('cierre-caja-home-content');
+          if (contentDiv) {
+            renderCierre(contentDiv, activeFecha);
+          } else {
+            renderCierreContent(activeFecha);
+          }
         }
       });
     });

@@ -25,11 +25,13 @@ export function renderVentas(container, showFichas = true) {
         <div class="flex items-center gap-sm" style="flex-wrap:nowrap;">
           <input type="date" class="form-control" id="filter-fecha" style="width:140px; height:38px; padding: 4px 8px;" value="${Utils.todayISO()}"/>
           <input type="text" class="form-control" id="search-ventas" placeholder="Buscar por cliente..." style="width:200px; height:38px; padding: 4px 8px;"/>
-          <select class="form-control" id="filter-tipo-venta" style="width:130px; height:38px; padding: 4px 8px;">
+          <select class="form-control" id="filter-tipo-venta" style="width:145px; height:38px; padding: 4px 8px;">
             <option value="">Todos los tipos</option>
             <option value="contado">Contado</option>
             <option value="credito">Crédito</option>
-            <option value="convenio">Convenio</option>
+            <option value="convenio">🤝 Convenio</option>
+            <option value="garantia">🔄 Garantía</option>
+            <option value="cortesia">🎁 Cortesía</option>
           </select>
           <select class="form-control" id="filter-estado-entrega" style="width:150px; height:38px; padding: 4px 8px;">
             <option value="">Todas entregas</option>
@@ -128,12 +130,15 @@ function renderVentasTable() {
 
   ventas.forEach(v => {
     const tasa = v.tasa || currentTasa;
-    totales.totalUSD += (v.total || 0);
-    totales.totalBs += (v.total || 0) * tasa;
+    const isSinCobro = (v.tipo === 'convenio' || v.tipo === 'garantia' || v.tipo === 'cortesia');
+    if (!isSinCobro) {
+      totales.totalUSD += (v.total || 0);
+      totales.totalBs += (v.total || 0) * tasa;
+    }
 
     if (v.tipo === 'credito') {
       totales.credito += (v.total || 0);
-    } else if (v.pagos && Array.isArray(v.pagos)) {
+    } else if (!isSinCobro && v.pagos && Array.isArray(v.pagos)) {
       v.pagos.forEach(p => {
         const metodoKey = p.metodo;
         const montoUSD = parseFloat(p.monto) || 0;
@@ -312,7 +317,11 @@ function renderVentasTable() {
     if (v.tipo === 'credito') {
       pagosStr = '<span class="badge badge-warning" style="font-size: 0.75em;">A Crédito</span>';
     } else if (v.tipo === 'convenio') {
-      pagosStr = '<span class="badge badge-info" style="font-size: 0.75em;">Convenio</span>';
+      pagosStr = '<span class="badge badge-info" style="font-size: 0.75em;">🤝 Convenio</span>';
+    } else if (v.tipo === 'garantia') {
+      pagosStr = '<span class="badge" style="background:#FEE2E2; color:#991B1B; font-size: 0.75em; border:1px solid #FECACA;">🔄 Garantía</span>';
+    } else if (v.tipo === 'cortesia') {
+      pagosStr = '<span class="badge" style="background:#EDE9FE; color:#5B21B6; font-size: 0.75em; border:1px solid #DDD6FE;">🎁 Cortesía</span>';
     } else if (v.pagos && v.pagos.length > 0) {
       pagosStr = v.pagos.map(p => {
         const method = allMetodos.find(m => m.id === p.metodo);
@@ -326,11 +335,15 @@ function renderVentasTable() {
     // Generar detalles del producto
     let detallesHTML = '';
     const tipos = store.getConfig('tiposBotellon') || [];
+    const isSinCobro = (v.tipo === 'convenio' || v.tipo === 'garantia' || v.tipo === 'cortesia');
     if (v.detalles && v.detalles.length > 0) {
       detallesHTML = v.detalles.map(d => {
         const prod = tipos.find(t => t.id === d.tipoBotellonId);
-        const prodName = d.nombre || (prod ? prod.nombre : 'Prod.');
-        return `<div style="font-size: 0.9em; margin-bottom: 2px;">${d.cantidad}x ${Utils.formatCurrency(d.precioUnitario)} ${prodName}</div>`;
+        const prodName = prod ? prod.nombre : (d.nombre || 'Prod.');
+        const isFree = isSinCobro || !!d.esCortesia || (d.subtotal === 0);
+        const unitPrice = isFree ? '$0.00' : Utils.formatCurrency(d.precioUnitario);
+        const cortesiaBadge = d.esCortesia ? '<span style="font-size:10px; color:#7C3AED; font-weight:bold;">(Cortesía)</span>' : '';
+        return `<div style="font-size: 0.9em; margin-bottom: 2px;">${d.cantidad}x ${unitPrice} ${prodName} ${cortesiaBadge}</div>`;
       }).join('');
     } else {
       detallesHTML = `<div style="font-size: 0.9em;">${v.botellones || 0} botellones</div>`;
@@ -340,24 +353,32 @@ function renderVentasTable() {
     const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
     const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
     
-    if (delivery > 0) {
+    if (delivery > 0 && !isSinCobro) {
       const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
       detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
     }
+
+    const totalDisplayHTML = isSinCobro 
+      ? '<span class="text-muted" style="font-weight:bold;">$0.00</span>' 
+      : `${Utils.formatCurrency(v.total)}${v.tasa ? `<br><small style="font-size: 0.8em; color: var(--color-text-secondary);">Bs ${Utils.formatNumber(v.total * v.tasa, true)}</small>` : ''}`;
+
+    const tipoBadgeHTML = v.tipo === 'credito' 
+      ? '<span class="badge badge-warning">Crédito</span>'
+      : v.tipo === 'convenio' 
+        ? '<span class="badge badge-info">🤝 Convenio</span>'
+        : v.tipo === 'garantia' 
+          ? '<span class="badge" style="background:#FEE2E2; color:#991B1B; border:1px solid #FECACA;">🔄 Garantía</span>'
+          : v.tipo === 'cortesia' 
+            ? '<span class="badge" style="background:#EDE9FE; color:#5B21B6; border:1px solid #DDD6FE;">🎁 Cortesía</span>'
+            : '<span class="badge badge-success">Contado</span>';
 
     return `
       <tr>
         <td>${Utils.formatDateTime(v.fecha)}</td>
         <td class="font-semibold">${Utils.escapeHtml(nombre)}</td>
         <td style="line-height: 1.2;">${detallesHTML}</td>
-        <td class="font-semibold" style="line-height: 1.2;">${Utils.formatCurrency(v.total)}
-          ${v.tasa ? `<br><small style="font-size: 0.8em; color: var(--color-text-secondary);">Bs ${Utils.formatNumber(v.total * v.tasa, true)}</small>` : ''}
-        </td>
-        <td>
-          <span class="badge ${v.tipo === 'credito' ? 'badge-warning' : (v.tipo === 'convenio' ? 'badge-info' : 'badge-success')}">
-            ${v.tipo === 'credito' ? 'Crédito' : (v.tipo === 'convenio' ? 'Convenio' : 'Contado')}
-          </span>
-        </td>
+        <td class="font-semibold" style="line-height: 1.2;">${totalDisplayHTML}</td>
+        <td>${tipoBadgeHTML}</td>
         <td>${pagosStr}</td>
         <td>
           ${(v.estadoEntrega === 'pendiente') ? `
@@ -464,12 +485,26 @@ export function renderNuevaVentaForm(container) {
         <div style="display: grid; grid-template-columns: minmax(120px, 2fr) 70px 80px auto; gap: 12px; align-items: center; margin-bottom: 0;">
           <div class="form-group" style="margin-bottom: 0;">
             <select class="form-control" id="select-tipo-botellon">
-              ${tipos.map(t => {
-                const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
-                const precioLabel = isBs ? `Bs ${Utils.formatNumber(t.precio, true)}` : Utils.formatCurrency(t.precio);
-                const stockText = t.categoria === 'producto' ? ` · Stock: ${t.stock !== undefined ? t.stock : 0}` : '';
-                return `<option value="${t.id}" data-precio="${t.precio}" data-moneda="${t.moneda || 'USD'}" data-litros="${t.litros}" data-stock="${t.stock !== undefined ? t.stock : 0}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)} (${precioLabel}${stockText})</option>`;
-              }).join('')}
+              ${(() => {
+                const recargas = tipos.filter(t => t.categoria !== 'producto');
+                const prods = tipos.filter(t => t.categoria === 'producto');
+
+                const renderOption = (t) => {
+                  const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
+                  const precioLabel = isBs ? `Bs ${Utils.formatNumber(t.precio, true)}` : Utils.formatCurrency(t.precio);
+                  const stockText = t.categoria === 'producto' ? ` · Stock: ${t.stock !== undefined ? t.stock : 0}` : '';
+                  return `<option value="${t.id}" data-precio="${t.precio}" data-moneda="${t.moneda || 'USD'}" data-litros="${t.litros}" data-stock="${t.stock !== undefined ? t.stock : 0}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)} (${precioLabel}${stockText})</option>`;
+                };
+
+                let html = '';
+                if (recargas.length > 0) {
+                  html += `<optgroup label="💧 RECARGAS DE AGUA">${recargas.map(renderOption).join('')}</optgroup>`;
+                }
+                if (prods.length > 0) {
+                  html += `<optgroup label="📦 PRODUCTOS FÍSICOS Y ACCESORIOS">${prods.map(renderOption).join('')}</optgroup>`;
+                }
+                return html;
+              })()}
             </select>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
@@ -484,10 +519,12 @@ export function renderNuevaVentaForm(container) {
             })()}" id="input-precio" placeholder="Precio $" title="Precio unitario en dólares"/>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
-            <button type="button" class="btn btn-info" id="btn-add-item" style="padding: 0 20px;">+ Añadir</button>
+            <button type="button" class="btn btn-primary" id="btn-add-item" style="padding: 0 20px; height: 38px; font-weight: 700;">+ Añadir</button>
           </div>
         </div>
-        
+        <div id="info-cortesia-producto" style="display: none; margin-top: 8px; font-size: 12px; color: #6D28D9; font-weight: 600; background: #EDE9FE; border: 1px solid #DDD6FE; padding: 4px 10px; border-radius: 6px;">
+          🎁 <span>Este botellón nuevo incluirá su recarga de agua por cortesía al añadirse al carrito.</span>
+        </div>
       </div>
 
       <!-- Carrito de Compras -->
@@ -495,11 +532,11 @@ export function renderNuevaVentaForm(container) {
         <table class="table table-sm">
           <thead>
             <tr>
-              <th>Producto</th>
-              <th style="text-align:center">Cant.</th>
-              <th style="text-align:right">Precio</th>
-              <th style="text-align:right">Subtotal</th>
-              <th></th>
+              <th style="padding-left: var(--space-md);">Producto</th>
+              <th style="text-align:center; width: 70px;">Cant.</th>
+              <th style="text-align:right; width: 95px;">Precio</th>
+              <th style="text-align:right; width: 110px;">Subtotal</th>
+              <th style="text-align:right; width: 45px; padding-right: var(--space-md);"></th>
             </tr>
           </thead>
           <tbody id="carrito-tbody"></tbody>
@@ -507,51 +544,67 @@ export function renderNuevaVentaForm(container) {
       </div>
 
 
-      <!-- Delivery y Total a Cobrar -->
-      <div class="form-row" style="margin-bottom: 20px; align-items: center;">
-        <div class="form-group" style="flex: 1.8; display: flex; align-items: center;">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <label class="form-check" style="margin: 0; font-size: 14px; cursor: pointer;">
-              <input type="checkbox" id="check-delivery"/> Delivery
-            </label>
-            <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px; margin-left: 10px; flex-wrap: wrap;">
-              <input type="number" class="form-control" id="cant-delivery" min="1" value="1" style="width: 65px;" title="Cant. de viajes" placeholder="Cant."/>
-              <span style="color:var(--color-text-secondary); font-size: 14px;">x</span>
-              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="$0.00" value="0.00" style="width: 85px;"/>
-              <select class="form-control" id="repartidor-delivery" style="width: 140px; font-size: 13px;">
-                <option value="">🛵 Repartidor</option>
-                ${(store.getConfig('repartidores') || []).map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
-              </select>
+      <!-- Delivery y Pendiente de Entrega en misma fila -->
+      <div class="flex items-center gap-lg mb-md" style="flex-wrap: wrap; background: #f8fafc; padding: 10px var(--space-md); border-radius: 8px; border: 1px solid var(--color-border); justify-content: space-between; align-items: center;">
+        <div class="flex items-center gap-lg" style="flex-wrap: wrap;">
+          <label class="form-check" style="margin-bottom: 0;">
+            <input type="checkbox" id="check-delivery"/>
+            <span>Delivery</span>
+          </label>
+          <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px;">
+            <div style="position: relative; width: 65px;">
+              <input type="number" class="form-control" id="cant-delivery" value="1" min="1" step="1" title="Cantidad de viajes" style="padding-left: 20px;" placeholder="Viajes"/>
+              <span style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--color-text-secondary);">x</span>
             </div>
-            <label class="form-check" style="margin: 0 0 0 15px; font-size: 14px; cursor: pointer; color: var(--color-warning);">
-              <input type="checkbox" id="check-pendiente-entrega"/> ⏳ Pendiente por Entregar
-            </label>
+            <div style="position: relative; width: 95px;">
+              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="0.00" title="Precio por viaje en dólares" style="padding-left: 18px;"/>
+              <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--color-text-secondary);">$</span>
+            </div>
+            <select class="form-control" id="repartidor-delivery" style="width: 140px;" title="Asignar repartidor">
+              <option value="">Sin repartidor</option>
+              ${(store.getConfig('repartidores') || []).map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
+            </select>
           </div>
+          <label class="form-check" style="margin-bottom: 0; margin-left: 10px;">
+            <input type="checkbox" id="check-pendiente-entrega"/>
+            <span style="color: var(--color-warning-dark); font-weight: 500;">⏳ Pendiente por Entregar</span>
+          </label>
         </div>
-        <div class="form-group" style="flex: 2;">
-          <div class="alert-panel success" style="margin-bottom: 0; font-size: var(--font-size-lg); justify-content: space-between; padding: 10px 20px; border-radius: 8px; align-items: center;">
-            <span>Total a Cobrar:</span>
-            <strong id="total-venta" style="font-size: 24px; text-align: right; line-height: 1.1;">$0.00</strong>
+        <div style="flex: 2; margin: 0;">
+          <div class="alert-panel success" style="margin: 0; justify-content: space-between; padding: 10px 20px; border-radius: 8px; align-items: center; display: flex;">
+            <span style="font-weight: 700; font-size: 16px;">Total a Cobrar:</span>
+            <div id="total-venta" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right;">
+              <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
+              <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">$0.00</span>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Fila 3: Condición y Pagos -->
       <div class="form-row" style="align-items: flex-start;">
-        <div class="form-group" style="flex: 1;">
-          <label class="form-label">Condición de Pago</label>
-          <div class="flex gap-lg" style="padding-top: 10px;">
-            <label class="form-check">
+        <div class="form-group" style="flex: 1.3;">
+          <label class="form-label" style="margin-bottom: 6px;">Condición de Operación</label>
+          <div class="flex gap-md" style="padding-top: 4px; flex-wrap: wrap;">
+            <label class="form-check" style="cursor: pointer;">
               <input type="radio" name="tipo" value="contado" checked/>
-              <span>Al Contado</span>
+              <span>🟢 Contado</span>
             </label>
-            <label class="form-check">
+            <label class="form-check" style="cursor: pointer;">
               <input type="radio" name="tipo" value="credito"/>
-              <span>A Crédito / Saldo a Favor</span>
+              <span>🟠 Crédito</span>
             </label>
-            <label class="form-check">
+            <label class="form-check" style="cursor: pointer;">
               <input type="radio" name="tipo" value="convenio"/>
-              <span>Convenio</span>
+              <span>🤝 Convenio</span>
+            </label>
+            <label class="form-check" style="cursor: pointer;">
+              <input type="radio" name="tipo" value="garantia"/>
+              <span>🔄 Garantía</span>
+            </label>
+            <label class="form-check" style="cursor: pointer;">
+              <input type="radio" name="tipo" value="cortesia"/>
+              <span>🎁 Cortesía</span>
             </label>
           </div>
         </div>
@@ -685,7 +738,8 @@ export function renderNuevaVentaForm(container) {
         }
       }
 
-      const tipo = fd.get('tipo');
+      const tipo = fd.get('tipo') || 'contado';
+      const isSinCobro = isTipoSinCobro(tipo);
 
       if (tipo === 'credito' && !clienteId) {
         showToast('Debe seleccionar o registrar un cliente para realizar una venta a Crédito', 'warning');
@@ -693,7 +747,7 @@ export function renderNuevaVentaForm(container) {
       }
 
       const { totalUSD, totalBs } = calcularTotalesVenta();
-      let totalVenta = totalUSD;
+      let totalVenta = isSinCobro ? 0 : totalUSD;
       let totalBotellones = 0;
       let totalLitros = 0;
 
@@ -701,6 +755,9 @@ export function renderNuevaVentaForm(container) {
         if (item.categoria !== 'producto') {
           totalBotellones += item.cantidad;
           totalLitros += item.litros;
+        } else if (item.esBotellonFisico && item.aguaCortesia) {
+          totalBotellones += item.cantidad;
+          totalLitros += (item.litros || (item.cantidad * (item.litrosAguaPorUnidad || 20)));
         }
       });
 
@@ -784,22 +841,28 @@ export function renderNuevaVentaForm(container) {
       const tasaCambio = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
       store.setConfig('tasaCambio', tasaCambio); // memorizar
 
+      const detallesFinales = carrito.map(it => ({
+        ...it,
+        precioUnitario: isSinCobro ? 0 : it.precioUnitario,
+        subtotal: isSinCobro ? 0 : it.subtotal
+      }));
+
       const venta = {
         id: Utils.generateId(),
         tasa: tasaCambio,
         clienteId,
-        detalles: [...carrito],
+        detalles: detallesFinales,
         botellones: totalBotellones,
         litrosTotales: totalLitros,
-        delivery: montoDelivery,
-        deliveryCant: isDelivActive ? cantValue : 0,
-        repartidorId,
-        repartidorNombre,
+        delivery: isSinCobro ? 0 : montoDelivery,
+        deliveryCant: isDelivActive && !isSinCobro ? cantValue : 0,
+        repartidorId: isSinCobro ? null : repartidorId,
+        repartidorNombre: isSinCobro ? null : repartidorNombre,
         estadoEntrega,
         fechaEntrega: isPendiente ? null : Utils.nowISO(),
         total: totalVenta,
         tipo,
-        pagos,
+        pagos: isSinCobro ? [] : pagos,
         fecha: fechaRegistro
       };
 
@@ -826,18 +889,30 @@ export function renderNuevaVentaForm(container) {
         store.setConfig('tiposBotellon', allTipos);
       }
 
-      if (clienteId && totalPagadoUSD > totalVenta) {
+      if (tipo === 'convenio') {
+        showToast('Convenio registrado con éxito ($0.00)', 'success');
+      } else if (tipo === 'garantia') {
+        showToast('Garantía por reposición registrada ($0.00)', 'success');
+      } else if (tipo === 'cortesia') {
+        showToast('Cortesía registrada con éxito ($0.00)', 'success');
+      } else if (clienteId && totalPagadoUSD > totalVenta) {
         const excedente = totalPagadoUSD - totalVenta;
-        const abono = {
-          id: Utils.generateId(),
-          clienteId,
-          monto: excedente,
-          metodo: pagos[0]?.metodo || 'efectivo_usd',
-          referencia: 'Excedente de venta',
-          fecha: Utils.nowISO()
-        };
-        store.save('abonos', abono);
-        showToast(`Venta registrada y abono de ${Utils.formatCurrency(excedente)} acreditado`, 'success');
+        if (excedente >= 0.01) {
+          const abono = {
+            id: Utils.generateId(),
+            ventaId: venta.id,
+            clienteId,
+            monto: Math.round(excedente * 100) / 100,
+            metodo: pagos[0]?.metodo || 'efectivo_usd',
+            tasa: tasaCambio,
+            referencia: 'Excedente de venta',
+            fecha: Utils.nowISO()
+          };
+          store.save('abonos', abono);
+          showToast(`Venta registrada y abono de ${Utils.formatCurrency(excedente)} acreditado`, 'success');
+        } else {
+          showToast('Venta registrada con éxito', 'success');
+        }
       } else {
         showToast('Venta registrada con éxito', 'success');
       }
@@ -854,6 +929,17 @@ export function renderNuevaVentaForm(container) {
       const hId = modal.querySelector('#hidden-cliente-id');
       if (hId) hId.value = '';
       actualizarBalanceBadge();
+
+      // Reset producto seleccionado al valor por defecto (primer item de la lista)
+      const selectProd = modal.querySelector('#select-tipo-botellon');
+      const inputCantProd = modal.querySelector('#input-botellones');
+      if (selectProd) {
+        selectProd.selectedIndex = 0;
+        if (inputCantProd) inputCantProd.value = '1';
+        if (typeof syncPrecioSeleccionado === 'function') {
+          syncPrecioSeleccionado();
+        }
+      }
 
       // Reset condition to Contado and clear credit banner
       modal.querySelector('input[name="tipo"][value="contado"]').checked = true;
@@ -904,12 +990,23 @@ export function renderNuevaVentaForm(container) {
   const carritoTbody = modal.querySelector('#carrito-tbody');
   const totalDisplay = modal.querySelector('#total-venta');
   
+  function isTipoSinCobro(tipoVal) {
+    return tipoVal === 'convenio' || tipoVal === 'garantia' || tipoVal === 'cortesia';
+  }
+
   function calcularTotalesVenta() {
+    const currentTipo = modal.querySelector('input[name="tipo"]:checked')?.value || 'contado';
     const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
+
+    if (isTipoSinCobro(currentTipo)) {
+      return { tasa, totalUSD: 0, totalBs: 0 };
+    }
+
     let totalUSD = 0;
     let totalBs = 0;
 
     carrito.forEach(item => {
+      if (item.esCortesia || item.precioUnitario === 0) return;
       if (item.monedaOriginal === 'VES' || item.monedaOriginal === 'Bs') {
         const itemBs = item.cantidad * item.precioBase;
         totalBs += itemBs;
@@ -921,7 +1018,7 @@ export function renderNuevaVentaForm(container) {
       }
     });
 
-    // Sumar delivery
+    // Sumar delivery si no es sin cobro
     const checkDelivery = modal.querySelector('#check-delivery');
     const inputDeliv = modal.querySelector('#monto-delivery');
     const cantDeliv = modal.querySelector('#cant-delivery');
@@ -943,7 +1040,10 @@ export function renderNuevaVentaForm(container) {
   function renderCarrito() {
     if (carrito.length === 0) {
       carritoContainer.style.display = 'none';
-      totalDisplay.textContent = '$0.00';
+      totalDisplay.innerHTML = `
+        <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
+        <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">$0.00</span>
+      `;
       actualizarPagosAutom(0, 0);
       return;
     }
@@ -952,37 +1052,94 @@ export function renderNuevaVentaForm(container) {
     
     carritoTbody.innerHTML = carrito.map((item, index) => {
       const isItemBs = item.monedaOriginal === 'VES' || item.monedaOriginal === 'Bs';
-      const precioUnitarioDisplay = isItemBs 
-        ? `Bs ${Utils.formatNumber(item.precioBase, true)}`
-        : Utils.formatCurrency(item.precioUnitario);
-      const subtotalDisplay = isItemBs
-        ? `Bs ${Utils.formatNumber(item.cantidad * item.precioBase, true)} <small style="color:var(--color-text-secondary); display:block; font-size:10px;">(~${Utils.formatCurrency(item.subtotal)})</small>`
-        : Utils.formatCurrency(item.subtotal);
+      const isBotellonFisico = !!item.esBotellonFisico;
+      const isFree = item.esCortesia || item.precioUnitario === 0;
+      const precioUnitarioDisplay = isFree 
+        ? '<span class="text-muted" style="font-weight:600;">$0.00</span>'
+        : (isItemBs 
+            ? `Bs ${Utils.formatNumber(item.precioBase, true)}`
+            : Utils.formatCurrency(item.precioUnitario));
+      const subtotalDisplay = isFree
+        ? '<span class="badge" style="background:#EDE9FE; color:#6D28D9; font-weight:700;">$0.00</span>'
+        : (isItemBs
+            ? `Bs ${Utils.formatNumber(item.cantidad * item.precioBase, true)} <small style="color:var(--color-text-secondary); display:block; font-size:10px;">(~${Utils.formatCurrency(item.subtotal)})</small>`
+            : Utils.formatCurrency(item.subtotal));
+
+      let badgeInfoHTML = '';
+      if (isBotellonFisico) {
+        if (item.aguaCortesia) {
+          badgeInfoHTML = `
+            <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span class="badge" style="background:#EDE9FE; color:#6D28D9; border: 1px solid #DDD6FE; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">
+                🎁 Incluye Agua de Cortesía (${item.litrosAguaPorUnidad || 20}L)
+              </span>
+              <button type="button" class="btn-toggle-cortesia" data-index="${index}" 
+                style="background: #ffffff; border: 1px solid #CBD5E1; color: #475569; border-radius: 5px; font-size: 11px; font-weight: 600; padding: 1px 7px; cursor: pointer; transition: background 0.15s;" 
+                title="Haga clic para desmarcar el agua y vender solo el envase">
+                ✕ Quitar agua
+              </button>
+            </div>
+          `;
+        } else {
+          badgeInfoHTML = `
+            <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span class="badge" style="background:#F1F5F9; color:#64748B; border: 1px solid #CBD5E1; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px;">
+                ⚠️ Solo envase vacío (Sin agua)
+              </span>
+              <button type="button" class="btn-toggle-cortesia" data-index="${index}" 
+                style="background: #EDE9FE; border: 1px solid #C4B5FD; color: #6D28D9; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 1px 7px; cursor: pointer; transition: background 0.15s;" 
+                title="Haga clic para marcar e incluir agua de cortesía gratis">
+                🎁 Incluir agua gratis
+              </button>
+            </div>
+          `;
+        }
+      } else if (item.esCortesia) {
+        badgeInfoHTML = '<div style="margin-top: 2px;"><span class="badge" style="background:#EDE9FE; color:#6D28D9; font-size: 10px; padding: 2px 5px; border-radius: 4px;">🎁 Cortesía</span></div>';
+      }
 
       return `
         <tr>
-          <td>
-            <div style="font-weight:600;">${Utils.escapeHtml(item.nombre)}</div>
-            ${isItemBs ? '<span style="font-size:10px; color:#2563EB;">(Fijo en Bs)</span>' : ''}
+          <td style="padding-left: var(--space-md);">
+            <div style="font-weight:600;">
+              ${Utils.escapeHtml(item.nombre)}
+            </div>
+            ${badgeInfoHTML}
+            ${isItemBs && !item.esCortesia ? '<span style="font-size:10px; color:#2563EB;">(Fijo en Bs)</span>' : ''}
           </td>
-          <td style="text-align:center">${item.cantidad}</td>
-          <td style="text-align:right">${precioUnitarioDisplay}</td>
-          <td style="text-align:right; font-weight:bold;">${subtotalDisplay}</td>
-          <td style="text-align:center">
-            <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:4px;" title="Eliminar">✕</button>
+          <td style="text-align:center; width: 70px;">${item.cantidad}</td>
+          <td style="text-align:right; width: 95px;">${precioUnitarioDisplay}</td>
+          <td style="text-align:right; width: 110px; font-weight:bold;">${subtotalDisplay}</td>
+          <td style="text-align:right; width: 45px; padding-right: var(--space-md); white-space:nowrap;">
+            <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:flex-end; width:100%;" title="Eliminar">✕</button>
           </td>
         </tr>
       `;
     }).join('');
     
     const { totalUSD, totalBs } = calcularTotalesVenta();
-    totalDisplay.innerHTML = `${Utils.formatCurrency(totalUSD)} <br><small style="font-size: 0.6em; font-weight: normal; opacity: 0.8; color: var(--color-text-secondary); line-height:1;">Bs ${Utils.formatNumber(totalBs, true)}</small>`;
+    totalDisplay.innerHTML = `
+      <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs ${Utils.formatNumber(totalBs, true)}</span>
+      <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">${Utils.formatCurrency(totalUSD)}</span>
+    `;
     
     carritoTbody.querySelectorAll('.btn-remove-cart').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const idx = parseInt(e.target.dataset.index);
+        const idx = parseInt(btn.dataset.index);
         carrito.splice(idx, 1);
         renderCarrito();
+      });
+    });
+
+    carritoTbody.querySelectorAll('.btn-toggle-cortesia').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.index);
+        const it = carrito[idx];
+        if (it && it.esBotellonFisico) {
+          it.aguaCortesia = !it.aguaCortesia;
+          it.litros = it.aguaCortesia ? (it.cantidad * (it.litrosAguaPorUnidad || 20)) : 0;
+          renderCarrito();
+        }
       });
     });
     
@@ -1166,9 +1323,27 @@ export function renderNuevaVentaForm(container) {
       inputPrecio.value = precioBase.toFixed(2);
       inputPrecio.title = `Fijo en dólares ($)`;
     }
+
+    const infoCortesia = modal.querySelector('#info-cortesia-producto');
+    if (infoCortesia) {
+      const cat = opt.dataset.categoria || 'relleno';
+      const rawNom = opt.dataset.nombre || opt.textContent.split('(')[0].trim();
+      const esBotellonFisico = (cat === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNom);
+      infoCortesia.style.display = esBotellonFisico ? 'block' : 'none';
+    }
   }
 
-  modal.querySelector('#btn-add-item').addEventListener('click', () => {
+  if (selectTipo) {
+    selectTipo.addEventListener('change', syncPrecioSeleccionado);
+    syncPrecioSeleccionado();
+  }
+
+  function extraerLitrosDeNombre(nombre) {
+    const match = (nombre || '').match(/(\d+)\s*(?:l|lt|lts|litro|litros)?/i);
+    return match ? parseFloat(match[1]) : 20;
+  }
+
+  function agregarItemAlCarrito() {
     const cantidad = parseInt(inputBot.value);
     const precioInputVal = parseFloat(inputPrecio.value);
     
@@ -1178,15 +1353,21 @@ export function renderNuevaVentaForm(container) {
     }
     
     const opt = selectTipo.options[selectTipo.selectedIndex];
+    if (!opt) return;
+
     const tipoBotellonId = opt.value;
-    const nombre = opt.dataset.nombre;
-    const litrosPorUnidad = parseFloat(opt.dataset.litros) || 20;
+    const rawNombre = opt.dataset.nombre || opt.textContent.split('(')[0].trim();
     const categoria = opt.dataset.categoria || 'relleno';
+    const esBotellonFisico = (categoria === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNombre);
+    const litrosCapacidad = esBotellonFisico 
+      ? extraerLitrosDeNombre(rawNombre) 
+      : (parseFloat(opt.dataset.litros) || 20);
+
     const monedaOriginal = opt.dataset.moneda || 'USD';
     const precioBase = parseFloat(opt.dataset.precio) || 0;
     const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
 
-    const isBsProducto = monedaOriginal === 'VES' || monedaOriginal === 'Bs';
+    const isBsProducto = (monedaOriginal === 'VES' || monedaOriginal === 'Bs');
     const precioCalculadoUSD = isBsProducto ? (tasa > 0 ? +(precioBase / tasa).toFixed(2) : 0) : precioBase;
     
     // Si el usuario no modificó el precio convertido, mantenemos la moneda fija en Bs exacta
@@ -1195,29 +1376,45 @@ export function renderNuevaVentaForm(container) {
     const finalPrecioBase = esFijoBs ? precioBase : precioInputVal;
     const precioUnitario = esFijoBs ? (tasa > 0 ? (precioBase / tasa) : 0) : precioInputVal;
     
-    const existenteIdx = carrito.findIndex(item => item.tipoBotellonId === tipoBotellonId && item.monedaOriginal === finalMonedaOriginal);
+    const existenteIdx = carrito.findIndex(item => 
+      item.tipoBotellonId === tipoBotellonId && 
+      item.monedaOriginal === finalMonedaOriginal
+    );
     
     if (existenteIdx !== -1) {
       carrito[existenteIdx].cantidad += cantidad;
       carrito[existenteIdx].subtotal = carrito[existenteIdx].cantidad * carrito[existenteIdx].precioUnitario;
-      carrito[existenteIdx].litros += (cantidad * litrosPorUnidad);
+      if (carrito[existenteIdx].esBotellonFisico) {
+        carrito[existenteIdx].litros = carrito[existenteIdx].aguaCortesia ? (carrito[existenteIdx].cantidad * litrosCapacidad) : 0;
+      } else {
+        carrito[existenteIdx].litros += (cantidad * litrosCapacidad);
+      }
     } else {
       carrito.push({
         tipoBotellonId,
         categoria,
-        nombre,
+        nombre: rawNombre,
         cantidad,
+        esBotellonFisico,
+        aguaCortesia: esBotellonFisico, // marcado por defecto con cortesía los de la lista de productos con palabra "Botellón"
+        litrosAguaPorUnidad: litrosCapacidad,
         monedaOriginal: finalMonedaOriginal,
         precioBase: finalPrecioBase,
         precioUnitario,
         subtotal: cantidad * precioUnitario,
-        litros: cantidad * litrosPorUnidad
+        litros: esBotellonFisico ? (litrosCapacidad * cantidad) : (cantidad * litrosCapacidad)
       });
     }
     
     inputBot.value = '1';
+    if (selectTipo) {
+      selectTipo.selectedIndex = 0;
+      syncPrecioSeleccionado();
+    }
     renderCarrito();
-  });
+  }
+
+  modal.querySelector('#btn-add-item')?.addEventListener('click', () => agregarItemAlCarrito());
 
   function actualizarPagosAutom(totalUSD, totalBs) {
     const pagosMontoInputs = modal.querySelectorAll('.pago-monto');
@@ -1534,16 +1731,33 @@ export function renderNuevaVentaForm(container) {
   function actualizarInfoCredito() {
     if (!seccionInfoCredito) return;
     const currentTipo = modal.querySelector('input[name="tipo"]:checked')?.value || 'contado';
-    if (currentTipo !== 'credito' && currentTipo !== 'convenio') {
+    if (currentTipo !== 'credito' && !isTipoSinCobro(currentTipo)) {
       seccionInfoCredito.style.display = 'none';
       return;
     }
     seccionInfoCredito.style.display = 'block';
 
-    if (currentTipo === 'convenio') {
-      seccionInfoCredito.innerHTML = `ℹ️ Esta venta se registrará bajo modalidad de <strong>Convenio Institucional / Especial</strong>.`;
+    if (isTipoSinCobro(currentTipo)) {
+      let icon = '🤝';
+      let title = 'Convenio Institucional / Especial';
+      if (currentTipo === 'garantia') {
+        icon = '🔄';
+        title = 'Garantía / Reposición (Agua Sucia / Reclamo de Calidad)';
+      } else if (currentTipo === 'cortesia') {
+        icon = '🎁';
+        title = 'Cortesía / Obsequio / Promoción';
+      }
+      seccionInfoCredito.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; line-height: 1.4;">
+          <span style="font-size: 24px;">${icon}</span>
+          <div>
+            <strong style="color: var(--color-primary-900);">${title} ($0.00)</strong><br/>
+            <span style="font-size: 12px; color: var(--color-text-secondary);">Esta operación no genera cobro en caja ($0.00). Los litros de agua y envases se descontarán automáticamente del inventario.</span>
+          </div>
+        </div>
+      `;
       seccionInfoCredito.style.background = 'var(--color-bg-secondary)';
-      seccionInfoCredito.style.border = '1px solid var(--color-border)';
+      seccionInfoCredito.style.border = '1.5px solid var(--color-border)';
       return;
     }
 
@@ -1600,9 +1814,11 @@ export function renderNuevaVentaForm(container) {
   
   radiosTipo.forEach(r => {
     r.addEventListener('change', () => {
-      const isCreditoConvenio = (r.value === 'credito' || r.value === 'convenio');
-      if (seccionPagos) seccionPagos.style.display = isCreditoConvenio ? 'none' : 'block';
+      const isSinCobro = isTipoSinCobro(r.value);
+      const isCredito = (r.value === 'credito');
+      if (seccionPagos) seccionPagos.style.display = (isSinCobro || isCredito) ? 'none' : 'block';
       actualizarInfoCredito();
+      renderCarrito();
     });
   });
   
@@ -1783,6 +1999,20 @@ function deleteVenta(id) {
             store.setConfig('tiposBotellon', allTipos);
           }
         }
+
+        // Eliminar abonos/excedentes asociados a esta venta
+        const abonosAsociados = (store.getAll('abonos') || []).filter(a => {
+          if (a.ventaId === id) return true;
+          // Respaldo para ventas previas: coincidencia por cliente, fecha similar (+- 2 min) y 'Excedente de venta'
+          if (venta.clienteId && a.clienteId === venta.clienteId && a.referencia === 'Excedente de venta') {
+            const diffMs = Math.abs(new Date(a.fecha) - new Date(venta.fecha));
+            if (diffMs < 120000) return true;
+          }
+          return false;
+        });
+        abonosAsociados.forEach(a => {
+          store.delete('abonos', a.id);
+        });
       }
       store.delete('ventas', id);
       syncToCloud();

@@ -163,7 +163,7 @@ img {
   display: block;
 }
 
-/* === LAYOUT === */
+/* === LAYOUT & SIDEBAR COLLAPSIBLE === */
 .app-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
@@ -171,6 +171,12 @@ img {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  transition: grid-template-columns var(--transition-normal);
+  position: relative;
+}
+
+.app-layout.sidebar-collapsed {
+  grid-template-columns: 0px 1fr !important;
 }
 
 /* === SIDEBAR === */
@@ -181,9 +187,159 @@ img {
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  padding: var(--space-xl) 0 var(--space-md);
+  padding: var(--space-sm) 0 var(--space-md);
   overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 20;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  box-sizing: border-box;
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+.app-layout.sidebar-collapsed .sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  border-right: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transform: translateX(-100%) !important;
+}
+
+/* Wrapper principal que contiene la barra superior de reapertura y el contenido */
+.main-wrapper {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Barra superior minimalista estilo Todoist para reabrir la barra lateral */
+.sidebar-open-bar {
+  display: none;
+  align-items: center;
+  padding: 14px var(--space-xl) 0 var(--space-xl);
+  flex-shrink: 0;
+  background: var(--color-bg);
   z-index: 10;
+}
+
+.app-layout.sidebar-collapsed .sidebar-open-bar {
+  display: flex !important;
+}
+
+.btn-open-sidebar-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #64748B);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 5px 9px;
+  margin-left: -7px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+  font-family: inherit;
+}
+
+.btn-open-sidebar-header:hover {
+  background: var(--color-surface-hover, #F1F5F9);
+  color: var(--color-text-main, #0F172A);
+}
+
+.btn-open-sidebar-header:active {
+  transform: scale(0.97);
+}
+
+.btn-open-sidebar-header svg {
+  display: block;
+  stroke: currentColor;
+}
+
+/* Botón icono de colapsar barra lateral estilo Todoist */
+.btn-sidebar-icon-toggle {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary, #64748B);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-sidebar-icon-toggle:hover {
+  background: var(--color-surface-hover, #F1F5F9);
+  color: var(--color-text-main, #0F172A);
+}
+
+.btn-sidebar-icon-toggle:active {
+  transform: scale(0.95);
+}
+
+.btn-sidebar-icon-toggle svg {
+  display: block;
+  stroke: currentColor;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xl);
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.app-layout.sidebar-collapsed .main-content {
+  padding-top: 10px !important;
+}
+
+.btn-sidebar-collapse:hover {
+  background: var(--color-surface-hover) !important;
+  color: var(--color-text-main) !important;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  }
+  .sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 15;
+  }
+  .app-layout:not(.sidebar-collapsed) .sidebar-backdrop {
+    display: block !important;
+  }
 }
 
 .sidebar-logo {

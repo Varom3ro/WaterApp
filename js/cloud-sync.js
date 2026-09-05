@@ -199,9 +199,17 @@ export async function syncToCloud(isManual = false) {
     // Análisis de productos más vendidos reales
     const productCounts = {};
     ventas.forEach(v => {
-      if (v.items && Array.isArray(v.items) && v.items.length > 0) {
+      if (v.detalles && Array.isArray(v.detalles) && v.detalles.length > 0) {
+        v.detalles.forEach(it => {
+          const prod = tipos.find(t => t.id === it.tipoBotellonId);
+          const name = prod ? prod.nombre : (it.nombre || 'Botellón 20 Litros');
+          const cant = parseInt(it.cantidad) || 1;
+          productCounts[name] = (productCounts[name] || 0) + cant;
+        });
+      } else if (v.items && Array.isArray(v.items) && v.items.length > 0) {
         v.items.forEach(it => {
-          const name = it.nombre || it.nombreTipo || 'Botellón 20 Litros';
+          const prod = tipos.find(t => t.id === (it.tipoBotellonId || it.id));
+          const name = prod ? prod.nombre : (it.nombre || it.nombreTipo || 'Botellón 20 Litros');
           const cant = parseInt(it.cantidad) || 1;
           productCounts[name] = (productCounts[name] || 0) + cant;
         });

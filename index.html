@@ -14,22 +14,29 @@
   <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png" />
   <link rel="apple-touch-icon" href="img/icon-192.png" />
   <title>Tu Empresa - Gestión de Agua v2.0</title>
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=2.8.8" />
 </head>
 
 <body>
   <div id="app"></div>
   <script>
     window.addEventListener('error', function(e) {
-      document.body.innerHTML += '<div style="color:red; background:white; padding:20px; z-index:9999; position:absolute; top:0; left:0;">' + e.message + '<br>' + e.filename + ':' + e.lineno + '</div>';
+      const msg = e.message || '';
+      if (msg.includes('ResizeObserver') || msg.includes('Script error')) return;
+      console.error('[App Error]', e);
     });
     window.addEventListener('unhandledrejection', function(e) {
-      document.body.innerHTML += '<div style="color:red; background:white; padding:20px; z-index:9999; position:absolute; top:50px; left:0;">Promise Reject: ' + e.reason + '</div>';
+      const msg = (e && e.reason) ? (e.reason.message || String(e.reason)) : '';
+      if (msg.includes('ServiceWorker') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        console.warn('[PWA/Network]: Error de red o actualización de Service Worker ignorado:', e.reason);
+        return;
+      }
+      console.error('[Unhandled Rejection]', e.reason);
     });
   </script>
   <script src="js/qrcode.min.js"></script>
   <script src="js/html2pdf.bundle.min.js"></script>
-  <script type="module" src="js/app.js?v=2.7.5"></script>
+  <script type="module" src="js/app.js?v=2.8.8"></script>
 </body>
 
 </html>

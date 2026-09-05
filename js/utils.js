@@ -3,6 +3,8 @@
 // ============================================
 
 export const Utils = {
+  VERSION: '2.8.8',
+
   // Generar ID único
   generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
