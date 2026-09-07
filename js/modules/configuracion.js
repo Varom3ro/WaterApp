@@ -2,8 +2,7 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { renderSidebar } from '../components/sidebar.js';
-import { syncToCloud } from '../cloud-sync.js';
+import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
@@ -423,16 +422,59 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
-      <!-- Backup -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">💾 Respaldo de Datos</h3>
+      <!-- Respaldo y Recuperación en la Nube (Plan Plus) -->
+      <div class="card full-width" style="border-left: 4px solid #0284C7;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>☁️</span> Respaldo y Recuperación en la Nube (Plan Plus)
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Copia de seguridad en tiempo real en la nube para proteger tus clientes, catálogo, ventas e inventario ante pérdida de equipo o formateo.
+            </p>
+          </div>
+          <span class="badge" style="background: rgba(2, 132, 199, 0.1); color: #0284C7; font-weight: 700; border: 1px solid rgba(2, 132, 199, 0.3); padding: 4px 10px; border-radius: 6px;">
+            🔒 Blindaje de Equipo Activo
+          </span>
         </div>
-        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Exporta o importa la base de datos completa.</p>
+
+        <div class="card-body mt-md">
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; background: var(--color-bg-body, #f8fafc); padding: 14px; border-radius: 8px; border: 1px solid var(--color-border);">
+            <div style="flex: 1; min-width: 200px;">
+              <span style="font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Cuenta Vinculada</span>
+              <strong id="label-cloud-email" style="font-size: 14px; color: var(--color-primary-800, #0F766E); word-break: break-all;">${usuarioEmail}</strong>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+              <span style="font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Estado de Protección</span>
+              <span style="color: #15803D; font-weight: 700; font-size: 13px;">🟢 Conectado y Blindado</span>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+              <span style="font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Último Respaldo en la Nube</span>
+              <span id="label-cloud-last-backup" style="font-size: 13px; color: var(--color-text-primary); font-weight: 600;">Consultando...</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <button class="btn btn-primary" id="btn-backup-cloud-now" style="background: #0284C7; border-color: #0284C7; display: flex; align-items: center; gap: 8px;">
+              <span>☁️</span> Respaldar Todo en la Nube Ahora
+            </button>
+            <button class="btn btn-secondary" id="btn-restore-cloud-now" style="display: flex; align-items: center; gap: 8px;">
+              <span>🔄</span> Restaurar desde la Nube
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup Local -->
+      <div class="card full-width">
+        <div class="card-header">
+          <h3 class="card-title">💾 Copia de Seguridad Local (Archivo JSON)</h3>
+        </div>
+        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Descarga una copia completa en tu disco duro o pendrive, o importa un archivo previamente exportado.</p>
         <div class="flex gap-md" style="flex-wrap:wrap">
-          <button class="btn btn-primary" id="btn-export">📥 Exportar</button>
+          <button class="btn btn-secondary" id="btn-export">📥 Descargar Archivo JSON</button>
           <label class="btn btn-secondary" style="cursor:pointer">
-            📤 Importar
+            📤 Cargar Archivo JSON
             <input type="file" accept=".json" id="btn-import" style="display:none"/>
           </label>
         </div>
@@ -827,7 +869,122 @@ export function renderConfiguracion(container) {
     });
   });
 
-  // Backup events
+  // ---- Respaldo en la Nube (Plan Plus) ----
+  const lblLastCloud = container.querySelector('#label-cloud-last-backup');
+  if (lblLastCloud) {
+    getCloudBackup(usuarioEmail).then(info => {
+      if (!lblLastCloud) return;
+      if (info && info.ultimaActualizacion) {
+        const d = new Date(info.ultimaActualizacion);
+        lblLastCloud.innerHTML = `${d.toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })} <span style="color:#64748B; font-weight:normal;">(${info.clientesCount} clientes · ${info.ventasCount} ventas)</span>`;
+      } else {
+        lblLastCloud.textContent = 'Aún no hay respaldo guardado';
+      }
+    }).catch(() => {
+      if (lblLastCloud) lblLastCloud.textContent = 'Sin conexión a la nube';
+    });
+  }
+
+  const btnCloudBackup = container.querySelector('#btn-backup-cloud-now');
+  if (btnCloudBackup) {
+    btnCloudBackup.addEventListener('click', async () => {
+      btnCloudBackup.disabled = true;
+      btnCloudBackup.innerHTML = '<span>⏳</span> Respaldando en la Nube...';
+      try {
+        const res = await backupToCloudNow();
+        if (res.success) {
+          showToast(`☁️ Respaldo guardado con éxito (${res.clientesCount} clientes, ${res.ventasCount} ventas)`, 'success');
+          if (lblLastCloud) {
+            lblLastCloud.innerHTML = `${new Date().toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })} <span style="color:#64748B; font-weight:normal;">(${res.clientesCount} clientes · ${res.ventasCount} ventas)</span>`;
+          }
+        } else {
+          showToast('⚠️ No se pudo completar el respaldo. Verifica tu conexión.', 'warning');
+        }
+      } catch (err) {
+        showToast('Error al respaldar: ' + err.message, 'danger');
+      } finally {
+        btnCloudBackup.disabled = false;
+        btnCloudBackup.innerHTML = '<span>☁️</span> Respaldar Todo en la Nube Ahora';
+      }
+    });
+  }
+
+  const btnCloudRestore = container.querySelector('#btn-restore-cloud-now');
+  if (btnCloudRestore) {
+    btnCloudRestore.addEventListener('click', async () => {
+      btnCloudRestore.disabled = true;
+      btnCloudRestore.innerHTML = '<span>⏳</span> Verificando nube...';
+      try {
+        const info = await getCloudBackup(usuarioEmail);
+        btnCloudRestore.disabled = false;
+        btnCloudRestore.innerHTML = '<span>🔄</span> Restaurar desde la Nube';
+
+        if (!info || !info.backup) {
+          showToast('No se encontró ninguna copia de seguridad en la nube para esta cuenta.', 'warning');
+          return;
+        }
+
+        const fechaStr = info.ultimaActualizacion
+          ? new Date(info.ultimaActualizacion).toLocaleString('es-VE', { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Reciente';
+
+        openModal({
+          title: '🔄 Restaurar Respaldo desde la Nube',
+          content: `
+            <div style="text-align: left; padding: 4px;">
+              <p style="font-size: 14px; color: var(--color-text-primary); margin-bottom: 14px;">
+                Se restaurarán todos los datos almacenados en la nube para la tienda <strong>${info.nombreEmpresa}</strong>.
+              </p>
+              <div style="background: var(--color-bg-body, #f8fafc); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px; font-size: 13px; margin-bottom: 16px;">
+                <div>👥 <strong>Clientes registrados:</strong> ${info.clientesCount}</div>
+                <div style="margin-top: 4px;">💧 <strong>Ventas registradas:</strong> ${info.ventasCount}</div>
+                <div style="margin-top: 4px;">📦 <strong>Productos / Catálogo:</strong> ${info.productosCount}</div>
+                <div style="margin-top: 8px; border-top: 1px solid var(--color-border); padding-top: 6px; font-size: 12px; color: var(--color-text-secondary);">
+                  🕒 Fecha del respaldo: <strong>${fechaStr}</strong>
+                </div>
+              </div>
+              <p style="font-size: 13px; color: var(--color-danger, #ef4444); margin-bottom: 16px;">
+                ⚠️ <em>Esta acción reemplazará los datos actuales de este navegador con la copia de la nube.</em>
+              </p>
+              <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-restore-modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-restore-modal" style="background: #0284C7; border-color: #0284C7;">
+                  Sí, Restaurar Ahora
+                </button>
+              </div>
+            </div>
+          `
+        });
+
+        const cancelBtn = document.getElementById('btn-cancel-restore-modal');
+        if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+        const confirmBtn = document.getElementById('btn-confirm-restore-modal');
+        if (confirmBtn) {
+          confirmBtn.addEventListener('click', async () => {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '⏳ Restaurando...';
+            const res = await restoreFromCloud(usuarioEmail);
+            if (res.success) {
+              closeModal();
+              showToast('✅ Información restaurada exitosamente', 'success');
+              setTimeout(() => location.reload(), 1000);
+            } else {
+              alert('Error al restaurar: ' + res.message);
+              confirmBtn.disabled = false;
+              confirmBtn.textContent = 'Sí, Restaurar Ahora';
+            }
+          });
+        }
+      } catch (e) {
+        btnCloudRestore.disabled = false;
+        btnCloudRestore.innerHTML = '<span>🔄</span> Restaurar desde la Nube';
+        showToast('Error al conectar con la nube: ' + e.message, 'danger');
+      }
+    });
+  }
+
+  // Backup events (Local)
   container.querySelector('#btn-export').addEventListener('click', () => {
     const data = store.exportData();
     const blob = new Blob([data], { type: 'application/json' });

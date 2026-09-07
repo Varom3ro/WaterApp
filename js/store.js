@@ -710,9 +710,10 @@ class Store {
         return JSON.stringify(data, null, 2);
     }
 
-    importData(jsonString) {
+    importData(dataInput) {
         try {
-            const data = JSON.parse(jsonString);
+            const data = typeof dataInput === 'string' ? JSON.parse(dataInput) : dataInput;
+            if (!data || typeof data !== 'object') return false;
             for (const col of COLLECTIONS) {
                 if (!Array.isArray(data[col])) continue;
                 this.cache[col] = data[col];
