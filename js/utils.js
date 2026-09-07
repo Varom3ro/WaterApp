@@ -3,7 +3,7 @@
 // ============================================
 
 export const Utils = {
-  VERSION: '2.8.10',
+  VERSION: '2.8.11',
 
   // Generar ID único
   generateId() {
@@ -60,6 +60,21 @@ export const Utils = {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
+  },
+
+  // Formatear hora
+  formatTime(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return new Intl.DateTimeFormat('es-VE', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (e) {
+      return '';
+    }
   },
 
   // Fecha actual en formato ISO local

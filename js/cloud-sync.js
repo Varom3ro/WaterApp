@@ -152,8 +152,12 @@ export async function syncToCloud(isManual = false) {
         else if (m === 'efectivo_usd') metodoLabel = '💵 Efectivo $';
       }
 
+      const horaStr = (typeof Utils.formatTime === 'function')
+        ? Utils.formatTime(v.fecha)
+        : (v.fecha ? new Date(v.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+
       ultimosMovs.push({
-        hora: Utils.formatTime(v.fecha),
+        hora: horaStr,
         fecha: v.fecha,
         tipo: 'Venta',
         icono: '💧',
@@ -165,8 +169,12 @@ export async function syncToCloud(isManual = false) {
     });
 
     mermas.slice(-5).reverse().forEach(m => {
+      const horaMerma = (typeof Utils.formatTime === 'function')
+        ? Utils.formatTime(m.fecha)
+        : (m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+
       ultimosMovs.push({
-        hora: Utils.formatTime(m.fecha),
+        hora: horaMerma,
         fecha: m.fecha,
         tipo: 'Merma',
         icono: '🧹',
