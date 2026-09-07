@@ -12,6 +12,7 @@ export function renderConfiguracion(container) {
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
   const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
   const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
+  const cortesiaBotellonNuevo = store.getConfig('cortesiaBotellonNuevo') === true;
   const metodosPago = store.getMetodosPago(false);
 
   let usuarioEmail = 'Licencia Local';
@@ -366,6 +367,35 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
+      <!-- Recarga de Agua de Cortesía en Botellón Nuevo -->
+      <div class="card full-width" style="border-left: 4px solid #7C3AED;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>🎁</span> Recarga de Agua de Cortesía en Botellón Nuevo
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Permite incluir automáticamente una recarga de agua gratis ($0.00) por cortesía al vender un envase o botellón nuevo del catálogo de productos.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="label-status-cortesia-botellon" style="font-size: 13px; font-weight: 700; color: ${cortesiaBotellonNuevo ? '#15803D' : '#64748B'};">
+              ${cortesiaBotellonNuevo ? '🟢 Activado' : '⚪ Desactivado'}
+            </span>
+            <label style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0; cursor: pointer;">
+              <input type="checkbox" id="toggle-cortesia-botellon" ${cortesiaBotellonNuevo ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+              <span id="slider-cortesia-botellon" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${cortesiaBotellonNuevo ? '#15803D' : '#CBD5E1'}; transition: .3s; border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+                <span id="slider-knob-cortesia-botellon" style="position: absolute; content: ''; height: 20px; width: 20px; left: ${cortesiaBotellonNuevo ? '27px' : '3px'}; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text-secondary); line-height: 1.4;">
+          💡 <em>Al estar <strong>Activado</strong>, al seleccionar cualquier botellón de la lista de productos en el Punto de Venta se incluirá el agua de cortesía gratis (descontando los litros de agua del tanque sin costo extra) y con la opción de quitarla en el carrito. Al estar <strong>Desactivado</strong>, los botellones se venderán como envases vacíos normales sin recarga de agua.</em>
+        </div>
+      </div>
+
       <!-- Seguridad y Contraseña -->
       <div class="card">
         <div class="card-header">
@@ -460,6 +490,33 @@ export function renderConfiguracion(container) {
     selectUnidadCaudalimetro.addEventListener('change', (e) => {
       store.setConfig('unidadCaudalimetro', e.target.value);
       showToast('Unidad de medida del reloj actualizada', 'success');
+    });
+  }
+
+  // Cortesía Botellón Nuevo Toggle
+  const toggleCortesiaBotellon = container.querySelector('#toggle-cortesia-botellon');
+  const labelStatusCortesiaBotellon = container.querySelector('#label-status-cortesia-botellon');
+  const sliderCortesiaBotellon = container.querySelector('#slider-cortesia-botellon');
+  const sliderKnobCortesiaBotellon = container.querySelector('#slider-knob-cortesia-botellon');
+
+  if (toggleCortesiaBotellon) {
+    toggleCortesiaBotellon.addEventListener('change', (e) => {
+      const activo = e.target.checked;
+      store.setConfig('cortesiaBotellonNuevo', activo);
+      
+      if (labelStatusCortesiaBotellon) {
+        labelStatusCortesiaBotellon.textContent = activo ? '🟢 Activado' : '⚪ Desactivado';
+        labelStatusCortesiaBotellon.style.color = activo ? '#15803D' : '#64748B';
+      }
+      if (sliderCortesiaBotellon) {
+        sliderCortesiaBotellon.style.backgroundColor = activo ? '#15803D' : '#CBD5E1';
+      }
+      if (sliderKnobCortesiaBotellon) {
+        sliderKnobCortesiaBotellon.style.left = activo ? '27px' : '3px';
+      }
+
+      showToast(activo ? '🎁 Cortesía de agua en botellones nuevos activada' : 'Cortesía de agua en botellones nuevos desactivada', activo ? 'success' : 'info');
+      if (typeof syncToCloud === 'function') syncToCloud();
     });
   }
 

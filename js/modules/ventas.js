@@ -1065,8 +1065,9 @@ export function renderNuevaVentaForm(container) {
             ? `Bs ${Utils.formatNumber(item.cantidad * item.precioBase, true)} <small style="color:var(--color-text-secondary); display:block; font-size:10px;">(~${Utils.formatCurrency(item.subtotal)})</small>`
             : Utils.formatCurrency(item.subtotal));
 
+      const cortesiaActiva = store.getConfig('cortesiaBotellonNuevo') === true;
       let badgeInfoHTML = '';
-      if (isBotellonFisico) {
+      if (isBotellonFisico && (cortesiaActiva || item.aguaCortesia)) {
         if (item.aguaCortesia) {
           badgeInfoHTML = `
             <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
@@ -1080,7 +1081,7 @@ export function renderNuevaVentaForm(container) {
               </button>
             </div>
           `;
-        } else {
+        } else if (cortesiaActiva) {
           badgeInfoHTML = `
             <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <span class="badge" style="background:#F1F5F9; color:#64748B; border: 1px solid #CBD5E1; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px;">
@@ -1326,10 +1327,11 @@ export function renderNuevaVentaForm(container) {
 
     const infoCortesia = modal.querySelector('#info-cortesia-producto');
     if (infoCortesia) {
+      const cortesiaActiva = store.getConfig('cortesiaBotellonNuevo') === true;
       const cat = opt.dataset.categoria || 'relleno';
       const rawNom = opt.dataset.nombre || opt.textContent.split('(')[0].trim();
       const esBotellonFisico = (cat === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNom);
-      infoCortesia.style.display = esBotellonFisico ? 'block' : 'none';
+      infoCortesia.style.display = (cortesiaActiva && esBotellonFisico) ? 'block' : 'none';
     }
   }
 
@@ -1355,10 +1357,12 @@ export function renderNuevaVentaForm(container) {
     const opt = selectTipo.options[selectTipo.selectedIndex];
     if (!opt) return;
 
+    const cortesiaActiva = store.getConfig('cortesiaBotellonNuevo') === true;
     const tipoBotellonId = opt.value;
     const rawNombre = opt.dataset.nombre || opt.textContent.split('(')[0].trim();
     const categoria = opt.dataset.categoria || 'relleno';
     const esBotellonFisico = (categoria === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNombre);
+    const tieneCortesia = cortesiaActiva && esBotellonFisico;
     const litrosCapacidad = esBotellonFisico 
       ? extraerLitrosDeNombre(rawNombre) 
       : (parseFloat(opt.dataset.litros) || 20);
@@ -1396,13 +1400,13 @@ export function renderNuevaVentaForm(container) {
         nombre: rawNombre,
         cantidad,
         esBotellonFisico,
-        aguaCortesia: esBotellonFisico, // marcado por defecto con cortesía los de la lista de productos con palabra "Botellón"
+        aguaCortesia: tieneCortesia, // solo por cortesía si la opción está activada en Configuración
         litrosAguaPorUnidad: litrosCapacidad,
         monedaOriginal: finalMonedaOriginal,
         precioBase: finalPrecioBase,
         precioUnitario,
         subtotal: cantidad * precioUnitario,
-        litros: esBotellonFisico ? (litrosCapacidad * cantidad) : (cantidad * litrosCapacidad)
+        litros: tieneCortesia ? (litrosCapacidad * cantidad) : (esBotellonFisico ? 0 : cantidad * litrosCapacidad)
       });
     }
     
