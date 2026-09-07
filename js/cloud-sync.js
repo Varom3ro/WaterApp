@@ -88,10 +88,12 @@ export async function syncToCloud(isManual = false) {
 
     const totalBs = totalUSD * tasa;
 
+    const clientes = store.getAll('clientes') || [];
+
     // 🛡️ ESCUDO PROTECTOR ANTI-SOBRESCRITURA:
-    // Si este dispositivo tiene 0 ventas en todo su historial y el tanque en 0,
-    // comprobar si la tienda ya tiene datos en la nube para NO borrar el tanque ni el mes con ceros.
-    if (ventas.length === 0 && (!inventario.litros || inventario.litros === 0) && !isManual) {
+    // Si este dispositivo tiene 0 ventas, 0 clientes y tanque en 0,
+    // comprobar si la tienda ya tiene datos en la nube para NO borrar el respaldo ni el tanque con ceros.
+    if (ventas.length === 0 && clientes.length === 0 && (!inventario.litros || inventario.litros === 0) && !isManual) {
       try {
         const checkRes = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
           headers: {
@@ -103,12 +105,16 @@ export async function syncToCloud(isManual = false) {
           const cloudData = await checkRes.json();
           if (cloudData && cloudData.length > 0) {
             const remote = cloudData[0];
+            const hasBackup = remote.respaldo_completo && (
+              (remote.respaldo_completo.clientes && remote.respaldo_completo.clientes.length > 0) ||
+              (remote.respaldo_completo.ventas && remote.respaldo_completo.ventas.length > 0)
+            );
             const remoteTotalMes = remote.analisis_mes?.totalMesUSD || 0;
             const remoteLitros = remote.nivel_tanque?.litros || 0;
             const remoteMovs = remote.ultimos_movimientos?.length || 0;
 
-            if (remoteTotalMes > 0 || remoteLitros > 0 || remoteMovs > 0) {
-              console.log('[CloudSync] 🛡️ Dispositivo vacío detectado. Se protegen datos activos de la nube (tanque, mes, movimientos).');
+            if (hasBackup || remoteTotalMes > 0 || remoteLitros > 0 || remoteMovs > 0) {
+              console.log('[CloudSync] 🛡️ Dispositivo vacío detectado. Se protegen datos activos de la nube (respaldo, tanque, mes).');
               if (remoteLitros > 0 && inventario.litros === 0) {
                 store.setConfig('inventario', remote.nivel_tanque);
               }
@@ -252,6 +258,15 @@ export async function syncToCloud(isManual = false) {
       }
     });
 
+    // Generar respaldo completo para recuperación ante desastres (Plan Plus)
+    let respaldoObj = null;
+    try {
+      const backupStr = store.exportData();
+      respaldoObj = JSON.parse(backupStr);
+    } catch (bErr) {
+      console.warn('[CloudSync] Error generando snapshot de respaldo:', bErr);
+    }
+
     const payload = {
       empresa_email: email,
       nombre_empresa: empresaNombre,
@@ -286,7 +301,8 @@ export async function syncToCloud(isManual = false) {
         ventasPorDia,
         maxDia,
         maxMonto
-      }
+      },
+      respaldo_completo: respaldoObj
     };
 
     const res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
@@ -301,7 +317,7 @@ export async function syncToCloud(isManual = false) {
     });
 
     if (res.ok) {
-      console.log('[CloudSync] ✅ Datos reales de la tienda sincronizados con Supabase:', payload);
+      console.log('[CloudSync] ✅ Datos y respaldo íntegro de la tienda sincronizados con Supabase:', payload);
       return true;
     } else {
       console.warn('[CloudSync] Error en respuesta de Supabase:', await res.text());
@@ -313,7 +329,111 @@ export async function syncToCloud(isManual = false) {
   }
 }
 
+/**
+ * Consulta la copia de seguridad de una cuenta en Supabase.
+ */
+export async function getCloudBackup(emailParam = null) {
+  try {
+    let email = emailParam;
+    if (!email) {
+      const licenciaLocal = localStorage.getItem('licencia_usuario');
+      if (!licenciaLocal) return null;
+      email = JSON.parse(licenciaLocal).email;
+    }
+    if (!email) return null;
+
+    const res = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.length === 0) return null;
+
+    const remote = data[0];
+    const backup = remote.respaldo_completo;
+    if (!backup) return null;
+
+    const clientesCount = Array.isArray(backup.clientes) ? backup.clientes.length : 0;
+    const ventasCount = Array.isArray(backup.ventas) ? backup.ventas.length : 0;
+    const prodsCfg = backup.configuracion?.find(c => c.id === 'tiposBotellon');
+    const productosCount = prodsCfg && Array.isArray(prodsCfg.value) ? prodsCfg.value.length : 0;
+
+    return {
+      email,
+      nombreEmpresa: remote.nombre_empresa || 'Tu Empresa',
+      ultimaActualizacion: remote.ultima_actualizacion,
+      nivelTanque: remote.nivel_tanque,
+      clientesCount,
+      ventasCount,
+      productosCount,
+      backup
+    };
+  } catch (e) {
+    console.error('[CloudSync] Error al consultar respaldo de la nube:', e);
+    return null;
+  }
+}
+
+/**
+ * Restaura toda la base de datos (clientes, inventario, ventas, etc.) desde la nube.
+ */
+export async function restoreFromCloud(emailParam = null) {
+  try {
+    const backupInfo = await getCloudBackup(emailParam);
+    if (!backupInfo || !backupInfo.backup) {
+      return { success: false, message: 'No se encontró una copia de seguridad en la nube para esta cuenta.' };
+    }
+
+    const ok = store.importData(backupInfo.backup);
+    if (!ok) {
+      return { success: false, message: 'Error al procesar el archivo de respaldo.' };
+    }
+
+    // Restaurar nivel de tanque si está disponible
+    if (backupInfo.nivelTanque && backupInfo.nivelTanque.litros !== undefined) {
+      store.setConfig('inventario', backupInfo.nivelTanque);
+    }
+
+    console.log('[CloudSync] ✅ Respaldo restaurado desde la nube exitosamente:', backupInfo);
+    return {
+      success: true,
+      email: backupInfo.email,
+      nombreEmpresa: backupInfo.nombreEmpresa,
+      clientesCount: backupInfo.clientesCount,
+      ventasCount: backupInfo.ventasCount,
+      productosCount: backupInfo.productosCount,
+      ultimaActualizacion: backupInfo.ultimaActualizacion
+    };
+  } catch (e) {
+    console.error('[CloudSync] Error al restaurar desde la nube:', e);
+    return { success: false, message: e.message || 'Error inesperado al restaurar.' };
+  }
+}
+
+/**
+ * Disparador para respaldo manual inmediato desde la interfaz.
+ */
+export async function backupToCloudNow() {
+  const ok = await syncToCloud(true);
+  const clientes = store.getAll('clientes') || [];
+  const ventas = store.getAll('ventas') || [];
+  const tipos = store.getConfig('tiposBotellon') || [];
+  return {
+    success: ok,
+    clientesCount: clientes.length,
+    ventasCount: ventas.length,
+    productosCount: tipos.length,
+    fecha: new Date().toISOString()
+  };
+}
+
 // Exponer globalmente
 if (typeof window !== 'undefined') {
   window.syncToCloud = syncToCloud;
+  window.getCloudBackup = getCloudBackup;
+  window.restoreFromCloud = restoreFromCloud;
+  window.backupToCloudNow = backupToCloudNow;
 }
