@@ -967,6 +967,24 @@ export function renderNuevaVentaForm(container) {
 
       syncToCloud();
 
+      // Reset delivery FIRST before clearing cart
+      const checkDelivery = modal.querySelector('#check-delivery');
+      if (checkDelivery) {
+        checkDelivery.checked = false;
+        const contDeliv = modal.querySelector('#container-monto-delivery');
+        if (contDeliv) contDeliv.style.display = 'none';
+        const inputDeliv = modal.querySelector('#monto-delivery');
+        if (inputDeliv) inputDeliv.value = '0.00';
+        const cDeliv = modal.querySelector('#cant-delivery');
+        if (cDeliv) cDeliv.value = '1';
+        const rDeliv = modal.querySelector('#repartidor-delivery');
+        if (rDeliv) rDeliv.value = '';
+        const cPend = modal.querySelector('#check-pendiente-entrega');
+        if (cPend) cPend.checked = false;
+        const selTarifa = modal.querySelector('#tipo-tarifa-delivery');
+        if (selTarifa) selTarifa.selectedIndex = 0;
+      }
+
       // Reset form for continuous selling
       carrito.length = 0;
       renderCarrito();
@@ -1015,19 +1033,6 @@ export function renderNuevaVentaForm(container) {
         actualizarInfoCredito();
       }
 
-      // Reset delivery
-      const checkDelivery = modal.querySelector('#check-delivery');
-      if (checkDelivery) {
-         checkDelivery.checked = false;
-         modal.querySelector('#container-monto-delivery').style.display = 'none';
-         modal.querySelector('#monto-delivery').value = '0.00';
-         const cDeliv = modal.querySelector('#cant-delivery');
-         if (cDeliv) cDeliv.value = '1';
-         const rDeliv = modal.querySelector('#repartidor-delivery');
-         if (rDeliv) rDeliv.value = '';
-         const cPend = modal.querySelector('#check-pendiente-entrega');
-         if (cPend) cPend.checked = false;
-      }
       // Refrescar historial
       if (typeof renderVentasTable === 'function') {
         renderVentasTable();
@@ -1144,6 +1149,7 @@ export function renderNuevaVentaForm(container) {
       }
 
       carritoContainer.style.display = 'none';
+      carritoTbody.innerHTML = '';
       totalDisplay.innerHTML = `
         <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
         <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">$0.00</span>
