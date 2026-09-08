@@ -837,15 +837,6 @@ export function renderNuevaVentaForm(container) {
           fechaRegistro = new Date(inputFecha + 'T12:00:00').toISOString();
       }
       
-      const checkDeliv = modal.querySelector('#check-delivery');
-      const inputDeliv = modal.querySelector('#monto-delivery');
-      const cantDeliv = modal.querySelector('#cant-delivery');
-      const repDeliv = modal.querySelector('#repartidor-delivery');
-      let delivValue = parseFloat(inputDeliv.value) || 0;
-      let cantValue = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
-      const isDelivActive = !!(checkDeliv && checkDeliv.checked);
-      const montoDelivery = isDelivActive ? (delivValue * cantValue) : 0;
-
       let repartidorId = null;
       let repartidorNombre = null;
       if (isDelivActive && repDeliv && repDeliv.value) {
