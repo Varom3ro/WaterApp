@@ -548,23 +548,42 @@ function renderDeliveriesReport(content, range) {
   const stats = {};
   
   repartidores.forEach(r => {
-    stats[r.id] = { nombre: r.nombre, viajes: 0, montoTotal: 0 };
+    stats[r.id] = { nombre: r.nombre, viajes: 0, montoTotal: 0, local: 0, afuera: 0 };
   });
   
-  stats['sin_asignar'] = { nombre: 'Sin Asignar / General', viajes: 0, montoTotal: 0 };
+  stats['sin_asignar'] = { nombre: 'Sin Asignar / General', viajes: 0, montoTotal: 0, local: 0, afuera: 0 };
+
+  let viajesLocales = 0;
+  let montoLocales = 0;
+  let viajesAfuera = 0;
+  let montoAfuera = 0;
 
   ventasFiltradas.forEach(v => {
     const deliveryMonto = v.delivery || 0;
     if (deliveryMonto > 0) {
       const cant = v.deliveryCant || 1;
       const repId = v.repartidorId || 'sin_asignar';
-      
+      const isAfuera = v.deliveryTipo === 'afuera' || (v.deliveryTipoNombre && v.deliveryTipoNombre.toLowerCase().includes('afuera'));
+
+      if (isAfuera) {
+        viajesAfuera += cant;
+        montoAfuera += deliveryMonto;
+      } else {
+        viajesLocales += cant;
+        montoLocales += deliveryMonto;
+      }
+
       if (!stats[repId]) {
-        stats[repId] = { nombre: v.repartidorNombre || 'Desconocido', viajes: 0, montoTotal: 0 };
+        stats[repId] = { nombre: v.repartidorNombre || 'Desconocido', viajes: 0, montoTotal: 0, local: 0, afuera: 0 };
       }
       
       stats[repId].viajes += cant;
       stats[repId].montoTotal += deliveryMonto;
+      if (isAfuera) {
+        stats[repId].afuera = (stats[repId].afuera || 0) + cant;
+      } else {
+        stats[repId].local = (stats[repId].local || 0) + cant;
+      }
     }
   });
 
@@ -579,7 +598,7 @@ function renderDeliveriesReport(content, range) {
   });
 
   content.innerHTML = `
-    <div class="metrics-grid mb-lg" style="grid-template-columns: repeat(2, 1fr);">
+    <div class="metrics-grid mb-lg" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
       <div class="metric-card">
         <div class="metric-label">Total Entregas / Viajes</div>
         <div class="metric-value">${totalViajesGlobal}</div>
@@ -589,6 +608,16 @@ function renderDeliveriesReport(content, range) {
         <div class="metric-label">Total Recaudado por Envíos</div>
         <div class="metric-value">${Utils.formatCurrency(totalMontoGlobal)}</div>
         <div class="metric-change">En el período seleccionado</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">📍 Entregas Locales</div>
+        <div class="metric-value text-success">${viajesLocales}</div>
+        <div class="metric-change">${Utils.formatCurrency(montoLocales)} recaudados</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">🚗 Entregas Afuera</div>
+        <div class="metric-value" style="color: #0284C7;">${viajesAfuera}</div>
+        <div class="metric-change">${Utils.formatCurrency(montoAfuera)} recaudados</div>
       </div>
     </div>
 
@@ -602,16 +631,22 @@ function renderDeliveriesReport(content, range) {
             <tr>
               <th>Repartidor</th>
               <th style="text-align:center;">Viajes / Entregas</th>
+              <th style="text-align:center;">Desglose por Zona</th>
               <th style="text-align:right;">Monto Recaudado ($)</th>
             </tr>
           </thead>
           <tbody>
             ${listStats.length === 0 ? `
-              <tr><td colspan="3" class="text-center text-muted" style="padding:20px;">No se registran deliveries en el período seleccionado.</td></tr>
+              <tr><td colspan="4" class="text-center text-muted" style="padding:20px;">No se registran deliveries en el período seleccionado.</td></tr>
             ` : listStats.map(s => `
               <tr>
                 <td class="font-semibold">${Utils.escapeHtml(s.nombre)}</td>
                 <td style="text-align:center;"><span class="badge badge-info">${s.viajes} viaje(s)</span></td>
+                <td style="text-align:center; font-size:12px;">
+                  <span style="color:#059669; font-weight:600;">📍 Local: ${s.local || 0}</span>
+                  <span style="color:#CBD5E1; margin:0 4px;">|</span>
+                  <span style="color:#0284C7; font-weight:600;">🚗 Afuera: ${s.afuera || 0}</span>
+                </td>
                 <td style="text-align:right;" class="font-semibold text-success">${Utils.formatCurrency(s.montoTotal)}</td>
               </tr>
             `).join('')}

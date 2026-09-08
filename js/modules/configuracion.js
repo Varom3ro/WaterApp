@@ -8,6 +8,8 @@ import { renderSidebar } from '../components/sidebar.js';
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
   const repartidores = store.getConfig('repartidores') || [];
+  const tarifasDelivery = store.getTarifasDelivery();
+  const currentTasa = store.getConfig('tasaCambio') || 40.00;
   const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
   const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
@@ -157,42 +159,127 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
-      <!-- Repartidores de Delivery -->
+      <!-- Gestión Integral de Delivery -->
       <div class="card full-width">
-        <div class="card-header">
-          <h3 class="card-title">🛵 Repartidores de Delivery</h3>
-          <button class="btn btn-sm btn-primary" id="btn-add-repartidor">
-            + Agregar Repartidor
-          </button>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>🛵</span> Gestión Integral de Delivery
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Configura las tarifas por zona (Local y Afuera) y administra tu equipo de repartidores.
+            </p>
+          </div>
         </div>
-        <div class="table-container mt-md">
-          <table class="table">
-            <thead>
-              <tr>
-                <th style="width: 45%;">Nombre del Repartidor</th>
-                <th style="width: 20%;"></th>
-                <th style="width: 20%;">Estado</th>
-                <th style="width: 15%; text-align: right;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="repartidores-tbody">
-              ${repartidores.length === 0 ? `
-                <tr><td colspan="4" class="text-muted text-center" style="padding:15px;">No hay repartidores registrados.</td></tr>
-              ` : repartidores.map(r => `
-                <tr>
-                  <td class="font-semibold">${Utils.escapeHtml(r.nombre)}</td>
-                  <td></td>
-                  <td><span class="badge badge-success">Activo</span></td>
-                  <td style="text-align: right;">
-                    <div class="flex gap-sm" style="justify-content: flex-end;">
-                      <button class="btn btn-sm btn-secondary btn-edit-repartidor" data-id="${r.id}">✏️ Editar</button>
-                      <button class="btn btn-sm btn-secondary btn-delete-repartidor" data-id="${r.id}">🗑️</button>
-                    </div>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+
+        <div class="card-body mt-md" style="display: flex; flex-direction: column; gap: 22px;">
+          <!-- Subsección 1: Tarifas y Zonas de Entrega -->
+          <div style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: 8px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--color-primary-900); display: flex; align-items: center; gap: 6px;">
+                  <span>📍</span> Tarifas y Zonas de Entrega
+                </h4>
+                <p class="text-muted" style="font-size: 12px; margin: 2px 0 0 0;">
+                  Precios predeterminados en dólares ($) para seleccionar rápidamente en el Punto de Venta.
+                </p>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-tarifa-delivery" style="font-weight: 600;">
+                + Agregar Zona / Tarifa
+              </button>
+            </div>
+
+            <div class="table-container" style="background: white; border-radius: 6px; border: 1px solid var(--color-border);">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th style="width: 35%;">Zona / Concepto</th>
+                    <th style="width: 25%;">Precio ($ USD)</th>
+                    <th style="width: 25%;">Equivalente en Bs</th>
+                    <th style="width: 15%; text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tarifas-delivery-tbody">
+                  ${tarifasDelivery.map(t => {
+                    const equivBs = (parseFloat(t.precio) || 0) * currentTasa;
+                    const isDefault = t.id === 'local' || t.id === 'afuera';
+                    return `
+                      <tr>
+                        <td>
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 18px;">${t.id === 'local' ? '📍' : (t.id === 'afuera' ? '🚗' : '🚚')}</span>
+                            <span class="font-semibold" style="font-size: 13.5px;">${Utils.escapeHtml(t.nombre)}</span>
+                            ${isDefault ? `<span class="badge" style="font-size: 10px; padding: 2px 6px; background: #E2E8F0; color: #475569;">Fija</span>` : ''}
+                          </div>
+                        </td>
+                        <td>
+                          <span style="font-weight: 700; font-size: 14px; color: #065F46;">$ ${Utils.formatNumber(t.precio, true)}</span>
+                        </td>
+                        <td>
+                          <span class="text-muted" style="font-size: 13px;">Bs ${Utils.formatNumber(equivBs, true)}</span>
+                        </td>
+                        <td style="text-align: right;">
+                          <div class="flex gap-sm" style="justify-content: flex-end;">
+                            <button type="button" class="btn btn-sm btn-secondary btn-edit-tarifa-delivery" data-id="${t.id}" title="Editar tarifa">✏️ Editar</button>
+                            ${!isDefault ? `
+                              <button type="button" class="btn btn-sm btn-secondary btn-delete-tarifa-delivery" data-id="${t.id}" title="Eliminar tarifa">🗑️</button>
+                            ` : ''}
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Subsección 2: Equipo de Repartidores -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--color-primary-900); display: flex; align-items: center; gap: 6px;">
+                  <span>🛵</span> Equipo de Repartidores
+                </h4>
+                <p class="text-muted" style="font-size: 12px; margin: 2px 0 0 0;">
+                  Personal para la asignación y control de viajes en cada despacho.
+                </p>
+              </div>
+              <button class="btn btn-sm btn-primary" id="btn-add-repartidor">
+                + Agregar Repartidor
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 45%;">Nombre del Repartidor</th>
+                    <th style="width: 20%;"></th>
+                    <th style="width: 20%;">Estado</th>
+                    <th style="width: 15%; text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="repartidores-tbody">
+                  ${repartidores.length === 0 ? `
+                    <tr><td colspan="4" class="text-muted text-center" style="padding:15px;">No hay repartidores registrados.</td></tr>
+                  ` : repartidores.map(r => `
+                    <tr>
+                      <td class="font-semibold">${Utils.escapeHtml(r.nombre)}</td>
+                      <td></td>
+                      <td><span class="badge badge-success">Activo</span></td>
+                      <td style="text-align: right;">
+                        <div class="flex gap-sm" style="justify-content: flex-end;">
+                          <button class="btn btn-sm btn-secondary btn-edit-repartidor" data-id="${r.id}">✏️ Editar</button>
+                          <button class="btn btn-sm btn-secondary btn-delete-repartidor" data-id="${r.id}">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -254,21 +341,6 @@ export function renderConfiguracion(container) {
               `).join('')}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      <!-- Delivery Config -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">🚚 Tarifa de Delivery</h3>
-        </div>
-        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Monto predeterminado del servicio de envío.</p>
-        <div class="form-group" style="max-width: 200px;">
-          <label class="form-label">Precio ($)</label>
-          <div style="display:flex; gap:10px;">
-            <input type="number" id="input-config-delivery" class="form-control" step="0.01" value="${store.getConfig('precioDelivery') ?? '0.50'}" />
-            <button class="btn btn-primary" id="btn-save-delivery">Guardar</button>
-          </div>
         </div>
       </div>
 
@@ -639,17 +711,6 @@ export function renderConfiguracion(container) {
     });
   }
 
-  const btnSaveDeliv = container.querySelector('#btn-save-delivery');
-  if (btnSaveDeliv) {
-    btnSaveDeliv.addEventListener('click', () => {
-      const val = parseFloat(container.querySelector('#input-config-delivery').value);
-      if (!isNaN(val) && val >= 0) {
-        store.setConfig('precioDelivery', val);
-        showToast('Tarifa de delivery actualizada', 'success');
-      }
-    });
-  }
-
   // ---- Lógica de Zonas y Urbanizaciones ----
   let currentMunicipios = [...store.getZonasMunicipios()];
   let currentUrbanizaciones = [...store.getZonasUrbanizaciones()];
@@ -830,6 +891,37 @@ export function renderConfiguracion(container) {
           closeModal();
           renderConfiguracion(container);
           showToast('Eliminado correctamente', 'success');
+        }
+      });
+    });
+  });
+
+  // Eventos de Tarifas de Delivery
+  const btnAddTarifaDeliv = container.querySelector('#btn-add-tarifa-delivery');
+  if (btnAddTarifaDeliv) {
+    btnAddTarifaDeliv.addEventListener('click', () => openTarifaDeliveryModal());
+  }
+
+  container.querySelectorAll('.btn-edit-tarifa-delivery').forEach(btn => {
+    btn.addEventListener('click', () => openTarifaDeliveryModal(btn.dataset.id));
+  });
+
+  container.querySelectorAll('.btn-delete-tarifa-delivery').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const allTarifas = store.getTarifasDelivery();
+      const tObj = allTarifas.find(t => t.id === id);
+      if (!tObj) return;
+      openModal({
+        title: 'Confirmar Eliminación',
+        content: `¿Estás seguro de eliminar la tarifa <strong>"${Utils.escapeHtml(tObj.nombre)}"</strong>?`,
+        saveLabel: 'Eliminar',
+        onSave: () => {
+          const nuevas = allTarifas.filter(t => t.id !== id);
+          store.saveTarifasDelivery(nuevas);
+          closeModal();
+          renderConfiguracion(container);
+          showToast('Tarifa de delivery eliminada', 'success');
         }
       });
     });
@@ -1037,6 +1129,80 @@ export function renderConfiguracion(container) {
     };
     reader.readAsText(file);
   });
+}
+
+function openTarifaDeliveryModal(id = null) {
+  const isEdit = !!id;
+  const currentTasa = store.getConfig('tasaCambio') || 40.00;
+  const list = store.getTarifasDelivery();
+  const tarifa = isEdit ? list.find(t => t.id === id) : null;
+  const isFixed = tarifa && (tarifa.id === 'local' || tarifa.id === 'afuera');
+
+  openModal({
+    title: isEdit ? `Editar Tarifa: ${tarifa?.nombre || ''}` : 'Nueva Tarifa / Zona de Delivery',
+    content: `
+      <form id="form-tarifa-delivery">
+        <div class="form-group mb-md">
+          <label class="form-label" style="font-weight: 700;">Nombre de la Zona / Tarifa *</label>
+          <input type="text" class="form-control" name="nombre" value="${Utils.escapeHtml(tarifa?.nombre || '')}" placeholder="Ej: Local, Afuera, Zona Industrial..." required ${isFixed ? 'readonly style="background:#F1F5F9;"' : ''}/>
+          ${isFixed ? '<small class="text-muted" style="display:block; margin-top:4px;">El nombre de esta zona principal es fijo para mantener la compatibilidad.</small>' : ''}
+        </div>
+        <div class="form-group mb-md">
+          <label class="form-label" style="font-weight: 700;">Precio sugerido ($ USD) *</label>
+          <div style="position: relative; max-width: 200px;">
+            <input type="number" step="0.01" min="0" class="form-control" name="precio" id="input-modal-precio-tarifa" value="${tarifa?.precio !== undefined ? tarifa.precio : '0.50'}" required style="padding-left: 24px; font-size: 16px; font-weight: 700;"/>
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-weight: bold; color: var(--color-text-secondary);">$</span>
+          </div>
+          <small class="text-muted" id="preview-precio-tarifa-bs" style="display: block; margin-top: 6px;">
+            Equivalente: ~ Bs ${Utils.formatNumber(((tarifa?.precio || 0.5) * currentTasa), true)} (Tasa: ${Utils.formatNumber(currentTasa, true)})
+          </small>
+        </div>
+      </form>
+    `,
+    saveLabel: 'Guardar Tarifa',
+    onSave: (overlay) => {
+      const form = overlay.querySelector('#form-tarifa-delivery');
+      const nombre = (form.querySelector('input[name="nombre"]').value || '').trim();
+      const precio = parseFloat(form.querySelector('input[name="precio"]').value);
+
+      if (!nombre) {
+        showToast('El nombre de la zona es requerido', 'warning');
+        return false;
+      }
+      if (isNaN(precio) || precio < 0) {
+        showToast('Ingrese un precio válido', 'warning');
+        return false;
+      }
+
+      let allTarifas = [...store.getTarifasDelivery()];
+      if (isEdit) {
+        const idx = allTarifas.findIndex(t => t.id === id);
+        if (idx !== -1) {
+          allTarifas[idx] = { ...allTarifas[idx], nombre, precio };
+        }
+      } else {
+        const newId = 'zona_' + Date.now().toString(36);
+        allTarifas.push({ id: newId, nombre, precio, activo: true });
+      }
+
+      store.saveTarifasDelivery(allTarifas);
+      closeModal();
+      renderConfiguracion(document.querySelector('.main-content'));
+      showToast('Tarifa de delivery guardada correctamente', 'success');
+      return true;
+    }
+  });
+
+  setTimeout(() => {
+    const pInput = document.getElementById('input-modal-precio-tarifa');
+    const pPrev = document.getElementById('preview-precio-tarifa-bs');
+    if (pInput && pPrev) {
+      pInput.addEventListener('input', () => {
+        const val = parseFloat(pInput.value) || 0;
+        pPrev.textContent = `Equivalente: ~ Bs ${Utils.formatNumber(val * currentTasa, true)} (Tasa: ${Utils.formatNumber(currentTasa, true)})`;
+      });
+    }
+  }, 100);
 }
 
 function openRepartidorModal(id = null) {

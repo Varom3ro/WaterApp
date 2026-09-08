@@ -351,7 +351,8 @@ function renderVentasTable() {
       }).join('');
     } else if (v.delivery > 0 || (v.botellones === 0 && v.total > 0)) {
       const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
-      detallesHTML = `<div style="font-size: 0.9em; font-weight: 600; color: #0284C7;">🛵 Servicio de Delivery: ${Utils.formatCurrency(v.delivery || v.total)}${repNombre}</div>`;
+      const tipoNombre = v.deliveryTipoNombre ? ` (${Utils.escapeHtml(v.deliveryTipoNombre)})` : '';
+      detallesHTML = `<div style="font-size: 0.9em; font-weight: 600; color: #0284C7;">🛵 Servicio de Delivery${tipoNombre}: ${Utils.formatCurrency(v.delivery || v.total)}${repNombre}</div>`;
     } else {
       detallesHTML = `<div style="font-size: 0.9em;">${v.botellones || 0} botellones</div>`;
     }
@@ -364,7 +365,8 @@ function renderVentasTable() {
       
       if (delivery > 0 && !isSinCobro) {
         const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
-        detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
+        const tipoNombre = v.deliveryTipoNombre ? ` (${Utils.escapeHtml(v.deliveryTipoNombre)})` : '';
+        detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery${tipoNombre}: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
       }
     }
 
@@ -424,6 +426,8 @@ function renderVentasTable() {
 export function renderNuevaVentaForm(container) {
   const clientes = store.getAll('clientes');
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
+  const tarifasDelivery = store.getTarifasDelivery(true);
+  const repartidores = store.getConfig('repartidores') || [];
   const inventario = store.getInventarioActual();
   const metodosActivos = store.getMetodosPago(true);
   const isUsdMethod = (id) => {
@@ -561,7 +565,14 @@ export function renderNuevaVentaForm(container) {
             <input type="checkbox" id="check-delivery"/>
             <span>Delivery</span>
           </label>
-          <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px;">
+          <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <select class="form-control" id="tipo-tarifa-delivery" style="width: 175px; font-weight: 600;" title="Seleccionar zona o tipo de delivery">
+              ${tarifasDelivery.map((t, idx) => `
+                <option value="${t.id}" data-precio="${t.precio}" ${idx === 0 ? 'selected' : ''}>
+                  ${t.id === 'local' ? '📍' : (t.id === 'afuera' ? '🚗' : '🚚')} ${Utils.escapeHtml(t.nombre)} ($${Utils.formatNumber(t.precio, true)})
+                </option>
+              `).join('')}
+            </select>
             <div style="position: relative; width: 65px;">
               <input type="number" class="form-control" id="cant-delivery" value="1" min="1" step="1" title="Cantidad de viajes" style="padding-left: 20px;" placeholder="Viajes"/>
               <span style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--color-text-secondary);">x</span>
@@ -572,7 +583,7 @@ export function renderNuevaVentaForm(container) {
             </div>
             <select class="form-control" id="repartidor-delivery" style="width: 140px;" title="Asignar repartidor">
               <option value="">Sin repartidor</option>
-              ${(store.getConfig('repartidores') || []).map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
+              ${repartidores.map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
             </select>
           </div>
           <label class="form-check" style="margin-bottom: 0; margin-left: 10px;">
@@ -729,6 +740,7 @@ export function renderNuevaVentaForm(container) {
   modal.querySelector('#btn-save-venta-home').addEventListener('click', () => {
     const overlay = modal;
     const checkDeliv = modal.querySelector('#check-delivery');
+    const selectTipoTarifa = modal.querySelector('#tipo-tarifa-delivery');
     const inputDeliv = modal.querySelector('#monto-delivery');
     const cantDeliv = modal.querySelector('#cant-delivery');
     const repDeliv = modal.querySelector('#repartidor-delivery');
@@ -737,6 +749,14 @@ export function renderNuevaVentaForm(container) {
     const isDelivActive = !!(checkDeliv && checkDeliv.checked);
     const montoDelivery = isDelivActive ? (delivValue * cantValue) : 0;
     const isSoloDelivery = (carrito.length === 0 && isDelivActive && montoDelivery > 0);
+
+    let deliveryTipo = null;
+    let deliveryTipoNombre = null;
+    if (isDelivActive && selectTipoTarifa) {
+      deliveryTipo = selectTipoTarifa.value;
+      const opt = selectTipoTarifa.options[selectTipoTarifa.selectedIndex];
+      deliveryTipoNombre = opt ? opt.textContent.replace(/^[\s📍🚗🚚]+/, '').split('($')[0].trim() : 'Local';
+    }
 
     if (carrito.length === 0 && !isSoloDelivery) {
       showToast('Debe añadir al menos un producto o activar un servicio de Delivery', 'error');
@@ -854,10 +874,11 @@ export function renderNuevaVentaForm(container) {
 
       let detallesFinales = [];
       if (isSoloDelivery) {
+        const tipoLabel = deliveryTipoNombre ? ` - ${deliveryTipoNombre}` : '';
         detallesFinales = [{
           id: 'delivery_servicio',
           tipoBotellonId: 'delivery',
-          nombre: `Servicio de Delivery (${cantValue} viaje${cantValue > 1 ? 's' : ''})`,
+          nombre: `Servicio de Delivery${tipoLabel} (${cantValue} viaje${cantValue > 1 ? 's' : ''})`,
           cantidad: cantValue,
           precioUnitario: isSinCobro ? 0 : delivValue,
           subtotal: isSinCobro ? 0 : montoDelivery,
@@ -881,6 +902,8 @@ export function renderNuevaVentaForm(container) {
         litrosTotales: totalLitros,
         delivery: isSinCobro ? 0 : montoDelivery,
         deliveryCant: isDelivActive && !isSinCobro ? cantValue : 0,
+        deliveryTipo: isDelivActive && !isSinCobro ? deliveryTipo : null,
+        deliveryTipoNombre: isDelivActive && !isSinCobro ? deliveryTipoNombre : null,
         repartidorId: isSinCobro ? null : repartidorId,
         repartidorNombre: isSinCobro ? null : repartidorNombre,
         estadoEntrega,
@@ -1077,12 +1100,18 @@ export function renderNuevaVentaForm(container) {
     if (carrito.length === 0) {
       if (isDelivChecked && delivMontoTotal > 0) {
         const { totalUSD, totalBs } = calcularTotalesVenta();
+        const selTarifaEl = modal.querySelector('#tipo-tarifa-delivery');
+        let selTarifaNombre = 'Local';
+        if (selTarifaEl && selTarifaEl.selectedIndex >= 0) {
+          const opt = selTarifaEl.options[selTarifaEl.selectedIndex];
+          selTarifaNombre = opt ? opt.textContent.replace(/^[\s📍🚗🚚]+/, '').split('($')[0].trim() : 'Local';
+        }
         carritoContainer.style.display = 'block';
         carritoTbody.innerHTML = `
           <tr style="background: rgba(2, 132, 199, 0.05); border-bottom: 1.5px dashed #BAE6FD;">
             <td style="padding-left: var(--space-md);">
               <div style="font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 6px;">
-                <span>🛵</span> Servicio de Delivery
+                <span>🛵</span> Servicio de Delivery (${Utils.escapeHtml(selTarifaNombre)})
               </div>
               <small style="color: var(--color-text-secondary); font-size: 11px;">Cobro exclusivo de flete / traslado</small>
             </td>
@@ -1903,14 +1932,25 @@ export function renderNuevaVentaForm(container) {
   
   const checkDelivery = modal.querySelector('#check-delivery');
   const containerDelivery = modal.querySelector('#container-monto-delivery');
+  const selectTipoTarifa = modal.querySelector('#tipo-tarifa-delivery');
   const inputDelivery = modal.querySelector('#monto-delivery');
   const cantDelivery = modal.querySelector('#cant-delivery');
   
   if (checkDelivery && containerDelivery && inputDelivery) {
+    const updatePrecioFromTarifa = () => {
+      if (selectTipoTarifa && selectTipoTarifa.selectedIndex >= 0) {
+        const opt = selectTipoTarifa.options[selectTipoTarifa.selectedIndex];
+        const pVal = opt ? parseFloat(opt.dataset.precio) : 0.50;
+        inputDelivery.value = (!isNaN(pVal) ? pVal : 0.50).toFixed(2);
+      } else {
+        inputDelivery.value = (store.getConfig('precioDelivery') ?? 0.50).toFixed(2);
+      }
+    };
+
     checkDelivery.addEventListener('change', (e) => {
       containerDelivery.style.display = e.target.checked ? 'flex' : 'none';
       if (e.target.checked) {
-        inputDelivery.value = (store.getConfig('precioDelivery') ?? 0.50).toFixed(2);
+        updatePrecioFromTarifa();
         if (cantDelivery) cantDelivery.value = '1';
       } else {
         inputDelivery.value = '0.00';
@@ -1918,6 +1958,13 @@ export function renderNuevaVentaForm(container) {
       }
       renderCarrito();
     });
+
+    if (selectTipoTarifa) {
+      selectTipoTarifa.addEventListener('change', () => {
+        updatePrecioFromTarifa();
+        renderCarrito();
+      });
+    }
     
     inputDelivery.addEventListener('input', () => {
       renderCarrito();
