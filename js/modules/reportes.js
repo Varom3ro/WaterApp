@@ -310,7 +310,7 @@ function renderVentasYCisternas(content, range) {
       <div class="metric-card">
         <div class="metric-label">Ventas Recaudadas ($)</div>
         <div class="metric-value text-success">${Utils.formatCurrency(totalRecaudadoReal)}</div>
-        <div class="metric-change">${totalAbonosMonto > 0 ? `Contado: ${Utils.formatCurrency(totalVentasCobradoMonto)} + Cobros: ${Utils.formatCurrency(totalAbonosMonto)}` : 'Cobrado en caja y bancos'}</div>
+        <div class="metric-change">${totalAbonosMonto > 0 ? `Contado: ${Utils.formatCurrency(totalVentasCobradoMonto)} + Abonos de Deuda: ${Utils.formatCurrency(totalAbonosMonto)}` : 'Cobrado en caja y bancos'}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Ventas Comerciales</div>
