@@ -557,6 +557,38 @@ class Store {
         return true;
     }
 
+    // ---- Gestión de Tarifas de Delivery ----
+
+    getTarifasDelivery(onlyActivas = false) {
+        const stored = this.getConfig('tarifasDelivery');
+        let tarifas = [];
+        if (Array.isArray(stored) && stored.length > 0) {
+            tarifas = stored;
+        } else {
+            const precioBase = parseFloat(this.getConfig('precioDelivery')) || 0.50;
+            tarifas = [
+                { id: 'local', nombre: 'Local', precio: precioBase, activo: true, isDefault: true },
+                { id: 'afuera', nombre: 'Afuera / Foráneo', precio: 1.00, activo: true, isDefault: true }
+            ];
+            this.setConfig('tarifasDelivery', tarifas);
+        }
+
+        if (onlyActivas) {
+            return tarifas.filter(t => t.activo !== false);
+        }
+        return tarifas;
+    }
+
+    saveTarifasDelivery(tarifas) {
+        if (!Array.isArray(tarifas)) return false;
+        this.setConfig('tarifasDelivery', tarifas);
+        const local = tarifas.find(t => t.id === 'local');
+        if (local && !isNaN(parseFloat(local.precio))) {
+            this.setConfig('precioDelivery', parseFloat(local.precio));
+        }
+        return true;
+    }
+
     // ---- Cierre de Caja y Arqueo ----
 
     getCierreCaja(fecha) {
