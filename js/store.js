@@ -33,6 +33,24 @@ class Store {
 
         this._initDefaults();
         this.depurarAbonosInvalidos();
+
+        // 🗜️ Auto-optimizar logotipo si es excesivamente pesado (> 60KB) para evitar bloqueos de red o base de datos
+        try {
+            const logo = this.getConfig('empresaLogo');
+            if (logo && typeof logo === 'string' && logo.length > 60000 && logo.startsWith('data:image/')) {
+                if (typeof Utils.compressImage === 'function') {
+                    Utils.compressImage(logo, 400, 250, 0.85).then(compressed => {
+                        if (compressed && compressed.length < logo.length) {
+                            this.setConfig('empresaLogo', compressed);
+                            console.log(`[Store] 🗜️ Logotipo optimizado de ${(logo.length/1024).toFixed(1)}KB a ${(compressed.length/1024).toFixed(1)}KB`);
+                        }
+                    }).catch(() => {});
+                }
+            }
+        } catch (logoErr) {
+            console.warn('[Store] No se pudo verificar optimización de logo:', logoErr);
+        }
+
         this.isReady = true;
     }
 

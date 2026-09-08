@@ -2,7 +2,7 @@
 // Tu Empresa - Service Worker (PWA Offline)
 // ============================================
 
-const CACHE_NAME = 'waterapp-cache-v2.8.11';
+const CACHE_NAME = 'waterapp-cache-v2.8.12';
 
 const ASSETS_TO_CACHE = [
   './',

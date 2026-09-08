@@ -271,6 +271,15 @@ export async function syncToCloud(isManual = false) {
     try {
       const backupStr = store.exportData();
       respaldoObj = JSON.parse(backupStr);
+      // 🛡️ Filtro de seguridad de tamaño: Evitar que imágenes gigantes bloqueen el respaldo o agoten el timeout en Supabase
+      if (respaldoObj && Array.isArray(respaldoObj.configuracion)) {
+        respaldoObj.configuracion = respaldoObj.configuracion.map(c => {
+          if (c.id === 'empresaLogo' && typeof c.value === 'string' && c.value.length > 70000) {
+            return { ...c, value: './img/logo.png' };
+          }
+          return c;
+        });
+      }
     } catch (bErr) {
       console.warn('[CloudSync] Error generando snapshot de respaldo:', bErr);
     }
@@ -319,7 +328,7 @@ export async function syncToCloud(isManual = false) {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=representation'
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
       },
       body: JSON.stringify(payload)
     });

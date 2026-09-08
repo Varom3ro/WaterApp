@@ -3,6 +3,7 @@ import { Utils } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js';
+import { renderSidebar } from '../components/sidebar.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
@@ -488,13 +489,24 @@ export function renderConfiguracion(container) {
     btnSyncManual.addEventListener('click', async () => {
       btnSyncManual.disabled = true;
       btnSyncManual.textContent = '⏳ Sincronizando...';
-      const ok = await syncToCloud();
-      btnSyncManual.disabled = false;
-      btnSyncManual.textContent = '☁️ Sincronizar Nube Ahora';
-      if (ok) {
-        showToast('☁️ Datos reales sincronizados con la Nube con éxito', 'success');
-      } else {
-        showToast('⚠️ No se pudo sincronizar. Verifica tu conexión a internet.', 'warning');
+      try {
+        const ok = await syncToCloud(true);
+        if (ok) {
+          const clientes = store.getAll('clientes') || [];
+          const ventas = store.getAll('ventas') || [];
+          showToast(`☁️ Datos sincronizados con la Nube con éxito (${clientes.length} clientes, ${ventas.length} ventas)`, 'success');
+          const lblLastCloud = container.querySelector('#label-cloud-last-backup');
+          if (lblLastCloud) {
+            lblLastCloud.innerHTML = `${new Date().toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })} <span style="color:#64748B; font-weight:normal;">(${clientes.length} clientes · ${ventas.length} ventas)</span>`;
+          }
+        } else {
+          showToast('⚠️ No se pudo sincronizar con la nube. Intente nuevamente.', 'warning');
+        }
+      } catch (err) {
+        showToast('Error al sincronizar: ' + (err.message || 'Error de comunicación'), 'danger');
+      } finally {
+        btnSyncManual.disabled = false;
+        btnSyncManual.textContent = '☁️ Sincronizar Nube Ahora';
       }
     });
   }
@@ -571,8 +583,18 @@ export function renderConfiguracion(container) {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (evt) => {
-          tempLogoBase64 = evt.target.result;
+        reader.onload = async (evt) => {
+          const raw = evt.target.result;
+          try {
+            if (typeof Utils.compressImage === 'function') {
+              const compressed = await Utils.compressImage(raw, 400, 250, 0.85);
+              tempLogoBase64 = compressed;
+            } else {
+              tempLogoBase64 = raw;
+            }
+          } catch (err) {
+            tempLogoBase64 = raw;
+          }
           if (previewLogo) previewLogo.src = tempLogoBase64;
         };
         reader.readAsDataURL(file);
@@ -591,13 +613,19 @@ export function renderConfiguracion(container) {
 
   const btnSaveEmpresa = container.querySelector('#btn-save-empresa-info');
   if (btnSaveEmpresa) {
-    btnSaveEmpresa.addEventListener('click', () => {
+    btnSaveEmpresa.addEventListener('click', async () => {
       const inputNombre = container.querySelector('#input-empresa-nombre');
       const nombreVal = inputNombre ? inputNombre.value.trim() : 'Tu Empresa';
 
       store.setConfig('empresaNombre', nombreVal || 'Tu Empresa');
       if (tempLogoBase64) {
-        store.setConfig('empresaLogo', tempLogoBase64);
+        let finalLogo = tempLogoBase64;
+        if (typeof Utils.compressImage === 'function' && finalLogo.length > 60000 && finalLogo.startsWith('data:image/')) {
+          try {
+            finalLogo = await Utils.compressImage(finalLogo, 400, 250, 0.85);
+          } catch (e) {}
+        }
+        store.setConfig('empresaLogo', finalLogo);
       }
 
       showToast('Datos de la empresa actualizados correctamente', 'success');
@@ -607,6 +635,7 @@ export function renderConfiguracion(container) {
       if (sidebarContainer) {
         sidebarContainer.outerHTML = renderSidebar();
       }
+      if (typeof syncToCloud === 'function') syncToCloud(true);
     });
   }
 
