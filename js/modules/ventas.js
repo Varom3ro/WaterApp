@@ -338,6 +338,10 @@ function renderVentasTable() {
     const isSinCobro = (v.tipo === 'convenio' || v.tipo === 'garantia' || v.tipo === 'cortesia');
     if (v.detalles && v.detalles.length > 0) {
       detallesHTML = v.detalles.map(d => {
+        if (d.categoria === 'servicio') {
+          const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
+          return `<div style="font-size: 0.9em; margin-bottom: 2px; font-weight: 600; color: #0284C7;">🛵 ${Utils.escapeHtml(d.nombre)}: ${Utils.formatCurrency(d.subtotal || d.precioUnitario)}${repNombre}</div>`;
+        }
         const prod = tipos.find(t => t.id === d.tipoBotellonId);
         const prodName = prod ? prod.nombre : (d.nombre || 'Prod.');
         const isFree = isSinCobro || !!d.esCortesia || (d.subtotal === 0);
@@ -345,17 +349,23 @@ function renderVentasTable() {
         const cortesiaBadge = d.esCortesia ? '<span style="font-size:10px; color:#7C3AED; font-weight:bold;">(Cortesía)</span>' : '';
         return `<div style="font-size: 0.9em; margin-bottom: 2px;">${d.cantidad}x ${unitPrice} ${prodName} ${cortesiaBadge}</div>`;
       }).join('');
+    } else if (v.delivery > 0 || (v.botellones === 0 && v.total > 0)) {
+      const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
+      detallesHTML = `<div style="font-size: 0.9em; font-weight: 600; color: #0284C7;">🛵 Servicio de Delivery: ${Utils.formatCurrency(v.delivery || v.total)}${repNombre}</div>`;
     } else {
       detallesHTML = `<div style="font-size: 0.9em;">${v.botellones || 0} botellones</div>`;
     }
 
-    // Calcular/mostrar delivery
-    const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
-    const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
-    
-    if (delivery > 0 && !isSinCobro) {
-      const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
-      detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
+    // Calcular/mostrar delivery adicional si no fue mostrado ya como servicio principal
+    const tieneServicioDeliv = v.detalles && v.detalles.some(d => d.categoria === 'servicio');
+    if (!tieneServicioDeliv && !(v.botellones === 0 && (v.delivery > 0 || v.total > 0))) {
+      const sumaSubtotal = v.detalles ? v.detalles.reduce((acc, d) => acc + d.subtotal, 0) : v.total;
+      const delivery = v.delivery !== undefined ? v.delivery : (v.total - sumaSubtotal > 0.01 ? v.total - sumaSubtotal : 0);
+      
+      if (delivery > 0 && !isSinCobro) {
+        const repNombre = v.repartidorNombre ? ` (${Utils.escapeHtml(v.repartidorNombre)})` : '';
+        detallesHTML += `<div style="font-size: 0.85em; color: var(--color-text-secondary); margin-top: 2px;">+ Delivery: ${Utils.formatCurrency(delivery)}${repNombre}</div>`;
+      }
     }
 
     const totalDisplayHTML = isSinCobro 
@@ -718,10 +728,20 @@ export function renderNuevaVentaForm(container) {
   
   modal.querySelector('#btn-save-venta-home').addEventListener('click', () => {
     const overlay = modal;
-      if (carrito.length === 0) {
-        showToast('Debe añadir al menos un producto a la venta', 'error');
-        return;
-      }
+    const checkDeliv = modal.querySelector('#check-delivery');
+    const inputDeliv = modal.querySelector('#monto-delivery');
+    const cantDeliv = modal.querySelector('#cant-delivery');
+    const repDeliv = modal.querySelector('#repartidor-delivery');
+    let delivValue = parseFloat(inputDeliv ? inputDeliv.value : 0) || 0;
+    let cantValue = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+    const isDelivActive = !!(checkDeliv && checkDeliv.checked);
+    const montoDelivery = isDelivActive ? (delivValue * cantValue) : 0;
+    const isSoloDelivery = (carrito.length === 0 && isDelivActive && montoDelivery > 0);
+
+    if (carrito.length === 0 && !isSoloDelivery) {
+      showToast('Debe añadir al menos un producto o activar un servicio de Delivery', 'error');
+      return;
+    }
 
       const form = overlay.querySelector('#form-venta');
       const fd = new FormData(form);
@@ -841,11 +861,25 @@ export function renderNuevaVentaForm(container) {
       const tasaCambio = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
       store.setConfig('tasaCambio', tasaCambio); // memorizar
 
-      const detallesFinales = carrito.map(it => ({
-        ...it,
-        precioUnitario: isSinCobro ? 0 : it.precioUnitario,
-        subtotal: isSinCobro ? 0 : it.subtotal
-      }));
+      let detallesFinales = [];
+      if (isSoloDelivery) {
+        detallesFinales = [{
+          id: 'delivery_servicio',
+          tipoBotellonId: 'delivery',
+          nombre: `Servicio de Delivery (${cantValue} viaje${cantValue > 1 ? 's' : ''})`,
+          cantidad: cantValue,
+          precioUnitario: isSinCobro ? 0 : delivValue,
+          subtotal: isSinCobro ? 0 : montoDelivery,
+          categoria: 'servicio',
+          litros: 0
+        }];
+      } else {
+        detallesFinales = carrito.map(it => ({
+          ...it,
+          precioUnitario: isSinCobro ? 0 : it.precioUnitario,
+          subtotal: isSinCobro ? 0 : it.subtotal
+        }));
+      }
 
       const venta = {
         id: Utils.generateId(),
@@ -911,10 +945,10 @@ export function renderNuevaVentaForm(container) {
           store.save('abonos', abono);
           showToast(`Venta registrada y abono de ${Utils.formatCurrency(excedente)} acreditado`, 'success');
         } else {
-          showToast('Venta registrada con éxito', 'success');
+          showToast(isSoloDelivery ? '🛵 Servicio de Delivery registrado con éxito' : 'Venta registrada con éxito', 'success');
         }
       } else {
-        showToast('Venta registrada con éxito', 'success');
+        showToast(isSoloDelivery ? '🛵 Servicio de Delivery registrado con éxito' : 'Venta registrada con éxito', 'success');
       }
 
       syncToCloud();
@@ -1038,7 +1072,57 @@ export function renderNuevaVentaForm(container) {
   }
 
   function renderCarrito() {
+    const checkDelivery = modal.querySelector('#check-delivery');
+    const inputDeliv = modal.querySelector('#monto-delivery');
+    const cantDeliv = modal.querySelector('#cant-delivery');
+    const isDelivChecked = !!(checkDelivery && checkDelivery.checked);
+    let delivMontoTotal = 0;
+    if (isDelivChecked && inputDeliv) {
+      const dVal = parseFloat(inputDeliv.value) || 0;
+      const cVal = parseInt(cantDeliv ? cantDeliv.value : 1) || 1;
+      delivMontoTotal = dVal * cVal;
+    }
+
     if (carrito.length === 0) {
+      if (isDelivChecked && delivMontoTotal > 0) {
+        const { totalUSD, totalBs } = calcularTotalesVenta();
+        carritoContainer.style.display = 'block';
+        carritoTbody.innerHTML = `
+          <tr style="background: rgba(2, 132, 199, 0.05); border-bottom: 1.5px dashed #BAE6FD;">
+            <td style="padding-left: var(--space-md);">
+              <div style="font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 6px;">
+                <span>🛵</span> Servicio de Delivery
+              </div>
+              <small style="color: var(--color-text-secondary); font-size: 11px;">Cobro exclusivo de flete / traslado</small>
+            </td>
+            <td style="text-align: center; width: 70px; font-weight: 700; color: #0369A1;">${cantDeliv ? cantDeliv.value : 1}</td>
+            <td style="text-align: right; width: 95px; font-weight: 600;">${Utils.formatCurrency(parseFloat(inputDeliv.value) || 0)}</td>
+            <td style="text-align: right; width: 110px; font-weight: 800; color: #0284C7;">${Utils.formatCurrency(totalUSD)}</td>
+            <td style="text-align: right; width: 45px; padding-right: var(--space-md);">
+              <button type="button" id="btn-cancel-deliv-solo" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:0; line-height:1;" title="Quitar Delivery">✕</button>
+            </td>
+          </tr>
+        `;
+        const btnCancelDeliv = carritoTbody.querySelector('#btn-cancel-deliv-solo');
+        if (btnCancelDeliv) {
+          btnCancelDeliv.addEventListener('click', () => {
+            checkDelivery.checked = false;
+            modal.querySelector('#container-monto-delivery').style.display = 'none';
+            inputDeliv.value = '0.00';
+            renderCarrito();
+          });
+        }
+        totalDisplay.innerHTML = `
+          <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs ${Utils.formatNumber(totalBs, true)}</span>
+          <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">${Utils.formatCurrency(totalUSD)}</span>
+        `;
+        actualizarPagosAutom(totalUSD, totalBs);
+        if (typeof actualizarBotonSaldoFavor === 'function') {
+          actualizarBotonSaldoFavor();
+        }
+        return;
+      }
+
       carritoContainer.style.display = 'none';
       totalDisplay.innerHTML = `
         <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
