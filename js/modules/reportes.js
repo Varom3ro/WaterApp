@@ -219,6 +219,7 @@ function renderVentasYCisternas(content, range) {
 
     if (v.detalles && Array.isArray(v.detalles)) {
       v.detalles.forEach(d => {
+        if (d.categoria === 'servicio') return; // Se totaliza de forma exclusiva en la sección de Deliveries
         const prod = tipos.find(t => t.id === d.tipoBotellonId);
         const prodName = prod ? prod.nombre : (d.nombre || 'Producto');
         const cap = prod ? (parseFloat(prod.litros) || 20) : (parseFloat(d.capacidad) || 20);
@@ -1219,7 +1220,8 @@ function getConsolidatedReportHTML(range, periodoLabel) {
               } else {
                 prodsStr = `${v.botellones}x Botellón`;
               }
-              if (v.delivery > 0 && !isSinCobro) prodsStr += ` + Deliv ($${Utils.formatNumber(v.delivery, true)})`;
+              const tieneServicioDeliv = v.detalles && v.detalles.some(d => d.categoria === 'servicio');
+              if (v.delivery > 0 && !isSinCobro && !tieneServicioDeliv) prodsStr += ` + Deliv ($${Utils.formatNumber(v.delivery, true)})`;
               
               let metodoStr = 'Contado';
               if (v.tipo === 'credito') metodoStr = 'Crédito';
@@ -1471,7 +1473,8 @@ function exportConsolidatedCSV(range, periodoLabel) {
     } else {
       prodsStr = `${v.botellones}x Botellón`;
     }
-    if (v.delivery > 0 && !isSinCobro) prodsStr += ` + Delivery ($${v.delivery.toFixed(2)})`;
+    const tieneServicioDeliv = v.detalles && v.detalles.some(d => d.categoria === 'servicio');
+    if (v.delivery > 0 && !isSinCobro && !tieneServicioDeliv) prodsStr += ` + Delivery ($${v.delivery.toFixed(2)})`;
 
     const tasa = v.tasa || currentTasa;
     const totalUsdNum = isSinCobro ? 0 : (v.total || 0);

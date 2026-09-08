@@ -3,7 +3,7 @@
 // ============================================
 
 export const Utils = {
-  VERSION: '2.8.12',
+  VERSION: '2.8.13',
 
   // Generar ID único
   generateId() {
