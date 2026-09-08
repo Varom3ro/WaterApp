@@ -3,7 +3,7 @@
 // ============================================
 
 export const Utils = {
-  VERSION: '2.8.11',
+  VERSION: '2.8.12',
 
   // Generar ID único
   generateId() {
@@ -160,5 +160,59 @@ export const Utils = {
     con_abono: { label: 'Con Abono', class: 'badge-info' },
     debe: { label: 'Debe', class: 'badge-warning' },
     moroso: { label: 'Moroso', class: 'badge-danger' }
+  },
+
+  // Comprimir imagen a base64 ligero (máximo 400x250 o calidad especificada)
+  compressImage(source, maxWidth = 400, maxHeight = 250, quality = 0.85) {
+    return new Promise((resolve) => {
+      if (!source || typeof source !== 'string' || source.startsWith('./') || source.startsWith('/') || source.startsWith('http')) {
+        return resolve(source);
+      }
+      // Si ya es un SVG o es pequeño (< 50KB)
+      if (source.includes('image/svg+xml') || (source.length < 50000 && !source.startsWith('data:image/bmp'))) {
+        return resolve(source);
+      }
+
+      if (typeof Image === 'undefined' || typeof document === 'undefined') {
+        return resolve(source);
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          let width = img.width || 400;
+          let height = img.height || 250;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const isPng = source.startsWith('data:image/png');
+          let result = canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', quality);
+          // Si el PNG resultante sigue siendo pesado (> 120KB), forzar a JPEG
+          if (result.length > 120000) {
+            result = canvas.toDataURL('image/jpeg', 0.8);
+          }
+          resolve(result);
+        } catch (err) {
+          console.warn('[Utils] Error comprimiendo imagen en canvas:', err);
+          resolve(source);
+        }
+      };
+      img.onerror = () => resolve(source);
+      img.src = source;
+    });
   }
 };
