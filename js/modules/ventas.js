@@ -2213,14 +2213,6 @@ export function openModalPropina(onSuccess) {
 
   const content = `
     <form id="form-propina">
-      <div style="text-align: center; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border);">
-        <span style="font-size: 32px;">🎁</span>
-        <h3 style="margin: 4px 0 0 0; color: var(--color-primary-900); font-size: 17px;">Registrar Propina (Punto / Banco)</h3>
-        <p style="margin: 3px 0 0 0; font-size: 13px; color: var(--color-text-secondary);">
-          Registra el cobro bancario de propina para que cuadre con el lote del punto y se liquide a los muchachos.
-        </p>
-      </div>
-
       <!-- Fila Monto y Moneda -->
       <div class="form-row" style="margin-bottom: 15px;">
         <div class="form-group" style="flex: 1.2;">
@@ -2253,8 +2245,8 @@ export function openModalPropina(onSuccess) {
           </select>
         </div>
         <div class="form-group" style="flex: 1;">
-          <label class="form-label" style="font-weight: 700;">Nº de Referencia *</label>
-          <input type="text" class="form-control" name="referencia" id="propina-referencia" required placeholder="Ej: 4589" style="font-weight: 600;"/>
+          <label class="form-label" id="lbl-propina-referencia" style="font-weight: 700;">Nº de Referencia *</label>
+          <input type="text" class="form-control" name="referencia" id="propina-referencia" placeholder="Ej: 4589" style="font-weight: 600;"/>
         </div>
       </div>
 
@@ -2291,8 +2283,9 @@ export function openModalPropina(onSuccess) {
         return false;
       }
 
-      if (!referencia) {
-        showToast('El número de referencia del voucher es requerido', 'warning');
+      const requiereRef = ['punto', 'pago_movil', 'transferencia'].includes(metodo);
+      if (requiereRef && !referencia) {
+        showToast('El número de referencia es requerido para este método de pago', 'warning');
         return false;
       }
 
@@ -2339,11 +2332,14 @@ export function openModalPropina(onSuccess) {
     }
   });
 
-  // Listener para la conversión en vivo
+  // Listener para la conversión en vivo y requerimiento dinámico de referencia
   setTimeout(() => {
     const inputMonto = document.getElementById('propina-monto');
     const selectMoneda = document.getElementById('propina-moneda');
     const txtConversion = document.getElementById('propina-conversion-txt');
+    const selectMetodo = document.getElementById('propina-metodo');
+    const inputRef = document.getElementById('propina-referencia');
+    const lblRef = document.getElementById('lbl-propina-referencia');
 
     function updateConversion() {
       if (!inputMonto || !selectMoneda || !txtConversion) return;
@@ -2358,8 +2354,37 @@ export function openModalPropina(onSuccess) {
       }
     }
 
+    function updateMetodoState() {
+      if (!selectMetodo || !inputRef || !lblRef) return;
+      const met = selectMetodo.value;
+      const requiereRef = ['punto', 'pago_movil', 'transferencia'].includes(met);
+
+      if (requiereRef) {
+        lblRef.innerHTML = 'Nº de Referencia *';
+        inputRef.required = true;
+        inputRef.placeholder = 'Ej: 4589';
+      } else {
+        lblRef.innerHTML = 'Nº de Referencia <span style="font-weight: normal; font-size: 11.5px; color: var(--color-text-secondary);">(Opcional)</span>';
+        inputRef.required = false;
+        inputRef.placeholder = 'No requerido en efectivo';
+      }
+
+      // Auto-selección de moneda conveniente si se selecciona efectivo
+      if (met === 'efectivo_usd' && selectMoneda) {
+        selectMoneda.value = 'USD';
+        updateConversion();
+      } else if (met === 'efectivo_bs' && selectMoneda) {
+        selectMoneda.value = 'Bs';
+        updateConversion();
+      }
+    }
+
     if (inputMonto) inputMonto.addEventListener('input', updateConversion);
     if (selectMoneda) selectMoneda.addEventListener('change', updateConversion);
+    if (selectMetodo) selectMetodo.addEventListener('change', updateMetodoState);
+
+    // Ejecutar al inicio para reflejar el estado del método inicial
+    updateMetodoState();
   }, 100);
 }
 
