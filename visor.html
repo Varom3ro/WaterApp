@@ -1068,10 +1068,44 @@
 
 <script>
   const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
+  const SUPABASE_LIC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
   let currentStoreEmail = '';
   let autoRefreshInterval = null;
+
+  // Verificación de estado de cuenta y licencia en tiempo real (controlado desde superadmin.html)
+  async function verificarLicencia(email) {
+    try {
+      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(email)}`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) return { ok: true };
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        return { ok: false, razon: '⚠️ Este correo no está registrado en el sistema WaterApp.' };
+      }
+      const c = data[0];
+      if (!c.activo) {
+        return { ok: false, razon: '🚫 Acceso suspendido por administración. Comunícate con soporte.' };
+      }
+      const reg = new Date(c.fecha_registro);
+      const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 24 * 60 * 60 * 1000));
+      if ((exp - new Date()) <= 0) {
+        return { ok: false, razon: '⏳ Tu suscripción ha vencido. Contacta a administración para renovarla.' };
+      }
+      if (c.notas && c.notas.includes('[BLOQUEO_VISOR]')) {
+        return { ok: false, razon: '📱 El acceso al Visor Móvil para esta cuenta ha sido deshabilitado.' };
+      }
+      return { ok: true, cliente: c };
+    } catch (e) {
+      console.warn('Error al verificar licencia:', e);
+      return { ok: true };
+    }
+  }
 
   // Alternar ver clave (Ojito)
   const btnTogglePwd = document.getElementById('btn-toggle-pwd');
@@ -1093,6 +1127,7 @@
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const pwd = document.getElementById('login-pwd').value.trim();
     const errorBox = document.getElementById('login-error');
+    const btn = document.getElementById('btn-login');
 
     if (!email) {
       if (errorBox) {
@@ -1104,7 +1139,26 @@
 
     if (errorBox) errorBox.style.display = 'none';
 
-    // Comprobación de acceso (demo o en vivo)
+    btn.disabled = true;
+    const btnOriginalText = btn.textContent;
+    btn.textContent = '⏳ Verificando acceso...';
+
+    // Verificación de Licencia y Estado de la Cuenta
+    const licCheck = await verificarLicencia(email);
+    if (!licCheck.ok) {
+      btn.disabled = false;
+      btn.textContent = btnOriginalText;
+      if (errorBox) {
+        errorBox.textContent = licCheck.razon;
+        errorBox.style.display = 'block';
+      }
+      return;
+    }
+
+    btn.disabled = false;
+    btn.textContent = btnOriginalText;
+
+    // Comprobación de acceso aprobada
     currentStoreEmail = email;
     localStorage.setItem('visor_owner_email', email);
 
@@ -1159,6 +1213,23 @@
 
   // Cargar Datos de Supabase
   async function cargarDatosEnVivo() {
+    if (!currentStoreEmail) return;
+
+    // Verificar en caliente si la cuenta sigue activa o fue suspendida por el admin
+    const licCheck = await verificarLicencia(currentStoreEmail);
+    if (!licCheck.ok) {
+      localStorage.removeItem('visor_owner_email');
+      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+      document.getElementById('main-app').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+      const errorBox = document.getElementById('login-error');
+      if (errorBox) {
+        errorBox.textContent = licCheck.razon;
+        errorBox.style.display = 'block';
+      }
+      return;
+    }
+
     try {
       const res = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
         headers: {

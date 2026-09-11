@@ -842,9 +842,15 @@
                   <span class="client-info-val">${escapeHtml(c.telefono)}</span>
                 </li>
               ` : ''}
+              <li class="client-info-item" style="margin-top: 4px;">
+                <span class="client-info-label">Visor Móvil:</span>
+                <span class="client-info-val" style="font-weight: 700; color: ${!c.activo ? 'var(--danger)' : ((c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'var(--warning)' : 'var(--accent)')};">
+                  ${!c.activo ? '🔴 Suspendido (General)' : ((c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? '🚫 Bloqueado' : '🟢 Habilitado')}
+                </span>
+              </li>
               ${c.notas ? `
                 <li style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
-                  📝 ${escapeHtml(c.notas)}
+                  📝 ${escapeHtml(c.notas.replace('[BLOQUEO_VISOR]', '').trim())}
                 </li>
               ` : ''}
             </ul>
@@ -861,8 +867,12 @@
             </div>
 
             <div class="client-actions-sub">
-              <button class="btn btn-sm ${c.activo ? 'btn-warning' : 'btn-success'}" onclick="toggleActivo('${c.id}', ${!c.activo})" title="${c.activo ? 'Suspender acceso' : 'Reactivar acceso'}">
-                ${c.activo ? '⏸️ Suspender' : '▶️ Reactivar'}
+              <button class="btn btn-sm ${c.activo ? 'btn-warning' : 'btn-success'}" onclick="toggleActivo('${c.id}', ${!c.activo})" title="${c.activo ? 'Suspender acceso a todo el sistema' : 'Reactivar acceso al sistema'}">
+                ${c.activo ? '⏸️ Suspender Todo' : '▶️ Reactivar'}
+              </button>
+
+              <button class="btn btn-sm ${(c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'btn-success' : 'btn-secondary'}" onclick="toggleVisorBloqueo('${c.id}')" title="${(c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'Habilitar acceso al visor móvil' : 'Bloquear acceso al visor móvil'}">
+                ${(c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? '📱 Habilitar Visor' : '🚫 Bloquear Visor'}
               </button>
               
               ${waLink ? `
@@ -935,6 +945,37 @@
       });
       if (!res.ok) throw new Error('Error al cambiar estado en Supabase');
       showToast(nuevoEstado ? '▶️ Licencia Reactivada' : '⏸️ Licencia Suspendida', 'success');
+      cargarClientes();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // Bloquear / Habilitar Visor Móvil específicamente
+  async function toggleVisorBloqueo(id) {
+    const c = clientes.find(item => item.id === id);
+    if (!c) return;
+
+    let notas = c.notas || '';
+    const yaBloqueado = notas.includes('[BLOQUEO_VISOR]');
+    if (yaBloqueado) {
+      notas = notas.replace('[BLOQUEO_VISOR]', '').trim();
+    } else {
+      notas = (notas ? notas + ' ' : '') + '[BLOQUEO_VISOR]';
+    }
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ notas })
+      });
+      if (!res.ok) throw new Error('Error al actualizar en Supabase');
+      showToast(yaBloqueado ? '📱 Visor Móvil Habilitado' : '🚫 Visor Móvil Bloqueado', yaBloqueado ? 'success' : 'warning');
       cargarClientes();
     } catch (e) {
       showToast(`Error: ${e.message}`, 'error');
