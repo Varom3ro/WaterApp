@@ -40,12 +40,39 @@ export async function syncToCloud(isManual = false) {
     let botellones = 0;
     let litros = 0;
     let efectivoUSD = 0;
+    let efectivoBs = 0;
+    let efectivoBsUSD = 0;
     let pagoMovil = 0;
     let pagoMovilBs = 0;
     let punto = 0;
     let puntoBs = 0;
     let transferencia = 0;
     let credito = 0;
+
+    // Mapa dinámico de métodos de pago (estándar y personalizados)
+    const allMetodosConfig = (typeof store.getMetodosPago === 'function')
+      ? store.getMetodosPago(false)
+      : [
+          { id: 'efectivo_usd', label: 'Efectivo USD', icon: '💵', moneda: 'USD', color: 'var(--primary)' },
+          { id: 'efectivo_bs', label: 'Efectivo Bs', icon: '💴', moneda: 'Bs', color: '#10B981' },
+          { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', moneda: 'Bs', color: '#8B5CF6' },
+          { id: 'punto', label: 'Punto de Venta', icon: '💳', moneda: 'Bs', color: '#06B6D4' },
+          { id: 'transferencia', label: 'Transferencia', icon: '🏦', moneda: 'Bs', color: 'var(--warning)' }
+        ];
+
+    const metodosMap = {};
+    allMetodosConfig.forEach(m => {
+      metodosMap[m.id] = {
+        id: m.id,
+        label: m.label,
+        icon: m.icon || '💳',
+        moneda: m.moneda || 'Bs',
+        color: m.color || '#3B82F6',
+        totalUSD: 0,
+        totalBs: 0,
+        cantidadVentas: 0
+      };
+    });
 
     ventasHoy.forEach(v => {
       const vTotal = parseFloat(v.total) || 0;
@@ -59,30 +86,91 @@ export async function syncToCloud(isManual = false) {
         v.pagos.forEach(p => {
           const m = parseFloat(p.monto) || 0;
           const currentTasa = parseFloat(p.tasa) || tasa;
-          if (p.metodo === 'efectivo_usd') {
-            efectivoUSD += m;
-          } else if (p.metodo === 'pago_movil') {
-            pagoMovil += m;
-            pagoMovilBs += (m * currentTasa);
-          } else if (p.metodo === 'punto_venta' || p.metodo === 'punto') {
-            punto += m;
-            puntoBs += (m * currentTasa);
-          } else if (p.metodo === 'transferencia') {
-            transferencia += m;
+          let metId = p.metodo || 'efectivo_usd';
+          if (metId === 'punto_venta') metId = 'punto';
+          const montoBs = p.montoBs ? parseFloat(p.montoBs) : (m * currentTasa);
+
+          if (!metodosMap[metId]) {
+            metodosMap[metId] = {
+              id: metId,
+              label: p.metodoNombre || metId,
+              icon: '💳',
+              moneda: 'Bs',
+              color: '#3B82F6',
+              totalUSD: 0,
+              totalBs: 0,
+              cantidadVentas: 0
+            };
           }
+
+          metodosMap[metId].totalUSD += m;
+          metodosMap[metId].totalBs += montoBs;
+          metodosMap[metId].cantidadVentas += 1;
+
+          if (metId === 'efectivo_usd') efectivoUSD += m;
+          else if (metId === 'efectivo_bs') { efectivoBsUSD += m; efectivoBs += montoBs; }
+          else if (metId === 'pago_movil') { pagoMovil += m; pagoMovilBs += montoBs; }
+          else if (metId === 'punto') { punto += m; puntoBs += montoBs; }
+          else if (metId === 'transferencia') { transferencia += m; }
         });
       } else {
-        if (v.metodoPago === 'pago_movil') {
-          pagoMovil += vTotal;
-          pagoMovilBs += (vTotal * tasa);
-        } else if (v.metodoPago === 'punto_venta' || v.metodoPago === 'punto') {
-          punto += vTotal;
-          puntoBs += (vTotal * tasa);
-        } else if (v.metodoPago === 'transferencia') {
-          transferencia += vTotal;
-        } else {
-          efectivoUSD += vTotal;
+        let metId = v.metodoPago || 'efectivo_usd';
+        if (metId === 'punto_venta') metId = 'punto';
+        const montoBs = vTotal * tasa;
+
+        if (!metodosMap[metId]) {
+          metodosMap[metId] = {
+            id: metId,
+            label: metId,
+            icon: '💳',
+            moneda: 'Bs',
+            color: '#3B82F6',
+            totalUSD: 0,
+            totalBs: 0,
+            cantidadVentas: 0
+          };
         }
+
+        metodosMap[metId].totalUSD += vTotal;
+        metodosMap[metId].totalBs += montoBs;
+        metodosMap[metId].cantidadVentas += 1;
+
+        if (metId === 'efectivo_usd') efectivoUSD += vTotal;
+        else if (metId === 'efectivo_bs') { efectivoBsUSD += vTotal; efectivoBs += montoBs; }
+        else if (metId === 'pago_movil') { pagoMovil += vTotal; pagoMovilBs += montoBs; }
+        else if (metId === 'punto') { punto += vTotal; puntoBs += montoBs; }
+        else if (metId === 'transferencia') { transferencia += vTotal; }
+      }
+    });
+
+    // Lista de métodos ordenada para el visor
+    const desgloseMetodos = [];
+    const processedIds = new Set();
+    const ordenBase = ['efectivo_bs', 'efectivo_usd', 'pago_movil', 'punto', 'transferencia', 'credito'];
+
+    metodosMap['credito'] = {
+      id: 'credito',
+      label: 'Crédito',
+      icon: '📋',
+      moneda: 'USD',
+      color: '#F43F5E',
+      totalUSD: credito,
+      totalBs: credito * tasa,
+      cantidadVentas: 0
+    };
+    
+    ordenBase.forEach(id => {
+      const item = metodosMap[id];
+      if (item) {
+        processedIds.add(id);
+        desgloseMetodos.push(item);
+      }
+    });
+
+    Object.values(metodosMap).forEach(item => {
+      if (!processedIds.has(item.id)) {
+        processedIds.add(item.id);
+        desgloseMetodos.push(item);
       }
     });
 
@@ -136,8 +224,13 @@ export async function syncToCloud(isManual = false) {
     const litrosMermasHoy = mermasHoy.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
 
     // Últimos movimientos (ventas + mermas)
+    // 🛡️ Ordenar cronológicamente ANTES de extraer para asegurar que siempre se tomen las ventas más recientes
     const ultimosMovs = [];
-    ventas.slice(-25).reverse().forEach(v => {
+    const ventasCronologicas = [...ventas]
+      .filter(v => v && v.fecha)
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    ventasCronologicas.slice(0, 35).forEach(v => {
       let metodoLabel = '💵 Pagado';
       if (v.tipo === 'credito') metodoLabel = '📋 Crédito';
       else if (v.pagos && v.pagos[0]) {
@@ -154,7 +247,7 @@ export async function syncToCloud(isManual = false) {
 
       const horaStr = (typeof Utils.formatTime === 'function')
         ? Utils.formatTime(v.fecha)
-        : (v.fecha ? new Date(v.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+        : (v.fecha ? new Date(v.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : '');
 
       ultimosMovs.push({
         hora: horaStr,
@@ -168,10 +261,14 @@ export async function syncToCloud(isManual = false) {
       });
     });
 
-    mermas.slice(-5).reverse().forEach(m => {
+    const mermasCronologicas = [...mermas]
+      .filter(m => m && m.fecha)
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    mermasCronologicas.slice(0, 10).forEach(m => {
       const horaMerma = (typeof Utils.formatTime === 'function')
         ? Utils.formatTime(m.fecha)
-        : (m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+        : (m.fecha ? new Date(m.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : '');
 
       ultimosMovs.push({
         hora: horaMerma,
@@ -295,13 +392,16 @@ export async function syncToCloud(isManual = false) {
         litros,
         numVentas: ventasHoy.length,
         efectivoUSD,
+        efectivoBs,
+        efectivoBsUSD,
         pagoMovil,
         pagoMovilBs,
         punto,
         puntoBs,
         transferencia,
         credito,
-        litrosMermasHoy
+        litrosMermasHoy,
+        desglose_metodos: desgloseMetodos
       },
       nivel_tanque: {
         litros: inventario.litros || 0,
@@ -309,7 +409,7 @@ export async function syncToCloud(isManual = false) {
         nivelPct
       },
       stock_productos: prodsFisicos,
-      ultimos_movimientos: ultimosMovs.slice(0, 20),
+      ultimos_movimientos: ultimosMovs.slice(0, 35),
       analisis_mes: {
         totalMesUSD,
         totalMesBs,
