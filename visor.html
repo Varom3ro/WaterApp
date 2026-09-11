@@ -4,6 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>WaterApp - Visor Ejecutivo Móvil</title>
+  <!-- Metadatos PWA y Pantalla Móvil -->
+  <meta name="theme-color" content="#0B131E" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Visor Dueño" />
+  <meta name="application-name" content="Visor Dueño" />
+  <meta name="description" content="Panel Ejecutivo en Tiempo Real para Dueños de Plantas de Agua Potable" />
+  <link rel="manifest" href="manifest-visor.json" />
+  <link rel="apple-touch-icon" href="img/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="img/icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -391,6 +402,98 @@
       gap: 10px;
     }
 
+    /* Separador y Grupo de Día en Feed */
+    .feed-day-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .feed-day-divider {
+      display: flex;
+      align-items: center;
+      margin: 14px 0 6px 0;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .feed-day-divider:first-child {
+      margin-top: 2px;
+    }
+
+    .feed-day-divider::before,
+    .feed-day-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      transition: background-color 0.2s ease;
+    }
+
+    .feed-day-divider:hover::before,
+    .feed-day-divider:hover::after {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .feed-day-badge {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: #94A3B8;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .feed-day-divider:hover .feed-day-badge {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #fff;
+    }
+
+    .feed-day-divider:active .feed-day-badge {
+      transform: scale(0.96);
+    }
+
+    .feed-day-chevron {
+      display: inline-block;
+      font-size: 0.65rem;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      color: var(--primary);
+    }
+
+    .feed-day-chevron.collapsed {
+      transform: rotate(-90deg);
+      color: var(--text-muted);
+    }
+
+    .feed-day-count {
+      font-size: 0.65rem;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 6px;
+      border-radius: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .feed-day-items {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feed-day-items.collapsed {
+      display: none;
+    }
+
     .feed-item {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -400,6 +503,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .feed-item:active {
+      background: var(--surface-card);
+      border-color: rgba(255, 255, 255, 0.15);
     }
 
     .feed-left {
@@ -546,6 +655,139 @@
       font-size: 0.78rem;
       font-weight: 700;
     }
+
+    /* PWA Banner Flotante e Instalación */
+    .pwa-install-banner {
+      position: fixed;
+      bottom: calc(var(--bottom-nav-height) + 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);
+      max-width: 440px;
+      background: linear-gradient(135deg, #16382B 0%, #152232 100%);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translate(-50%, 20px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+
+    .pwa-banner-content {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .pwa-banner-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .pwa-banner-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .pwa-banner-text strong {
+      font-size: 0.85rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pwa-banner-text span {
+      font-size: 0.72rem;
+      color: #A7F3D0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pwa-banner-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btn-pwa-action {
+      background: var(--primary);
+      color: #0B131E;
+      font-weight: 800;
+      font-size: 0.78rem;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+
+    .btn-pwa-action:active {
+      transform: scale(0.95);
+    }
+
+    .btn-pwa-dismiss {
+      background: rgba(255, 255, 255, 0.1);
+      color: #94A3B8;
+      border: none;
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    /* Modal de Instrucciones iOS */
+    .ios-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .ios-modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
 <body>
@@ -583,6 +825,10 @@
       <button id="btn-login" class="btn btn-primary" style="margin-top: 0.5rem;">
         🚀 Ingresar al Visor
       </button>
+
+      <button id="btn-pwa-login" type="button" class="btn" style="display: none; margin-top: 0.75rem; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff;">
+        📲 Instalar App en este Teléfono
+      </button>
     </div>
   </div>
 
@@ -605,6 +851,7 @@
         </div>
       </div>
       <div style="display: flex; gap: 8px;">
+        <button class="btn-icon" id="btn-pwa-header" style="display: none;" title="Instalar App en el Móvil">📲</button>
         <button class="btn-icon" id="btn-sync-now" title="Actualizar datos">🔄</button>
         <button class="btn-icon" id="btn-logout" title="Cerrar sesión">🚪</button>
       </div>
@@ -637,13 +884,18 @@
 
       <!-- Desglose de Caja -->
       <h3 class="section-title">💵 Desglose de Caja Hoy</h3>
-      <div class="caja-grid">
+      <div class="caja-grid" id="caja-grid-container">
+        <div class="caja-card" style="border-left: 3px solid #10B981;">
+          <div class="caja-label">💴 Efectivo Bs</div>
+          <div class="caja-value" id="caja-efectivo-bs">$ 0.00</div>
+          <div class="caja-sub" id="caja-efectivo-bs-sub">Bs 0.00</div>
+        </div>
         <div class="caja-card" style="border-left: 3px solid var(--primary);">
           <div class="caja-label">💵 Efectivo USD</div>
           <div class="caja-value" id="caja-efectivo-usd">$ 0.00</div>
-          <div class="caja-sub">En caja</div>
+          <div class="caja-sub">En caja USD</div>
         </div>
-        <div class="caja-card" style="border-left: 3px solid #3B82F6;">
+        <div class="caja-card" style="border-left: 3px solid #8B5CF6;">
           <div class="caja-label">📱 Pago Móvil</div>
           <div class="caja-value" id="caja-pagomovil">$ 0.00</div>
           <div class="caja-sub" id="caja-pagomovil-bs">Bs 0.00</div>
@@ -657,6 +909,11 @@
           <div class="caja-label">🏦 Transferencias</div>
           <div class="caja-value" id="caja-transf">$ 0.00</div>
           <div class="caja-sub">Banco</div>
+        </div>
+        <div class="caja-card" style="border-left: 3px solid #F43F5E;">
+          <div class="caja-label">📋 Crédito</div>
+          <div class="caja-value" id="caja-credito">$ 0.00</div>
+          <div class="caja-sub">Por cobrar</div>
         </div>
       </div>
 
@@ -748,8 +1005,9 @@
       <div class="card-hero" style="background: linear-gradient(135deg, #1E1B4B 0%, #0F172A 100%); border-color: rgba(99, 102, 241, 0.3);">
         <div class="hero-label" style="color: #A5B4FC;">💵 Efectivo a Rendir Hoy</div>
         <div class="hero-amount" id="cierre-efectivo-usd">$ 0.00</div>
-        <div style="font-size: 0.85rem; color: #C7D2FE; margin-top: 4px;">
-          Monto exacto que el cajero debe entregarte en billetes.
+        <div class="hero-bs" id="cierre-efectivo-bs-hero" style="color: #6EE7B7; font-size: 1.15rem; font-weight: 700; margin-top: 4px;">+ Bs 0.00 en efectivo</div>
+        <div style="font-size: 0.8rem; color: #C7D2FE; margin-top: 6px;">
+          Billetes físicos que el cajero debe entregarte al cierre.
         </div>
       </div>
 
@@ -766,6 +1024,10 @@
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
           <span style="color: var(--text-muted); font-size: 0.9rem;">Total Efectivo ($):</span>
           <strong style="color: var(--primary); font-size: 1.05rem;" id="cierre-efectivo-usd-2">$ 0.00</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+          <span style="color: var(--text-muted); font-size: 0.9rem;">Total Efectivo (Bs):</span>
+          <strong style="color: #34D399; font-size: 1.05rem;" id="cierre-efectivo-bs">Bs 0.00</strong>
         </div>
         <div style="display: flex; justify-content: space-between; padding: 8px 0;">
           <span style="color: var(--text-muted); font-size: 0.9rem;">Mermas de Agua Reportadas:</span>
@@ -920,6 +1182,172 @@
     }
   }
 
+  function obtenerDesgloseMetodos(storeData) {
+    const r = storeData.resumen_hoy || {};
+    const backup = storeData.respaldo_completo;
+
+    // 6 Métodos Base Fijos (siempre presentes en caja)
+    const metodosMap = {
+      'efectivo_usd': { id: 'efectivo_usd', label: 'Efectivo USD', icon: '💵', color: 'var(--primary)', moneda: 'USD', totalUSD: 0, totalBs: 0, sub: 'En caja USD' },
+      'efectivo_bs': { id: 'efectivo_bs', label: 'Efectivo Bs', icon: '💴', color: '#10B981', moneda: 'Bs', totalUSD: 0, totalBs: 0, subBs: true },
+      'pago_movil': { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', color: '#8B5CF6', moneda: 'Bs', totalUSD: 0, totalBs: 0, subBs: true },
+      'punto': { id: 'punto', label: 'Punto de Venta', icon: '💳', color: '#06B6D4', moneda: 'Bs', totalUSD: 0, totalBs: 0, subBs: true },
+      'transferencia': { id: 'transferencia', label: 'Transferencias', icon: '🏦', color: 'var(--warning)', moneda: 'Bs', totalUSD: 0, totalBs: 0, sub: 'Banco' },
+      'credito': { id: 'credito', label: 'Crédito', icon: '📋', color: '#F43F5E', moneda: 'USD', totalUSD: r.credito || 0, totalBs: 0, sub: 'Por cobrar' }
+    };
+
+    const customMethodsOrder = [];
+
+    // Registrar métodos personalizados de la configuración del respaldo si existen (ej. Zelle, Binance)
+    if (backup && Array.isArray(backup.configuracion)) {
+      const customConf = backup.configuracion.find(c => c.id === 'metodosPagoPersonalizados');
+      if (customConf && Array.isArray(customConf.value)) {
+        customConf.value.forEach(cm => {
+          if (!metodosMap[cm.id]) {
+            const item = {
+              id: cm.id,
+              label: cm.label || 'Personalizado',
+              icon: cm.icon || '💳',
+              color: cm.color || '#2D6A4F',
+              moneda: cm.moneda || 'USD',
+              totalUSD: 0,
+              totalBs: 0,
+              sub: cm.moneda === 'Bs' ? '' : 'En USD'
+            };
+            metodosMap[cm.id] = item;
+            customMethodsOrder.push(cm.id);
+          }
+        });
+      }
+    }
+
+    // Si viene desglose_metodos precalculado en resumen_hoy, cargar valores
+    if (r.desglose_metodos && Array.isArray(r.desglose_metodos)) {
+      r.desglose_metodos.forEach(m => {
+        let mId = m.id;
+        if (mId === 'punto_venta') mId = 'punto';
+        if (!metodosMap[mId]) {
+          metodosMap[mId] = { ...m };
+          customMethodsOrder.push(mId);
+        } else {
+          metodosMap[mId].totalUSD = m.totalUSD || 0;
+          metodosMap[mId].totalBs = m.totalBs || 0;
+          if (m.label) metodosMap[mId].label = m.label;
+          if (m.icon) metodosMap[mId].icon = m.icon;
+        }
+      });
+    }
+
+    // Calcular o complementar desde las ventas de hoy del respaldo
+    if (backup && Array.isArray(backup.ventas) && backup.ventas.length > 0) {
+      let tasa = 800;
+      if (Array.isArray(backup.configuracion)) {
+        const tasaConf = backup.configuracion.find(c => c.id === 'tasaCambio');
+        if (tasaConf && tasaConf.value) tasa = parseFloat(tasaConf.value) || tasa;
+      }
+
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
+
+      let sumUSD = Object.values(metodosMap).reduce((s, m) => s + (m.totalUSD || 0), 0);
+      if (sumUSD === 0 || (r.totalUSD && sumUSD < (r.totalUSD - 0.05))) {
+        Object.keys(metodosMap).forEach(k => {
+          metodosMap[k].totalUSD = 0;
+          metodosMap[k].totalBs = 0;
+        });
+
+        let creditoHoy = 0;
+
+        backup.ventas.forEach(v => {
+          if (!v.fecha) return;
+          const vTime = new Date(v.fecha).getTime();
+          if (vTime >= todayStart && vTime <= todayEnd) {
+            const vTot = parseFloat(v.total) || 0;
+            if (v.tipo === 'credito') {
+              creditoHoy += vTot;
+            } else if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
+              v.pagos.forEach(p => {
+                const m = parseFloat(p.monto) || 0;
+                let mId = p.metodo || 'efectivo_usd';
+                if (mId === 'punto_venta') mId = 'punto';
+                const mBs = p.montoBs ? parseFloat(p.montoBs) : (m * (parseFloat(p.tasa) || tasa));
+
+                if (!metodosMap[mId]) {
+                  metodosMap[mId] = {
+                    id: mId,
+                    label: p.metodoNombre || mId,
+                    icon: '💳',
+                    color: '#3B82F6',
+                    moneda: 'USD',
+                    totalUSD: 0,
+                    totalBs: 0,
+                    sub: 'En USD'
+                  };
+                  customMethodsOrder.push(mId);
+                }
+                metodosMap[mId].totalUSD += m;
+                metodosMap[mId].totalBs += mBs;
+              });
+            } else {
+              let mId = v.metodoPago || 'efectivo_usd';
+              if (mId === 'punto_venta') mId = 'punto';
+              if (!metodosMap[mId]) {
+                metodosMap[mId] = { id: mId, label: mId, icon: '💳', color: '#3B82F6', moneda: 'USD', totalUSD: 0, totalBs: 0 };
+                customMethodsOrder.push(mId);
+              }
+              metodosMap[mId].totalUSD += vTot;
+              metodosMap[mId].totalBs += (vTot * tasa);
+            }
+          }
+        });
+
+        metodosMap['credito'].totalUSD = creditoHoy || r.credito || 0;
+      }
+    }
+
+    // Fallback si todos dan 0
+    if (Object.values(metodosMap).every(m => m.totalUSD === 0)) {
+      metodosMap['efectivo_usd'].totalUSD = r.efectivoUSD || 0;
+      metodosMap['efectivo_bs'].totalUSD = r.efectivoBsUSD || 0;
+      metodosMap['efectivo_bs'].totalBs = r.efectivoBs || 0;
+      metodosMap['pago_movil'].totalUSD = r.pagoMovil || 0;
+      metodosMap['pago_movil'].totalBs = r.pagoMovilBs || 0;
+      metodosMap['punto'].totalUSD = r.punto || 0;
+      metodosMap['punto'].totalBs = r.puntoBs || 0;
+      metodosMap['transferencia'].totalUSD = r.transferencia || 0;
+      metodosMap['credito'].totalUSD = r.credito || 0;
+    }
+
+    // Orden garantizado: Primero Efectivo Bs, luego Efectivo USD, resto de base y personalizados
+    const ordenBase = ['efectivo_bs', 'efectivo_usd', 'pago_movil', 'punto', 'transferencia', 'credito'];
+    const resultado = [];
+    const processed = new Set();
+
+    ordenBase.forEach(id => {
+      if (metodosMap[id]) {
+        resultado.push(metodosMap[id]);
+        processed.add(id);
+      }
+    });
+
+    customMethodsOrder.forEach(id => {
+      if (metodosMap[id] && !processed.has(id)) {
+        resultado.push(metodosMap[id]);
+        processed.add(id);
+      }
+    });
+
+    Object.values(metodosMap).forEach(m => {
+      if (!processed.has(m.id)) {
+        resultado.push(m);
+        processed.add(m.id);
+      }
+    });
+
+    return resultado;
+  }
+
   function renderDashboard(storeData) {
     const r = storeData.resumen_hoy || {};
     const t = storeData.nivel_tanque || {};
@@ -942,13 +1370,34 @@
     document.getElementById('txt-litros').textContent = `${(r.litros || 0).toLocaleString()} L`;
     document.getElementById('txt-ventas-count').textContent = r.numVentas || 0;
 
-    // Desglose de Caja
-    document.getElementById('caja-efectivo-usd').textContent = `$ ${(r.efectivoUSD || 0).toFixed(2)}`;
-    document.getElementById('caja-pagomovil').textContent = `$ ${(r.pagoMovil || 0).toFixed(2)}`;
-    document.getElementById('caja-pagomovil-bs').textContent = `Bs ${(r.pagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
-    document.getElementById('caja-punto').textContent = `$ ${(r.punto || 0).toFixed(2)}`;
-    document.getElementById('caja-punto-bs').textContent = `Bs ${(r.puntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
-    document.getElementById('caja-transf').textContent = `$ ${(r.transferencia || 0).toFixed(2)}`;
+    // Desglose de Caja Dinámico (Efectivo Bs primero, y si es impar se amplía la primera)
+    const cajaCont = document.getElementById('caja-grid-container');
+    if (cajaCont) {
+      const metodos = obtenerDesgloseMetodos(storeData);
+      const isOdd = metodos.length % 2 !== 0;
+
+      cajaCont.innerHTML = metodos.map((m, idx) => {
+        const usd = (m.totalUSD || 0).toFixed(2);
+        let subText = m.sub || '';
+        if (m.subBs || m.moneda === 'Bs' || (m.totalBs && m.totalBs > 0)) {
+          subText = `Bs ${(m.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+        } else if (!subText) {
+          subText = (m.id === 'efectivo_usd' || m.moneda === 'USD') ? 'En USD' : 'Banco / Cuenta';
+        }
+
+        const borderColor = m.color || '#3B82F6';
+        // Si el número de tarjetas es impar, se amplía la primera tarjeta (Efectivo Bs) a todo lo ancho
+        const spanTwo = (isOdd && idx === 0) ? 'grid-column: span 2;' : '';
+
+        return `
+          <div class="caja-card" style="border-left: 3px solid ${borderColor}; ${spanTwo}">
+            <div class="caja-label">${m.icon || '💳'} ${escapeHtml(m.label || m.id)}</div>
+            <div class="caja-value">$ ${usd}</div>
+            <div class="caja-sub">${escapeHtml(subText)}</div>
+          </div>
+        `;
+      }).join('');
+    }
 
     // Tanque
     const pct = t.nivelPct || 68;
@@ -960,29 +1409,82 @@
     document.getElementById('inv-tank-litros').textContent = `${(t.litros || 0).toLocaleString()} L`;
     document.getElementById('inv-tank-bar').style.width = `${pct}%`;
 
-    // Feed de Movimientos
+    // Feed de Movimientos con Separadores de Día y grupos colapsables
     const feedCont = document.getElementById('feed-container');
     if (feedCont) {
       if (movs.length > 0) {
-        feedCont.innerHTML = movs.map(m => `
-          <div class="feed-item">
-            <div class="feed-left">
-              <div class="feed-icon">${m.icono || '💧'}</div>
-              <div>
-                <div class="feed-title">${escapeHtml(m.descripcion || m.tipo)}</div>
-                <div class="feed-meta">${m.hora} · ${escapeHtml(m.cliente || 'Cliente')}</div>
+        // Ordenar cronológicamente descendente
+        const sortedMovs = [...movs].sort((a, b) => {
+          const tA = a.fecha ? new Date(a.fecha).getTime() : 0;
+          const tB = b.fecha ? new Date(b.fecha).getTime() : 0;
+          return tB - tA;
+        });
+
+        // Agrupar por fecha
+        const dayGroups = [];
+        const groupIndexMap = {};
+
+        sortedMovs.forEach(m => {
+          const k = getDayKey(m.fecha);
+          let g = groupIndexMap[k];
+          if (!g) {
+            g = {
+              dayKey: k,
+              label: k === 'unknown' ? 'Otros Movimientos' : formatDayHeader(m.fecha),
+              items: []
+            };
+            groupIndexMap[k] = g;
+            dayGroups.push(g);
+          }
+          g.items.push(m);
+        });
+
+        const htmlPieces = dayGroups.map(group => {
+          const isCollapsed = collapsedFeedDays.has(group.dayKey);
+
+          const itemsHtml = group.items.map(m => {
+            const fullDateTitle = m.fecha && !isNaN(new Date(m.fecha).getTime())
+              ? new Date(m.fecha).toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : `${m.hora} · ${m.cliente || ''}`;
+
+            return `
+              <div class="feed-item" title="${escapeHtml(fullDateTitle)}">
+                <div class="feed-left">
+                  <div class="feed-icon">${m.icono || '💧'}</div>
+                  <div>
+                    <div class="feed-title">${escapeHtml(m.descripcion || m.tipo)}</div>
+                    <div class="feed-meta">${m.hora} · ${escapeHtml(m.cliente || 'Cliente')}</div>
+                  </div>
+                </div>
+                <div class="feed-right">
+                  <div class="feed-amount" style="color: ${m.tipo === 'Merma' ? 'var(--warning)' : 'var(--primary)'};">${m.monto}</div>
+                  <div class="feed-method">${m.metodo || ''}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          return `
+            <div class="feed-day-group" data-day="${group.dayKey}">
+              <div class="feed-day-divider" onclick="toggleFeedDay('${group.dayKey}')" role="button" tabindex="0" title="Toca para recoger o desplegar">
+                <div class="feed-day-badge">
+                  <span id="feed-arrow-${group.dayKey}" class="feed-day-chevron ${isCollapsed ? 'collapsed' : ''}">▼</span>
+                  <span>${escapeHtml(group.label)}</span>
+                  <span class="feed-day-count">${group.items.length}</span>
+                </div>
+              </div>
+              <div id="feed-items-${group.dayKey}" class="feed-day-items ${isCollapsed ? 'collapsed' : ''}">
+                ${itemsHtml}
               </div>
             </div>
-            <div class="feed-right">
-              <div class="feed-amount" style="color: ${m.tipo === 'Merma' ? 'var(--warning)' : 'var(--primary)'};">${m.monto}</div>
-              <div class="feed-method">${m.metodo || ''}</div>
-            </div>
-          </div>
-        `).join('');
+          `;
+        });
+
+        feedCont.innerHTML = htmlPieces.join('');
       } else {
         feedCont.innerHTML = `
           <div style="text-align:center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.85rem; background: var(--surface); border-radius: 12px; border: 1px dashed var(--border);">
-            ✨ Sin ventas ni movimientos registrados hoy.
+            ✨ Sin ventas ni movimientos registrados.
           </div>
         `;
       }
@@ -1065,12 +1567,88 @@
     }
 
     // Cierre
-    document.getElementById('cierre-efectivo-usd').textContent = `$ ${(r.efectivoUSD || 0).toFixed(2)}`;
-    document.getElementById('cierre-efectivo-usd-2').textContent = `$ ${(r.efectivoUSD || 0).toFixed(2)}`;
+    const metodosCierre = obtenerDesgloseMetodos(storeData);
+    const totalEfUSD = metodosCierre.find(m => m.id === 'efectivo_usd')?.totalUSD || (r.efectivoUSD || 0);
+    const efBsItem = metodosCierre.find(m => m.id === 'efectivo_bs');
+    const totalEfBs = efBsItem?.totalBs || (r.efectivoBs || 0);
+    const totalEfBsUSD = efBsItem?.totalUSD || (r.efectivoBsUSD || 0);
+
+    document.getElementById('cierre-efectivo-usd').textContent = `$ ${totalEfUSD.toFixed(2)}`;
+    document.getElementById('cierre-efectivo-usd-2').textContent = `$ ${totalEfUSD.toFixed(2)}`;
+
+    const cierreEfBs = document.getElementById('cierre-efectivo-bs');
+    if (cierreEfBs) {
+      cierreEfBs.textContent = `Bs ${totalEfBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+    }
+    const cierreEfBsHero = document.getElementById('cierre-efectivo-bs-hero');
+    if (cierreEfBsHero) {
+      cierreEfBsHero.textContent = `+ Bs ${totalEfBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} en efectivo`;
+    }
+
     document.getElementById('cierre-total-usd').textContent = `$ ${(r.totalUSD || 0).toFixed(2)}`;
-    document.getElementById('cierre-digital-usd').textContent = `$ ${Math.max(0, (r.totalUSD || 0) - (r.efectivoUSD || 0)).toFixed(2)}`;
+    const totalDigital = Math.max(0, (r.totalUSD || 0) - totalEfUSD - totalEfBsUSD);
+    document.getElementById('cierre-digital-usd').textContent = `$ ${totalDigital.toFixed(2)}`;
     const mermaEl = document.getElementById('cierre-merma-litros');
     if (mermaEl) mermaEl.textContent = `${r.litrosMermasHoy || 0} Litros`;
+  }
+
+  // Control de secciones colapsables en el feed de movimientos
+  const collapsedFeedDays = new Set();
+
+  window.toggleFeedDay = function(dayKey) {
+    if (collapsedFeedDays.has(dayKey)) {
+      collapsedFeedDays.delete(dayKey);
+    } else {
+      collapsedFeedDays.add(dayKey);
+    }
+    const itemsEl = document.getElementById(`feed-items-${dayKey}`);
+    const arrowEl = document.getElementById(`feed-arrow-${dayKey}`);
+    if (itemsEl) {
+      itemsEl.classList.toggle('collapsed', collapsedFeedDays.has(dayKey));
+    }
+    if (arrowEl) {
+      arrowEl.classList.toggle('collapsed', collapsedFeedDays.has(dayKey));
+    }
+  };
+
+  function getDayKey(dateStr) {
+    if (!dateStr) return 'unknown';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'unknown';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function formatDayHeader(dateStr) {
+    if (!dateStr) return 'Movimientos';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Movimientos';
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const itemStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+    const diffDays = Math.round((todayStart - itemStart) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Hoy';
+    } else if (diffDays === 1) {
+      return 'Ayer';
+    } else {
+      const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const diaNom = dias[d.getDay()];
+      const diaNum = d.getDate();
+      const mesNom = meses[d.getMonth()];
+
+      if (d.getFullYear() === now.getFullYear()) {
+        return `${diaNom}, ${diaNum} ${mesNom}`;
+      } else {
+        return `${diaNum} ${mesNom} ${d.getFullYear()}`;
+      }
+    }
   }
 
   function escapeHtml(str) {
@@ -1084,7 +1662,126 @@
     document.getElementById('login-email').value = savedEmail;
     document.getElementById('btn-login').click();
   }
+
+  // ===================================================
+  // Soporte PWA (Service Worker e Instalación en Móvil)
+  // ===================================================
+  let deferredInstallPrompt = null;
+  const isIosDevice = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+  const isStandaloneApp = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  // Registrar Service Worker si el navegador lo soporta y estamos bajo HTTP/HTTPS (no file://)
+  if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw-visor.js')
+        .then(reg => console.log('[SW-Visor] Registrado correctamente:', reg.scope))
+        .catch(err => console.warn('[SW-Visor] Error al registrar:', err));
+    });
+  }
+
+  function activarBotonesInstalacion() {
+    if (isStandaloneApp) return;
+    const banner = document.getElementById('pwa-install-banner');
+    const btnHeader = document.getElementById('btn-pwa-header');
+    const btnLogin = document.getElementById('btn-pwa-login');
+
+    if (banner && !sessionStorage.getItem('pwa_banner_dismissed')) {
+      banner.style.display = 'flex';
+    }
+    if (btnHeader) btnHeader.style.display = 'flex';
+    if (btnLogin) btnLogin.style.display = 'block';
+  }
+
+  // Capturar evento de instalación nativo en Android / Chrome
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    activarBotonesInstalacion();
+  });
+
+  // Si es iOS en navegador Safari y no está instalado como app, mostrar opciones
+  if (isIosDevice && !isStandaloneApp) {
+    setTimeout(activarBotonesInstalacion, 1200);
+  }
+
+  async function ejecutarInstalacionPWA() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        console.log('[PWA] Visor instalado por el usuario');
+        ocultarOpcionesInstalacion();
+      }
+      deferredInstallPrompt = null;
+    } else if (isIosDevice) {
+      const modal = document.getElementById('ios-pwa-modal');
+      if (modal) modal.style.display = 'flex';
+    } else {
+      alert('Para instalar el Visor: Pulsa el menú de tu navegador (los tres puntos ⋮ o Compartir) y elige "Instalar aplicación" o "Agregar a pantalla principal".');
+    }
+  }
+
+  function ocultarOpcionesInstalacion() {
+    const banner = document.getElementById('pwa-install-banner');
+    const btnHeader = document.getElementById('btn-pwa-header');
+    const btnLogin = document.getElementById('btn-pwa-login');
+    if (banner) banner.style.display = 'none';
+    if (btnHeader) btnHeader.style.display = 'none';
+    if (btnLogin) btnLogin.style.display = 'none';
+  }
+
+  document.getElementById('btn-pwa-banner-install')?.addEventListener('click', ejecutarInstalacionPWA);
+  document.getElementById('btn-pwa-header')?.addEventListener('click', ejecutarInstalacionPWA);
+  document.getElementById('btn-pwa-login')?.addEventListener('click', ejecutarInstalacionPWA);
+
+  document.getElementById('btn-pwa-banner-close')?.addEventListener('click', () => {
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner) banner.style.display = 'none';
+    sessionStorage.setItem('pwa_banner_dismissed', '1');
+  });
+
+  document.getElementById('btn-close-ios-modal')?.addEventListener('click', () => {
+    const modal = document.getElementById('ios-pwa-modal');
+    if (modal) modal.style.display = 'none';
+  });
+
+  window.addEventListener('appinstalled', () => {
+    console.log('[PWA] Visor instalado con éxito');
+    ocultarOpcionesInstalacion();
+    deferredInstallPrompt = null;
+  });
 </script>
+
+<!-- Banner flotante de instalación PWA -->
+<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
+  <div class="pwa-banner-content">
+    <div class="pwa-banner-icon">💧</div>
+    <div class="pwa-banner-text">
+      <strong>Instalar Visor Móvil</strong>
+      <span>Acceso rápido sin barra de navegador</span>
+    </div>
+  </div>
+  <div class="pwa-banner-actions">
+    <button id="btn-pwa-banner-install" class="btn-pwa-action">Instalar</button>
+    <button id="btn-pwa-banner-close" class="btn-pwa-dismiss" title="Cerrar">✕</button>
+  </div>
+</div>
+
+<!-- Modal de instrucciones para iPhone / iOS -->
+<div id="ios-pwa-modal" class="ios-modal-overlay" style="display: none;">
+  <div class="ios-modal-card">
+    <div style="font-size: 2.2rem; margin-bottom: 8px;">📲</div>
+    <h3 style="color: #fff; font-size: 1.1rem; margin-bottom: 8px; font-weight: 800;">Instalar en tu iPhone</h3>
+    <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px;">
+      Para tener el Visor como una aplicación nativa en tu pantalla de inicio:
+    </p>
+    <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; color: #E2E8F0; margin-bottom: 16px; border: 1px solid var(--border);">
+      <div style="margin-bottom: 10px;">1️⃣ Toca el botón <strong>Compartir</strong> <span style="font-size: 1.1rem;">📤</span> en la barra inferior de Safari.</div>
+      <div>2️⃣ Desliza hacia abajo y pulsa <strong>"Agregar al inicio"</strong> <span style="font-size: 1.1rem;">➕</span>.</div>
+    </div>
+    <button id="btn-close-ios-modal" class="btn btn-primary" style="width: 100%;">Entendido</button>
+  </div>
+</div>
 
 </body>
 </html>
