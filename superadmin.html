@@ -25,6 +25,21 @@
       --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
     }
 
+    @keyframes pulseDot {
+      0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background: #10B981;
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulseDot 1.6s infinite;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -543,10 +558,10 @@
         <div class="metric-value" id="m-ingresos-mes">$0</div>
         <div class="metric-subtitle">En planes de $15/mes</div>
       </div>
-      <div class="metric-card" style="background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #8B5CF6;">
-        <div class="metric-label">Visor Móvil Activos</div>
-        <div class="metric-value" id="m-visores-conectados" style="color: #8B5CF6;">0</div>
-        <div class="metric-subtitle" id="m-visores-sub">0 instalados como App</div>
+      <div class="metric-card" style="background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #10B981;">
+        <div class="metric-label" style="display:flex; align-items:center; gap:6px;">🟢 Usuarios Visor en Vivo</div>
+        <div class="metric-value" id="m-visores-conectados" style="color: #10B981;">0</div>
+        <div class="metric-subtitle" id="m-visores-sub">0 en línea ahora · 0 Apps instaladas</div>
       </div>
     </div>
 
@@ -556,6 +571,7 @@
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
         <select id="filter-status" class="form-control" style="width: auto; height: 42px;">
           <option value="todos">Todos los Estados</option>
+          <option value="en_linea">🟢 Conectados en Vivo Ahora</option>
           <option value="activos">🟢 Solo Activos</option>
           <option value="por_vencer">🟡 Por Vencer (&le; 15 días)</option>
           <option value="vencidos">🔴 Vencidos / Suspendidos</option>
@@ -652,15 +668,28 @@
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  let adminLiveRefreshInterval = null;
+
   // Comprobar autenticación
   function checkAuth() {
     if (sessionStorage.getItem('superadmin_unlocked') === 'true') {
       document.getElementById('auth-overlay').style.display = 'none';
       document.getElementById('admin-app').style.display = 'block';
       cargarClientes();
+      if (!adminLiveRefreshInterval) {
+        adminLiveRefreshInterval = setInterval(() => {
+          if (!document.hidden && sessionStorage.getItem('superadmin_unlocked') === 'true') {
+            cargarClientes(true);
+          }
+        }, 20000);
+      }
     } else {
       document.getElementById('auth-overlay').style.display = 'flex';
       document.getElementById('admin-app').style.display = 'none';
+      if (adminLiveRefreshInterval) {
+        clearInterval(adminLiveRefreshInterval);
+        adminLiveRefreshInterval = null;
+      }
       setTimeout(() => {
         const inp = document.getElementById('input-admin-auth-pwd');
         if (inp) inp.focus();
@@ -699,8 +728,24 @@
     setTimeout(() => { toast.remove(); }, 3500);
   }
 
+  // Helper para obtener sesiones activas en los últimos 90 segundos
+  function getSesionesOnline(act, nowMs = Date.now()) {
+    if (!act || !act.sesiones || typeof act.sesiones !== 'object') return [];
+    const list = [];
+    Object.values(act.sesiones).forEach(s => {
+      if (s && s.last_seen) {
+        const diffSec = Math.round((nowMs - new Date(s.last_seen).getTime()) / 1000);
+        if (diffSec <= 90 && diffSec >= 0) {
+          list.push({ ...s, diffSec });
+        }
+      }
+    });
+    list.sort((a, b) => a.diffSec - b.diffSec);
+    return list;
+  }
+
   // Cargar Clientes desde Supabase
-  async function cargarClientes() {
+  async function cargarClientes(silencioso = false) {
     try {
       const res = await fetch(`${SUPABASE_URL}?order=created_at.desc`, {
         headers: {
@@ -713,17 +758,19 @@
       renderMetrics();
       renderClientes();
     } catch (e) {
-      showToast(`Error: ${e.message}`, 'error');
+      if (!silencioso) showToast(`Error: ${e.message}`, 'error');
     }
   }
 
   // Calcular métricas
   function renderMetrics() {
     const now = new Date();
+    const nowMs = now.getTime();
     let activas = 0;
     let porVencer = 0;
     let ingresosCloud = 0;
-    let visoresConectados = 0;
+    let totalUsuariosOnline = 0;
+    let tiendasOnline = 0;
     let visoresInstalados = 0;
 
     clientes.forEach(c => {
@@ -742,10 +789,14 @@
       }
 
       const act = c.visor_actividad;
-      if (act && act.ultimo_acceso) {
-        visoresConectados++;
+      if (act) {
         if (act.instalado || act.modo === 'App PWA') {
           visoresInstalados++;
+        }
+        const sesiones = getSesionesOnline(act, nowMs);
+        if (sesiones.length > 0) {
+          tiendasOnline++;
+          totalUsuariosOnline += sesiones.length;
         }
       }
     });
@@ -755,9 +806,19 @@
     document.getElementById('m-por-vencer').textContent = porVencer;
     document.getElementById('m-ingresos-mes').textContent = `$${ingresosCloud}`;
     const elVisCon = document.getElementById('m-visores-conectados');
-    if (elVisCon) elVisCon.textContent = visoresConectados;
+    if (elVisCon) {
+      elVisCon.innerHTML = totalUsuariosOnline > 0
+        ? `<span style="color: #10B981; display: inline-flex; align-items: center; gap: 6px;"><span class="pulse-dot"></span> ${totalUsuariosOnline}</span>`
+        : '0';
+    }
     const elVisSub = document.getElementById('m-visores-sub');
-    if (elVisSub) elVisSub.textContent = `${visoresInstalados} instalados como App`;
+    if (elVisSub) {
+      if (totalUsuariosOnline > 0) {
+        elVisSub.textContent = `${tiendasOnline} tienda(s) conectada(s) · ${visoresInstalados} Apps instaladas`;
+      } else {
+        elVisSub.textContent = `0 en línea ahora · ${visoresInstalados} Apps instaladas`;
+      }
+    }
   }
 
   // Helper para tiempos relativos amigables
@@ -795,6 +856,10 @@
       if (!matchText) return false;
 
       // Filtro de estado
+      if (filterStatus === 'en_linea') {
+        const sesiones = getSesionesOnline(c.visor_actividad, now.getTime());
+        return sesiones.length > 0;
+      }
       if (filterStatus === 'activos') return c.activo && !isExp;
       if (filterStatus === 'por_vencer') return c.activo && !isExp && diffDays <= 15;
       if (filterStatus === 'vencidos') return !c.activo || isExp;
@@ -843,12 +908,42 @@
       const msgWa = encodeURIComponent(`Hola ${c.nombre_empresa || 'amigo(a)'}, te saludamos de WaterApp. Tu licencia se encuentra próxima a renovar (${diffDays > 0 ? 'quedan ' + diffDays + ' días' : 'venció'}). ¿Deseas que te enviemos los datos de pago para la renovación?`);
       const waLink = c.telefono ? `https://wa.me/${c.telefono.replace(/[^0-9]/g, '')}?text=${msgWa}` : null;
 
-      // Telemetría de actividad en el Visor Móvil
+      // Telemetría y Presencia en Vivo del Visor Móvil
       const act = c.visor_actividad || {};
+      const sesionesOnline = getSesionesOnline(act, now.getTime());
+      const isOnline = sesionesOnline.length > 0;
       let visorActividadBadge = '';
       let visorActividadDetalle = '';
 
-      if (act && act.ultimo_acceso) {
+      if (isOnline) {
+        const cant = sesionesOnline.length;
+        visorActividadBadge = `<span class="badge" style="background:#D1FAE5; color:#065F46; border:1px solid #A7F3D0; font-size:0.7rem; padding: 3px 8px; display:inline-flex; align-items:center; gap:5px;"><span class="pulse-dot"></span> <strong>${cant} ${cant === 1 ? 'dispositivo en vivo' : 'dispositivos en vivo'}</strong></span>`;
+
+        const itemsHtml = sesionesOnline.map(s => {
+          const hace = s.diffSec < 10 ? 'hace unos seg.' : `hace ${s.diffSec}s`;
+          const icono = /iphone|ipad|android/i.test(s.plataforma || '') ? '📱' : '💻';
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0; border-bottom: 1px dashed #E2E8F0; font-size: 0.74rem;">
+              <span>${icono} <strong>${escapeHtml(s.plataforma || 'Móvil')}</strong> <span style="color:#64748B;">(${escapeHtml(s.modo || 'Web')})</span></span>
+              <span style="color:#10B981; font-weight:600; font-size:0.7rem;"><span class="pulse-dot" style="width:5px; height:5px;"></span> ${hace}</span>
+            </div>
+          `;
+        }).join('');
+
+        visorActividadDetalle = `
+          <div style="font-size: 0.76rem; color: #334155; margin-top: 5px; line-height: 1.4; background: #F0FDF4; border: 1px solid #BBF7D0; padding: 8px 10px; border-radius: 8px; width: 100%;">
+            <div style="font-weight:700; color:#166534; margin-bottom: 4px; display:flex; justify-content:space-between; align-items:center;">
+              <span>🟢 Conectado(s) Ahora (${cant})</span>
+              <span style="font-size:0.68rem; font-weight:normal; color:#15803D;">● Latido activo</span>
+            </div>
+            ${itemsHtml}
+            <div style="font-size:0.7rem; color:#64748B; margin-top: 5px; display:flex; justify-content:space-between;">
+              <span>📊 Total aperturas: <strong>${act.total_accesos || 1}</strong></span>
+              ${act.instalado ? '<span style="color:#166534; font-weight:600;">📲 App PWA Instalada</span>' : ''}
+            </div>
+          </div>
+        `;
+      } else if (act && act.ultimo_acceso) {
         const fUltimo = new Date(act.ultimo_acceso);
         const timeAgo = formatTimeAgo(fUltimo);
         const isInstalled = act.instalado || act.modo === 'App PWA';
@@ -862,7 +957,7 @@
             <div>📱 <strong>Dispositivo:</strong> ${escapeHtml(act.dispositivo || act.plataforma || 'Móvil')}</div>
             <div>🕒 <strong>Último ingreso:</strong> ${timeAgo} (${fUltimo.toLocaleDateString('es-VE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })})</div>
             ${act.fecha_instalacion ? `<div>⭐ <strong>Instalada el:</strong> ${new Date(act.fecha_instalacion).toLocaleDateString('es-VE', { day:'2-digit', month:'short', year:'numeric' })}</div>` : ''}
-            <div>📊 <strong>Total aperturas:</strong> ${act.total_accesos || 1} veces</div>
+            <div>📊 <strong>Total aperturas:</strong> ${act.total_accesos || 1} veces · <span style="color:#94A3B8;">⚪ Desconectado</span></div>
           </div>
         `;
       } else {

@@ -1107,18 +1107,20 @@
     }
   }
 
-  // Registrar actividad del visor en Supabase (Telemetría para superadmin)
-  async function registrarActividadVisor(email, evento = 'acceso') {
-    if (!email) return;
-
-    // Throttle de 2 minutos para no saturar si refresca constantemente
-    const lastReportKey = `visor_last_act_report_${email}`;
-    const lastReport = parseInt(sessionStorage.getItem(lastReportKey) || '0', 10);
-    const ahoraMs = Date.now();
-    if (evento === 'acceso' && (ahoraMs - lastReport < 120000)) {
-      return;
+  function obtenerDeviceIdVisor() {
+    let id = localStorage.getItem('visor_device_session_id');
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+      localStorage.setItem('visor_device_session_id', id);
     }
-    sessionStorage.setItem(lastReportKey, ahoraMs.toString());
+    return id;
+  }
+
+  let presenciaInterval = null;
+
+  // Registrar actividad y presencia en tiempo real del visor en Supabase
+  async function registrarActividadVisor(email, evento = 'heartbeat') {
+    if (!email) return;
 
     try {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -1129,12 +1131,11 @@
       else if (/windows/i.test(ua)) plataforma = 'Windows PC';
       else if (/macintosh|mac os x/i.test(ua)) plataforma = 'Mac';
 
-      // Navegador / PWA
       let navegador = 'Navegador';
       if (isStandalone) navegador = 'App PWA';
-      else if (ua.includes('Chrome')) navegador = 'Chrome Web';
-      else if (ua.includes('Safari')) navegador = 'Safari Web';
-      else if (ua.includes('Firefox')) navegador = 'Firefox Web';
+      else if (ua.includes('Chrome')) navegador = 'Chrome';
+      else if (ua.includes('Safari')) navegador = 'Safari';
+      else if (ua.includes('Firefox')) navegador = 'Firefox';
 
       const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(email)}&select=id,visor_actividad`, {
         headers: {
@@ -1149,7 +1150,33 @@
       const c = list[0];
       const prev = c.visor_actividad || {};
       const ahoraISO = new Date().toISOString();
+      const ahoraMs = Date.now();
+      const myDeviceId = obtenerDeviceIdVisor();
 
+      // Mantener mapa de sesiones activas (purgando inactivas > 90s)
+      const sesionesActivas = {};
+      if (prev.sesiones && typeof prev.sesiones === 'object') {
+        Object.entries(prev.sesiones).forEach(([sId, sData]) => {
+          if (sData && sData.last_seen) {
+            const diff = ahoraMs - new Date(sData.last_seen).getTime();
+            if (diff < 90000 && sId !== myDeviceId) {
+              sesionesActivas[sId] = sData;
+            }
+          }
+        });
+      }
+
+      // Actualizar la sesión de este dispositivo
+      sesionesActivas[myDeviceId] = {
+        id: myDeviceId,
+        plataforma: plataforma,
+        navegador: navegador,
+        modo: isStandalone ? 'App PWA' : 'Navegador Web',
+        dispositivo: `${plataforma} · ${isStandalone ? 'App PWA' : navegador}`,
+        last_seen: ahoraISO
+      };
+
+      const esNuevoIngreso = (evento === 'acceso');
       const nuevaActividad = {
         ...prev,
         instalado: (evento === 'instalado' || isStandalone || prev.instalado) ? true : false,
@@ -1159,8 +1186,9 @@
         dispositivo: `${plataforma} · ${isStandalone ? 'App PWA' : navegador}`,
         primer_acceso: prev.primer_acceso || ahoraISO,
         ultimo_acceso: ahoraISO,
-        total_accesos: (prev.total_accesos || 0) + 1,
-        fecha_instalacion: (evento === 'instalado' || (isStandalone && !prev.fecha_instalacion)) ? ahoraISO : (prev.fecha_instalacion || null)
+        total_accesos: (prev.total_accesos || 0) + (esNuevoIngreso ? 1 : 0),
+        fecha_instalacion: (evento === 'instalado' || (isStandalone && !prev.fecha_instalacion)) ? ahoraISO : (prev.fecha_instalacion || null),
+        sesiones: sesionesActivas
       };
 
       await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
@@ -1173,8 +1201,19 @@
         body: JSON.stringify({ visor_actividad: nuevaActividad })
       });
     } catch (e) {
-      console.warn('[Visor] Telemetría no enviada:', e);
+      console.warn('[Visor] Presencia no enviada:', e);
     }
+  }
+
+  function iniciarPresenciaEnVivo(email) {
+    if (presenciaInterval) clearInterval(presenciaInterval);
+    registrarActividadVisor(email, 'acceso');
+    // Latido cada 35 segundos para reportar presencia en línea
+    presenciaInterval = setInterval(() => {
+      if (!document.hidden && currentStoreEmail) {
+        registrarActividadVisor(currentStoreEmail, 'heartbeat');
+      }
+    }, 35000);
   }
 
   // Alternar ver clave (Ojito)
@@ -1232,8 +1271,8 @@
     currentStoreEmail = email;
     localStorage.setItem('visor_owner_email', email);
 
-    // Registrar actividad de acceso en Supabase
-    registrarActividadVisor(email, 'acceso');
+    // Iniciar presencia en vivo y telemetría de sesiones activas
+    iniciarPresenciaEnVivo(email);
 
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
@@ -1249,6 +1288,7 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && currentStoreEmail) {
       cargarDatosEnVivo();
+      registrarActividadVisor(currentStoreEmail, 'heartbeat');
     }
   });
 
@@ -1256,6 +1296,7 @@
   document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('visor_owner_email');
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    if (presenciaInterval) clearInterval(presenciaInterval);
     location.reload();
   });
 
