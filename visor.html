@@ -1107,6 +1107,76 @@
     }
   }
 
+  // Registrar actividad del visor en Supabase (Telemetría para superadmin)
+  async function registrarActividadVisor(email, evento = 'acceso') {
+    if (!email) return;
+
+    // Throttle de 2 minutos para no saturar si refresca constantemente
+    const lastReportKey = `visor_last_act_report_${email}`;
+    const lastReport = parseInt(sessionStorage.getItem(lastReportKey) || '0', 10);
+    const ahoraMs = Date.now();
+    if (evento === 'acceso' && (ahoraMs - lastReport < 120000)) {
+      return;
+    }
+    sessionStorage.setItem(lastReportKey, ahoraMs.toString());
+
+    try {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      const ua = navigator.userAgent;
+      let plataforma = 'PC / Web';
+      if (/iphone|ipad|ipod/i.test(ua)) plataforma = 'iPhone (iOS)';
+      else if (/android/i.test(ua)) plataforma = 'Android';
+      else if (/windows/i.test(ua)) plataforma = 'Windows PC';
+      else if (/macintosh|mac os x/i.test(ua)) plataforma = 'Mac';
+
+      // Navegador / PWA
+      let navegador = 'Navegador';
+      if (isStandalone) navegador = 'App PWA';
+      else if (ua.includes('Chrome')) navegador = 'Chrome Web';
+      else if (ua.includes('Safari')) navegador = 'Safari Web';
+      else if (ua.includes('Firefox')) navegador = 'Firefox Web';
+
+      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(email)}&select=id,visor_actividad`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!list || list.length === 0) return;
+
+      const c = list[0];
+      const prev = c.visor_actividad || {};
+      const ahoraISO = new Date().toISOString();
+
+      const nuevaActividad = {
+        ...prev,
+        instalado: (evento === 'instalado' || isStandalone || prev.instalado) ? true : false,
+        modo: isStandalone ? 'App PWA' : 'Navegador Web',
+        plataforma: plataforma,
+        navegador: navegador,
+        dispositivo: `${plataforma} · ${isStandalone ? 'App PWA' : navegador}`,
+        primer_acceso: prev.primer_acceso || ahoraISO,
+        ultimo_acceso: ahoraISO,
+        total_accesos: (prev.total_accesos || 0) + 1,
+        fecha_instalacion: (evento === 'instalado' || (isStandalone && !prev.fecha_instalacion)) ? ahoraISO : (prev.fecha_instalacion || null)
+      };
+
+      await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ visor_actividad: nuevaActividad })
+      });
+    } catch (e) {
+      console.warn('[Visor] Telemetría no enviada:', e);
+    }
+  }
+
   // Alternar ver clave (Ojito)
   const btnTogglePwd = document.getElementById('btn-toggle-pwd');
   const loginPwd = document.getElementById('login-pwd');
@@ -1161,6 +1231,9 @@
     // Comprobación de acceso aprobada
     currentStoreEmail = email;
     localStorage.setItem('visor_owner_email', email);
+
+    // Registrar actividad de acceso en Supabase
+    registrarActividadVisor(email, 'acceso');
 
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
@@ -1820,6 +1893,10 @@
     console.log('[PWA] Visor instalado con éxito');
     ocultarOpcionesInstalacion();
     deferredInstallPrompt = null;
+    const emailToReport = currentStoreEmail || localStorage.getItem('visor_owner_email');
+    if (emailToReport) {
+      registrarActividadVisor(emailToReport, 'instalado');
+    }
   });
 </script>
 
