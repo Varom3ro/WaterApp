@@ -376,11 +376,70 @@
       border-top: 1px solid var(--border);
     }
 
-    .client-actions-sub {
-      display: flex;
-      justify-content: space-between;
+    .client-actions-status {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-top: 8px;
+    }
+
+    .client-actions-sub {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      width: 100%;
+    }
+
+    .client-actions-sub .btn {
+      white-space: nowrap;
+    }
+
+    .btn-icon {
+      width: 36px;
+      min-width: 36px;
+      height: 34px;
+      padding: 0 !important;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+    }
+
+    .btn-wa {
+      background: #25D366;
+      color: white !important;
+      border: 1px solid #25D366;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-wa:hover {
+      background: #20BA56;
+      color: white !important;
+    }
+
+    @media (max-width: 768px) {
+      .clients-grid {
+        grid-template-columns: 1fr;
+      }
+      .client-card {
+        padding: 1.15rem;
+      }
+      .client-actions, .client-actions-status {
+        gap: 6px;
+      }
+      .btn-sm {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+      }
+      .header-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
     }
 
     /* Modales */
@@ -1038,30 +1097,32 @@
               </button>
             </div>
 
-            <div class="client-actions-sub">
-              <button class="btn btn-sm ${c.activo ? 'btn-warning' : 'btn-success'}" onclick="toggleActivo('${c.id}', ${!c.activo})" title="${c.activo ? 'Suspender acceso a todo el sistema' : 'Reactivar acceso al sistema'}">
-                ${c.activo ? '⏸️ Suspender Todo' : '▶️ Reactivar'}
+            <div class="client-actions-status">
+              <button class="btn btn-sm ${c.activo ? 'btn-warning' : 'btn-success'}" onclick="toggleActivo('${c.id}', ${!c.activo})" title="${c.activo ? 'Suspender acceso general' : 'Reactivar acceso general'}">
+                ${c.activo ? '⏸️ Suspender' : '▶️ Reactivar'}
               </button>
 
               <button class="btn btn-sm ${(c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'btn-success' : 'btn-secondary'}" onclick="toggleVisorBloqueo('${c.id}')" title="${(c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'Habilitar acceso al visor móvil' : 'Bloquear acceso al visor móvil'}">
                 ${(c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? '📱 Habilitar Visor' : '🚫 Bloquear Visor'}
               </button>
-              
+            </div>
+
+            <div class="client-actions-sub">
               ${waLink ? `
-                <a href="${waLink}" target="_blank" class="btn btn-sm btn-secondary" style="background:#25D366; color:white; border-color:#25D366;" title="Enviar WhatsApp">
+                <a href="${waLink}" target="_blank" class="btn btn-sm btn-wa" title="Enviar WhatsApp al cliente">
                   💬 WhatsApp
                 </a>
               ` : ''}
 
-              <a href="admin-catalogo.html" class="btn btn-sm btn-secondary" title="Configurar productos">
+              <a href="admin-catalogo.html" class="btn btn-sm btn-secondary" style="flex: 1; justify-content: center; display: inline-flex; align-items: center; gap: 4px;" title="Configurar catálogo de productos">
                 📦 Catálogo
               </a>
 
-              <button class="btn btn-sm btn-secondary" onclick="abrirEditarCliente('${c.id}')" title="Editar datos">
+              <button class="btn btn-sm btn-secondary btn-icon" onclick="abrirEditarCliente('${c.id}')" title="Editar datos del cliente">
                 ✏️
               </button>
 
-              <button class="btn btn-sm btn-danger" onclick="eliminarCliente('${c.id}', '${escapeHtml(c.email)}')" title="Eliminar cliente">
+              <button class="btn btn-sm btn-danger btn-icon" onclick="eliminarCliente('${c.id}', '${escapeHtml(c.email)}')" title="Eliminar cliente">
                 🗑️
               </button>
             </div>
