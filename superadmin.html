@@ -543,6 +543,11 @@
         <div class="metric-value" id="m-ingresos-mes">$0</div>
         <div class="metric-subtitle">En planes de $15/mes</div>
       </div>
+      <div class="metric-card" style="background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #8B5CF6;">
+        <div class="metric-label">Visor Móvil Activos</div>
+        <div class="metric-value" id="m-visores-conectados" style="color: #8B5CF6;">0</div>
+        <div class="metric-subtitle" id="m-visores-sub">0 instalados como App</div>
+      </div>
     </div>
 
     <!-- Toolbar / Buscador -->
@@ -554,6 +559,9 @@
           <option value="activos">🟢 Solo Activos</option>
           <option value="por_vencer">🟡 Por Vencer (&le; 15 días)</option>
           <option value="vencidos">🔴 Vencidos / Suspendidos</option>
+          <option value="visor_instalado">📲 Visor Instalado (App)</option>
+          <option value="visor_web">🌐 Visor en Navegador</option>
+          <option value="visor_sin_acceso">⚪ Sin uso del Visor</option>
         </select>
         <button id="btn-refresh" class="btn btn-secondary" title="Recargar datos">
           🔄 Refrescar
@@ -715,6 +723,8 @@
     let activas = 0;
     let porVencer = 0;
     let ingresosCloud = 0;
+    let visoresConectados = 0;
+    let visoresInstalados = 0;
 
     clientes.forEach(c => {
       const reg = new Date(c.fecha_registro);
@@ -730,12 +740,39 @@
       if (c.plan === 'cloud_mensual' && c.activo && !isExp) {
         ingresosCloud += 15;
       }
+
+      const act = c.visor_actividad;
+      if (act && act.ultimo_acceso) {
+        visoresConectados++;
+        if (act.instalado || act.modo === 'App PWA') {
+          visoresInstalados++;
+        }
+      }
     });
 
     document.getElementById('m-total-clientes').textContent = clientes.length;
     document.getElementById('m-activas').textContent = activas;
     document.getElementById('m-por-vencer').textContent = porVencer;
     document.getElementById('m-ingresos-mes').textContent = `$${ingresosCloud}`;
+    const elVisCon = document.getElementById('m-visores-conectados');
+    if (elVisCon) elVisCon.textContent = visoresConectados;
+    const elVisSub = document.getElementById('m-visores-sub');
+    if (elVisSub) elVisSub.textContent = `${visoresInstalados} instalados como App`;
+  }
+
+  // Helper para tiempos relativos amigables
+  function formatTimeAgo(date) {
+    if (!date || isNaN(date.getTime())) return 'N/A';
+    const diffSec = Math.round((new Date() - date) / 1000);
+    if (diffSec < 60) return 'Hace un momento';
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) return `Hace ${diffMin} min`;
+    const diffHours = Math.round(diffMin / 60);
+    if (diffHours < 24) return `Hace ${diffHours} h`;
+    const diffDays = Math.round(diffHours / 24);
+    if (diffDays === 1) return 'Ayer';
+    if (diffDays < 30) return `Hace ${diffDays} días`;
+    return date.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
   }
 
   // Renderizar Clientes
@@ -761,6 +798,9 @@
       if (filterStatus === 'activos') return c.activo && !isExp;
       if (filterStatus === 'por_vencer') return c.activo && !isExp && diffDays <= 15;
       if (filterStatus === 'vencidos') return !c.activo || isExp;
+      if (filterStatus === 'visor_instalado') return c.visor_actividad && (c.visor_actividad.instalado || c.visor_actividad.modo === 'App PWA');
+      if (filterStatus === 'visor_web') return c.visor_actividad && c.visor_actividad.ultimo_acceso && !c.visor_actividad.instalado && c.visor_actividad.modo !== 'App PWA';
+      if (filterStatus === 'visor_sin_acceso') return !c.visor_actividad || !c.visor_actividad.ultimo_acceso;
 
       return true;
     });
@@ -803,6 +843,37 @@
       const msgWa = encodeURIComponent(`Hola ${c.nombre_empresa || 'amigo(a)'}, te saludamos de WaterApp. Tu licencia se encuentra próxima a renovar (${diffDays > 0 ? 'quedan ' + diffDays + ' días' : 'venció'}). ¿Deseas que te enviemos los datos de pago para la renovación?`);
       const waLink = c.telefono ? `https://wa.me/${c.telefono.replace(/[^0-9]/g, '')}?text=${msgWa}` : null;
 
+      // Telemetría de actividad en el Visor Móvil
+      const act = c.visor_actividad || {};
+      let visorActividadBadge = '';
+      let visorActividadDetalle = '';
+
+      if (act && act.ultimo_acceso) {
+        const fUltimo = new Date(act.ultimo_acceso);
+        const timeAgo = formatTimeAgo(fUltimo);
+        const isInstalled = act.instalado || act.modo === 'App PWA';
+
+        visorActividadBadge = isInstalled
+          ? '<span class="badge badge-success" style="font-size:0.68rem; padding: 2px 7px;">📲 App Instalada</span>'
+          : '<span class="badge badge-info" style="font-size:0.68rem; padding: 2px 7px;">🌐 En Navegador</span>';
+
+        visorActividadDetalle = `
+          <div style="font-size: 0.76rem; color: #475569; margin-top: 4px; line-height: 1.45; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 6px 10px; border-radius: 8px; width: 100%;">
+            <div>📱 <strong>Dispositivo:</strong> ${escapeHtml(act.dispositivo || act.plataforma || 'Móvil')}</div>
+            <div>🕒 <strong>Último ingreso:</strong> ${timeAgo} (${fUltimo.toLocaleDateString('es-VE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })})</div>
+            ${act.fecha_instalacion ? `<div>⭐ <strong>Instalada el:</strong> ${new Date(act.fecha_instalacion).toLocaleDateString('es-VE', { day:'2-digit', month:'short', year:'numeric' })}</div>` : ''}
+            <div>📊 <strong>Total aperturas:</strong> ${act.total_accesos || 1} veces</div>
+          </div>
+        `;
+      } else {
+        visorActividadBadge = '<span class="badge" style="background:#F1F5F9; color:#94A3B8; border:1px solid #E2E8F0; font-size:0.68rem; padding: 2px 7px;">⚪ Sin accesos</span>';
+        visorActividadDetalle = `
+          <div style="font-size: 0.74rem; color: #94A3B8; margin-top: 3px; font-style: italic;">
+            El cliente aún no ha abierto el enlace del visor.
+          </div>
+        `;
+      }
+
       return `
         <div class="client-card">
           <div>
@@ -842,11 +913,17 @@
                   <span class="client-info-val">${escapeHtml(c.telefono)}</span>
                 </li>
               ` : ''}
-              <li class="client-info-item" style="margin-top: 4px;">
-                <span class="client-info-label">Visor Móvil:</span>
-                <span class="client-info-val" style="font-weight: 700; color: ${!c.activo ? 'var(--danger)' : ((c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'var(--warning)' : 'var(--accent)')};">
-                  ${!c.activo ? '🔴 Suspendido (General)' : ((c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? '🚫 Bloqueado' : '🟢 Habilitado')}
-                </span>
+              <li class="client-info-item" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); flex-direction: column; align-items: flex-start; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                  <span class="client-info-label" style="font-weight: 700; color: #1E293B;">Visor Móvil:</span>
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <span style="font-weight: 700; font-size: 0.72rem; color: ${!c.activo ? 'var(--danger)' : ((c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? 'var(--warning)' : 'var(--accent)')};">
+                      ${!c.activo ? '🔴 Suspendido' : ((c.notas && c.notas.includes('[BLOQUEO_VISOR]')) ? '🚫 Bloqueado' : '🟢 Activo')}
+                    </span>
+                    ${visorActividadBadge}
+                  </div>
+                </div>
+                ${visorActividadDetalle}
               </li>
               ${c.notas ? `
                 <li style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
