@@ -805,13 +805,13 @@
     <div class="card-login">
       <div class="form-group">
         <label class="form-label">Correo de tu Tienda / Planta</label>
-        <input type="email" id="login-email" class="form-control" placeholder="ejemplo@correo.com" value="viritoco@gmail.com" />
+        <input type="email" id="login-email" class="form-control" placeholder="ejemplo@correo.com" value="" autocomplete="email" />
       </div>
 
       <div class="form-group">
         <label class="form-label">Clave de Acceso</label>
         <div style="position: relative; display: flex; align-items: center;">
-          <input type="password" id="login-pwd" class="form-control" placeholder="Introduce tu clave" value="admin" style="padding-right: 46px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()"/>
+          <input type="password" id="login-pwd" class="form-control" placeholder="Introduce tu clave" value="" autocomplete="current-password" style="padding-right: 46px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()"/>
           <button type="button" id="btn-toggle-pwd" style="position: absolute; right: 12px; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center; justify-content: center;" title="Mostrar / Ocultar clave">
             👁️
           </button>
@@ -1074,8 +1074,8 @@
   let currentStoreEmail = '';
   let autoRefreshInterval = null;
 
-  // Verificación de estado de cuenta y licencia en tiempo real (controlado desde superadmin.html)
-  async function verificarLicencia(email) {
+  // Verificación de estado de cuenta, licencia y clave en tiempo real (controlado desde superadmin.html)
+  async function verificarLicencia(email, pwd = null) {
     try {
       const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(email)}`, {
         headers: {
@@ -1099,6 +1099,12 @@
       }
       if (c.notas && c.notas.includes('[BLOQUEO_VISOR]')) {
         return { ok: false, razon: '📱 El acceso al Visor Móvil para esta cuenta ha sido deshabilitado.' };
+      }
+      if (pwd !== null) {
+        const claveConfigurada = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : 'admin';
+        if (pwd !== claveConfigurada) {
+          return { ok: false, razon: '🔑 Clave de acceso incorrecta. Verifica la clave suministrada.' };
+        }
       }
       return { ok: true, cliente: c };
     } catch (e) {
@@ -1125,8 +1131,9 @@
     try {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
       const ua = navigator.userAgent;
-      let plataforma = 'PC / Web';
-      if (/iphone|ipad|ipod/i.test(ua)) plataforma = 'iPhone (iOS)';
+      let plataforma = 'Desconocido';
+      if (/iphone/i.test(ua)) plataforma = 'iPhone';
+      else if (/ipad/i.test(ua)) plataforma = 'iPad';
       else if (/android/i.test(ua)) plataforma = 'Android';
       else if (/windows/i.test(ua)) plataforma = 'Windows PC';
       else if (/macintosh|mac os x/i.test(ua)) plataforma = 'Mac';
@@ -1180,9 +1187,9 @@
       const nuevaActividad = {
         ...prev,
         instalado: (evento === 'instalado' || isStandalone || prev.instalado) ? true : false,
-        modo: isStandalone ? 'App PWA' : 'Navegador Web',
         plataforma: plataforma,
         navegador: navegador,
+        modo: isStandalone ? 'App PWA' : 'Navegador Web',
         dispositivo: `${plataforma} · ${isStandalone ? 'App PWA' : navegador}`,
         primer_acceso: prev.primer_acceso || ahoraISO,
         ultimo_acceso: ahoraISO,
@@ -1246,14 +1253,22 @@
       return;
     }
 
+    if (!pwd) {
+      if (errorBox) {
+        errorBox.textContent = '⚠️ Introduce tu clave de acceso.';
+        errorBox.style.display = 'block';
+      }
+      return;
+    }
+
     if (errorBox) errorBox.style.display = 'none';
 
     btn.disabled = true;
     const btnOriginalText = btn.textContent;
     btn.textContent = '⏳ Verificando acceso...';
 
-    // Verificación de Licencia y Estado de la Cuenta
-    const licCheck = await verificarLicencia(email);
+    // Verificación de Licencia, Estado de la Cuenta y Clave
+    const licCheck = await verificarLicencia(email, pwd);
     if (!licCheck.ok) {
       btn.disabled = false;
       btn.textContent = btnOriginalText;
@@ -1270,6 +1285,7 @@
     // Comprobación de acceso aprobada
     currentStoreEmail = email;
     localStorage.setItem('visor_owner_email', email);
+    localStorage.setItem('visor_owner_pwd', pwd);
 
     // Iniciar presencia en vivo y telemetría de sesiones activas
     iniciarPresenciaEnVivo(email);
@@ -1295,6 +1311,7 @@
   // Logout
   document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('visor_owner_email');
+    localStorage.removeItem('visor_owner_pwd');
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     if (presenciaInterval) clearInterval(presenciaInterval);
     location.reload();
@@ -1841,10 +1858,12 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Auto-login si ya inició sesión antes
+  // Auto-login solo si este dispositivo ya inició sesión exitosamente en el pasado
   const savedEmail = localStorage.getItem('visor_owner_email');
-  if (savedEmail) {
+  const savedPwd = localStorage.getItem('visor_owner_pwd');
+  if (savedEmail && savedPwd) {
     document.getElementById('login-email').value = savedEmail;
+    document.getElementById('login-pwd').value = savedPwd;
     document.getElementById('btn-login').click();
   }
 

@@ -673,9 +673,19 @@
         <input type="email" id="input-email" class="form-control" placeholder="ejemplo@correo.com" required />
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Teléfono / WhatsApp de Contacto</label>
-        <input type="tel" id="input-telefono" class="form-control" placeholder="Ej: +58 412 1234567" />
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">Teléfono / WhatsApp</label>
+          <input type="tel" id="input-telefono" class="form-control" placeholder="Ej: +58 412 1234567" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">🔑 Clave Visor Móvil *</label>
+          <input type="text" id="input-clave-visor" class="form-control" placeholder="Ej: 1234" value="1234" required />
+        </div>
+      </div>
+      <div style="font-size:0.75rem; color:var(--text-muted); margin-top: -8px; margin-bottom: 12px;">
+        Esta es la clave que le suministrarás al cliente para que ingrese desde su teléfono.
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -964,7 +974,9 @@
       const pct = Math.max(0, Math.min(100, Math.round((diffDays / (c.dias_prueba || 365)) * 100)));
 
       // Mensaje de WhatsApp
-      const msgWa = encodeURIComponent(`Hola ${c.nombre_empresa || 'amigo(a)'}, te saludamos de WaterApp. Tu licencia se encuentra próxima a renovar (${diffDays > 0 ? 'quedan ' + diffDays + ' días' : 'venció'}). ¿Deseas que te enviemos los datos de pago para la renovación?`);
+      const msgWa = diffDays <= 15
+        ? encodeURIComponent(`Hola ${c.nombre_empresa || 'amigo(a)'}, te saludamos de WaterApp. Tu licencia se encuentra próxima a renovar (${diffDays > 0 ? 'quedan ' + diffDays + ' días' : 'venció'}). ¿Deseas que te enviemos los datos de pago para la renovación?`)
+        : encodeURIComponent(`Hola ${c.nombre_empresa || 'amigo(a)'}, te saludamos de WaterApp. Puedes acceder a tu Visor Móvil desde: https://varom3ro.github.io/WaterApp/visor.html con tu correo: ${c.email} y clave de acceso: ${c.clave_visor || 'admin'}`);
       const waLink = c.telefono ? `https://wa.me/${c.telefono.replace(/[^0-9]/g, '')}?text=${msgWa}` : null;
 
       // Telemetría y Presencia en Vivo del Visor Móvil
@@ -1067,6 +1079,12 @@
                   <span class="client-info-val">${escapeHtml(c.telefono)}</span>
                 </li>
               ` : ''}
+              <li class="client-info-item" style="margin-top: 4px;">
+                <span class="client-info-label">🔑 Clave Visor:</span>
+                <span class="client-info-val" style="font-weight: 700; font-family: monospace; background: #EEF2F6; padding: 2px 7px; border-radius: 4px; color: #1E293B;">
+                  ${escapeHtml(c.clave_visor || 'admin')}
+                </span>
+              </li>
               <li class="client-info-item" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); flex-direction: column; align-items: flex-start; gap: 4px;">
                 <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                   <span class="client-info-label" style="font-weight: 700; color: #1E293B;">Visor Móvil:</span>
@@ -1243,6 +1261,7 @@
     document.getElementById('input-empresa').value = '';
     document.getElementById('input-email').value = '';
     document.getElementById('input-telefono').value = '';
+    document.getElementById('input-clave-visor').value = '1234';
     document.getElementById('select-plan').value = 'local_anual';
     document.getElementById('input-dias').value = '365';
     document.getElementById('input-notas').value = '';
@@ -1258,6 +1277,7 @@
     document.getElementById('input-empresa').value = c.nombre_empresa || '';
     document.getElementById('input-email').value = c.email || '';
     document.getElementById('input-telefono').value = c.telefono || '';
+    document.getElementById('input-clave-visor').value = c.clave_visor || 'admin';
     document.getElementById('select-plan').value = c.plan || 'local_anual';
     document.getElementById('input-dias').value = c.dias_prueba || 365;
     document.getElementById('input-notas').value = c.notas || '';
@@ -1282,6 +1302,7 @@
     const empresa = document.getElementById('input-empresa').value.trim();
     const email = document.getElementById('input-email').value.trim().toLowerCase();
     const telefono = document.getElementById('input-telefono').value.trim();
+    const claveVisor = document.getElementById('input-clave-visor').value.trim() || 'admin';
     const plan = document.getElementById('select-plan').value;
     const dias = parseInt(document.getElementById('input-dias').value) || 365;
     const notas = document.getElementById('input-notas').value.trim();
@@ -1304,6 +1325,7 @@
             nombre_empresa: empresa,
             email,
             telefono,
+            clave_visor: claveVisor,
             plan,
             dias_prueba: dias,
             notas
@@ -1324,6 +1346,7 @@
             nombre_empresa: empresa,
             email,
             telefono,
+            clave_visor: claveVisor,
             plan,
             dias_prueba: dias,
             notas,
