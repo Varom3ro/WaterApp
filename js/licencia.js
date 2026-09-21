@@ -9,6 +9,14 @@ const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
 export const Licencia = {
+  isDev() {
+    const host = window.location.hostname;
+    return ['localhost', '127.0.0.1'].includes(host) ||
+           host.startsWith('192.168.') ||
+           host.startsWith('10.') ||
+           host.startsWith('172.');
+  },
+
   // Identificador único persistente para este navegador / equipo
   getDeviceId() {
     let deviceId = localStorage.getItem('waterapp_device_uuid');
@@ -34,7 +42,7 @@ export const Licencia = {
         const checkLocal = localStorage.getItem('licencia_usuario');
         if (checkLocal) {
           const u = JSON.parse(checkLocal);
-          if (u.device_id && u.device_id !== localDeviceId) return false;
+          if (!this.isDev() && u.device_id && u.device_id !== localDeviceId) return false;
           if (!u.activo || this._checkExpirado(u.fecha_registro, u.dias_prueba)) return false;
         }
       }
@@ -43,7 +51,7 @@ export const Licencia = {
       const freshUser = JSON.parse(freshLocal);
 
       // Verificación de seguridad local/offline de dispositivo
-      if (freshUser.device_id && freshUser.device_id !== localDeviceId) {
+      if (!this.isDev() && freshUser.device_id && freshUser.device_id !== localDeviceId) {
         this.bloquearDispositivoNoAutorizado(freshUser);
         return false;
       }
@@ -81,7 +89,9 @@ export const Licencia = {
           const localDeviceId = this.getDeviceId();
 
           // 🛡️ BLINDAJE POR DISPOSITIVO ÚNICO (Opción A):
-          if (!user.device_id) {
+          if (this.isDev()) {
+            console.log('[Licencia] 🛠️ Entorno localhost/desarrollo: bloqueo de dispositivo omitido.');
+          } else if (!user.device_id) {
             // El usuario no tiene equipo registrado aún (o el admin lo reseteó a null en Supabase).
             // Vincular automáticamente este equipo actual como el oficial de la tienda.
             const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Vinculado: ${new Date().toISOString()}`;
@@ -249,14 +259,14 @@ export const Licencia = {
           user = data[0];
 
           // 🛡️ Verificar si ya está vinculado a otro equipo
-          if (user.device_id && user.device_id !== localDeviceId) {
+          if (!this.isDev() && user.device_id && user.device_id !== localDeviceId) {
             if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
             this.bloquearDispositivoNoAutorizado(user);
             return;
           }
 
           // Si el device_id está libre (nuevo o reseteado desde Supabase por el admin)
-          if (!user.device_id) {
+          if (!this.isDev() && !user.device_id) {
             const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Vinculado: ${new Date().toISOString()}`;
             await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
               method: 'PATCH',
