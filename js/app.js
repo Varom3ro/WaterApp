@@ -4,6 +4,7 @@
 
 import { router } from './router.js';
 import { store } from './store.js';
+import { Utils } from './utils.js';
 import { renderSidebar } from './components/sidebar.js';
 import { renderHeader } from './components/header.js';
 import { Licencia } from './licencia.js';
@@ -23,6 +24,11 @@ class App {
         this.init();
     }
 
+    updateTitle() {
+        const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+        document.title = `${empresaNombre} - Gestión de Agua v${Utils.VERSION}`;
+    }
+
     async init() {
         // Validar licencia de prueba antes de cualquier otra cosa
         const licenciaValida = await Licencia.validar();
@@ -30,6 +36,7 @@ class App {
 
         await store.init();
         window.__app_store = store;
+        this.updateTitle();
         Licencia.aplicarCatalogoRemotoSiExiste(store);
         syncToCloud();
 
@@ -44,10 +51,12 @@ class App {
         // Start router
         router.init('app-content');
         syncToCloud();
+        this.updateTitle();
 
         // Update active state on route change
         window.addEventListener('hashchange', () => {
             this.updateActiveLink();
+            this.updateTitle();
             syncToCloud();
         });
         this.updateActiveLink();
@@ -141,12 +150,11 @@ class App {
             <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
             <div class="main-wrapper">
               <div id="sidebar-open-bar" class="sidebar-open-bar">
-                <button id="btn-open-sidebar" class="btn-open-sidebar-header" type="button" title="Mostrar barra lateral (Ctrl+B)">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <button id="btn-open-sidebar" class="btn-open-sidebar-header" type="button" title="Abrir Menú Lateral (Ctrl+B)">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="9" y1="3" x2="9" y2="21"></line>
                   </svg>
-                  <span>Barra lateral</span>
                 </button>
               </div>
               <main class="main-content" id="app-content">

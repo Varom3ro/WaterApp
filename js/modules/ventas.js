@@ -57,7 +57,7 @@ export function renderVentas(container, showFichas = true) {
               <th>Tipo</th>
               <th>Pago</th>
               <th>Entrega</th>
-              <th>Acciones</th>
+              ${showFichas ? '<th>Acciones</th>' : ''}
             </tr>
           </thead>
           <tbody id="ventas-tbody"></tbody>
@@ -80,6 +80,7 @@ function renderVentasTable() {
   const tbody = document.getElementById('ventas-tbody');
   const emptyDiv = document.getElementById('ventas-empty');
   const fichasContainer = document.getElementById('ventas-totales-fichas');
+  const showAcciones = !!fichasContainer;
   if (!tbody) return;
 
   let ventas = store.getAll('ventas').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -402,16 +403,20 @@ function renderVentasTable() {
             </div>
           ` : `<span class="badge badge-success" style="font-size: 0.75em;">✅ Entregado</span>`}
         </td>
-        <td>
-          <button class="btn btn-sm btn-secondary btn-delete-venta" data-id="${v.id}" title="Eliminar">🗑️</button>
-        </td>
+        ${showAcciones ? `
+          <td>
+            <button class="btn btn-sm btn-secondary btn-delete-venta" data-id="${v.id}" title="Eliminar">🗑️</button>
+          </td>
+        ` : ''}
       </tr>
     `;
   }).join('');
 
-  tbody.querySelectorAll('.btn-delete-venta').forEach(btn => {
-    btn.addEventListener('click', () => deleteVenta(btn.dataset.id));
-  });
+  if (showAcciones) {
+    tbody.querySelectorAll('.btn-delete-venta').forEach(btn => {
+      btn.addEventListener('click', () => deleteVenta(btn.dataset.id));
+    });
+  }
 
   tbody.querySelectorAll('.btn-marcar-entregado').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -444,233 +449,531 @@ export function renderNuevaVentaForm(container) {
   let carrito = [];
 
   const content = `
-    <form id="form-venta">
 
+      <!-- Estilos para el Catálogo Táctil POS y Split Layout -->
+      <style>
+        .pos-main-split {
+          display: grid;
+          grid-template-columns: 1fr 1.22fr;
+          gap: 8px;
+          align-items: stretch;
+        }
+        .pos-left-column {
+          min-width: 0;
+          background: #ffffff;
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 84px);
+          min-height: 480px;
+          overflow: hidden;
+        }
+        .pos-right-column {
+          min-width: 0;
+          background: #ffffff;
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 84px);
+          min-height: 480px;
+          overflow: hidden;
+        }
+        .pos-client-bar {
+          padding: 10px 12px;
+          border-bottom: 1px solid var(--color-border);
+          background: #fafafa;
+          flex-shrink: 0;
+        }
+        .pos-order-table-section {
+          flex: 1;
+          overflow-y: auto;
+          padding: 12px;
+        }
+        .pos-catalog-section {
+          flex: 1;
+          overflow-y: auto;
+          padding: 12px;
+          background: #f8fafc;
+          border-bottom: 1px solid var(--color-border);
+          display: flex;
+          flex-direction: column;
+          min-height: 220px;
+        }
+        .pos-checkout-section {
+          flex-shrink: 0;
+          background: #ffffff;
+          padding: 6px 10px 8px 10px;
+          box-shadow: 0 -3px 10px rgba(0,0,0,0.03);
+        }
+        .pos-checkout-section .form-check {
+          min-height: auto;
+          margin-bottom: 0;
+          gap: 4px;
+        }
+        .pos-checkout-section .form-check input[type="checkbox"],
+        .pos-checkout-section .form-check input[type="radio"] {
+          width: 16px;
+          height: 16px;
+          margin: 0;
+        }
+        .pos-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 8px;
+          flex-shrink: 0;
+        }
+        .pos-category-tabs {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .pos-cat-pill {
+          border: 1.5px solid #CBD5E1;
+          background: #ffffff;
+          color: #334155;
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.18s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          user-select: none;
+          height: 36px;
+          box-sizing: border-box;
+        }
+        .pos-cat-pill span {
+          font-size: 15px;
+        }
+        .pos-cat-pill:hover {
+          background: #F1F5F9;
+          border-color: #94A3B8;
+        }
+        .pos-cat-pill.active {
+          background: var(--color-primary-900, #1B4332);
+          color: #ffffff;
+          border-color: var(--color-primary-900, #1B4332);
+          box-shadow: 0 2px 6px rgba(27, 67, 50, 0.22);
+        }
+        .pos-products-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          overflow-y: auto;
+          padding: 8px 6px 4px 6px;
+          flex: 1;
+          align-content: start;
+        }
+        .pos-product-card {
+          background: #ffffff;
+          border: 1.5px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 9px;
+          display: flex;
+          flex-direction: column;
+          cursor: pointer;
+          position: relative;
+          transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+          user-select: none;
+          min-height: 115px;
+        }
+        .pos-product-card:hover {
+          transform: translateY(-2px);
+          border-color: #2D6A4F;
+          box-shadow: 0 4px 12px rgba(45, 106, 79, 0.12);
+        }
+        .pos-product-card.in-cart {
+          border-color: #2D6A4F;
+          background: #F7FEFA;
+        }
+        .pos-product-card.is-agotado {
+          opacity: 0.52;
+          cursor: not-allowed;
+          background: #fdf2f2;
+          border-color: #fecaca !important;
+        }
+        .pos-product-card.is-agotado:hover {
+          transform: none !important;
+          box-shadow: none !important;
+          border-color: #f87171 !important;
+        }
+        .pos-product-card.is-agotado:active {
+          transform: none !important;
+        }
+        .pos-product-card.is-agotado .pos-card-add-btn {
+          background: #fee2e2;
+          color: #dc2626;
+          border-color: #fca5a5;
+          cursor: not-allowed;
+        }
+        .pos-card-qty-badge {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          background: #10B981;
+          color: #ffffff;
+          font-size: 10.5px;
+          font-weight: 800;
+          border-radius: 10px;
+          padding: 1px 7px;
+          box-shadow: 0 2px 6px rgba(16, 185, 129, 0.45);
+          z-index: 2;
+          animation: pulseScale 0.2s ease;
+        }
+        @keyframes pulseScale {
+          0% { transform: scale(0.6); }
+          70% { transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        .pos-card-top-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 6px;
+        }
+        .pos-card-icon {
+          width: 28px;
+          height: 28px;
+          border-radius: 7px;
+          background: #EBF7F0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          margin-bottom: 0;
+          flex-shrink: 0;
+        }
+        .pos-card-icon.producto {
+          background: #EFF6FF;
+        }
+        .pos-card-title {
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #1E293B;
+          line-height: 1.3;
+          margin: auto 0;
+          padding: 6px 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .pos-tag-litros {
+          background: #E0F2FE;
+          color: #0369A1;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 5px;
+          line-height: 1.2;
+          display: inline-flex;
+          align-items: center;
+        }
+        .pos-tag-stock {
+          background: #F1F5F9;
+          color: #475569;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 5px;
+          line-height: 1.2;
+          display: inline-flex;
+          align-items: center;
+        }
+        .pos-tag-stock.low {
+          background: #FEF3C7;
+          color: #92400E;
+        }
+        .pos-tag-stock.empty {
+          background: #FEE2E2;
+          color: #991B1B;
+        }
+        .pos-tag-cortesia {
+          background: #EDE9FE;
+          color: #6D28D9;
+          font-size: 9.5px;
+          font-weight: 700;
+          padding: 2px 5px;
+          border-radius: 4px;
+          line-height: 1.2;
+          white-space: nowrap;
+        }
+        .pos-card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-top: auto;
+          padding-top: 6px;
+          border-top: 1px dashed #E2E8F0;
+        }
+        .pos-card-price-primary {
+          font-size: 13px;
+          font-weight: 800;
+          color: #1B4332;
+          line-height: 1.1;
+        }
+        .pos-card-price-secondary {
+          font-size: 10px;
+          color: #64748B;
+          font-weight: 600;
+        }
+        .pos-card-add-btn {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #EBF7F0;
+          color: #2D6A4F;
+          border: 1px solid #B7E4C7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 800;
+          transition: all 0.15s ease;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .pos-product-card:hover .pos-card-add-btn {
+          background: #2D6A4F;
+          color: #ffffff;
+          border-color: #2D6A4F;
+        }
+        .pos-empty-state {
+          grid-column: 1 / -1;
+          text-align: center;
+          padding: 24px;
+          color: var(--color-text-secondary);
+          background: #ffffff;
+          border-radius: 8px;
+          border: 1px dashed #CBD5E1;
+        }
 
-      <!-- Fila 1: Tasa, Fecha y Disponibilidad -->
-      <div class="form-row">
-        <div class="form-group" style="flex: 0.8;">
-          <label class="form-label">Tasa (Bs/$)</label>
-          <input type="number" step="0.01" class="form-control" id="input-tasa" value="${store.getConfig('tasaCambio') || 40.00}" required/>
-        </div>
-        <div class="form-group" style="flex: 1;">
-          <label class="form-label">Fecha de Venta</label>
-          <input type="date" class="form-control" name="fecha" id="input-fecha" value="${Utils.todayISO()}" required/>
-        </div>
-        <div class="form-group" style="flex: 2;">
-          <label class="form-label">Disponibilidad del Agua</label>
-          <div class="alert-panel info" style="margin-bottom: 0; font-size: 16px; justify-content: center; padding: 7.5px; border-radius: 8px;">
-            💧 Disp: <strong style="margin-left: 8px; font-size: 18px;">${Utils.formatNumber(inventario.litros)} L</strong>
-          </div>
-        </div>
-      </div>
+        @media (max-width: 960px) and (min-width: 701px) {
+          .pos-main-split {
+            gap: 8px;
+          }
+          .pos-left-column, .pos-right-column {
+            height: calc(100vh - 84px);
+          }
+          .pos-products-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
 
-      <!-- Fila 2: Nuevo Cliente, Buscar Cliente, Botón Registrar Abono y Botón Registrar Propina -->
-      <div style="display: grid; grid-template-columns: 140px 1fr 145px 150px; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <button type="button" class="btn" id="btn-quick-new-cliente" style="height: 38px; width: 100%; white-space: nowrap; padding: 0 10px; font-size: 13px; background: var(--color-success-light); color: var(--color-success); border: 1px solid var(--color-success-light); font-weight: 700; border-radius: 6px;">+ Nuevo Cliente</button>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span>Cliente (Nombre o RIF)</span>
-            <span id="cliente-balance-badge" style="font-size:12px; font-weight:700;"></span>
-          </label>
-          <div class="search-container">
-            <input type="text" class="form-control" id="search-cliente-input" placeholder="Buscar o dejar vacío para Cliente General" autocomplete="off"/>
-            <input type="hidden" name="clienteId" id="hidden-cliente-id" value=""/>
-            <div id="search-cliente-results" class="search-results"></div>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <button type="button" class="btn btn-secondary" id="btn-quick-abono" style="height: 38px; width: 100%; white-space: nowrap; padding: 0 8px; font-size: 12.5px; font-weight: 700; border-radius: 6px; display:flex; align-items:center; justify-content:center; gap:5px;" title="Registrar un abono o pago por adelantado">
-            <span>💵</span> Abono
-          </button>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <button type="button" class="btn btn-secondary" id="btn-quick-propina" style="height: 38px; width: 100%; white-space: nowrap; padding: 0 8px; font-size: 12.5px; font-weight: 700; border-radius: 6px; display:flex; align-items:center; justify-content:center; gap:5px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;" title="Registrar una propina pasada por Punto de Venta o Banco">
-            <span>🎁</span> Propina
-          </button>
-        </div>
-      </div>
+        @media (max-width: 700px) {
+          .pos-main-split {
+            grid-template-columns: 1fr;
+          }
+          .pos-left-column, .pos-right-column {
+            height: auto;
+            min-height: 0;
+          }
+          .pos-products-grid {
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            max-height: 350px;
+          }
+        }
+      </style>
 
-      <!-- Fila 2: Formulario Añadir Ítem -->
-      <div style="border: 1px solid var(--color-border); padding: var(--space-md); border-radius: 8px; margin-bottom: var(--space-md); background: #f8fafc;">
-        <h4 style="margin-bottom: var(--space-sm); font-size: 14px; color: var(--color-text-secondary);">Añadir Producto</h4>
-        <div style="display: grid; grid-template-columns: minmax(120px, 2fr) 70px 80px auto; gap: 12px; align-items: center; margin-bottom: 0;">
-          <div class="form-group" style="margin-bottom: 0;">
-            <select class="form-control" id="select-tipo-botellon">
-              ${(() => {
-                const recargas = tipos.filter(t => t.categoria !== 'producto');
-                const prods = tipos.filter(t => t.categoria === 'producto');
-
-                const renderOption = (t) => {
-                  const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
-                  const precioLabel = isBs ? `Bs ${Utils.formatNumber(t.precio, true)}` : Utils.formatCurrency(t.precio);
-                  const stockText = t.categoria === 'producto' ? ` · Stock: ${t.stock !== undefined ? t.stock : 0}` : '';
-                  return `<option value="${t.id}" data-precio="${t.precio}" data-moneda="${t.moneda || 'USD'}" data-litros="${t.litros}" data-stock="${t.stock !== undefined ? t.stock : 0}" data-categoria="${t.categoria || 'relleno'}" data-nombre="${Utils.escapeHtml(t.nombre)}">${t.categoria === 'producto' ? '📦' : '💧'} ${Utils.escapeHtml(t.nombre)} (${precioLabel}${stockText})</option>`;
-                };
-
-                let html = '';
-                if (recargas.length > 0) {
-                  html += `<optgroup label="💧 RECARGAS DE AGUA">${recargas.map(renderOption).join('')}</optgroup>`;
-                }
-                if (prods.length > 0) {
-                  html += `<optgroup label="📦 PRODUCTOS FÍSICOS Y ACCESORIOS">${prods.map(renderOption).join('')}</optgroup>`;
-                }
-                return html;
-              })()}
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <input type="number" class="form-control" min="1" value="1" id="input-botellones" placeholder="Cant."/>
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <input type="number" class="form-control" step="0.01" min="0" value="${(() => {
-              const primer = tipos[0] || {};
-              const isBs = primer.moneda === 'VES' || primer.moneda === 'Bs';
-              const tasaInicial = store.getConfig('tasaCambio') || 40.00;
-              return isBs ? (tasaInicial > 0 ? (primer.precio / tasaInicial).toFixed(2) : '0.00') : (primer.precio || 1.50).toFixed(2);
-            })()}" id="input-precio" placeholder="Precio $" title="Precio unitario en dólares"/>
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <button type="button" class="btn btn-primary" id="btn-add-item" style="padding: 0 20px; height: 38px; font-weight: 700;">+ Añadir</button>
-          </div>
-        </div>
-        <div id="info-cortesia-producto" style="display: none; margin-top: 8px; font-size: 12px; color: #6D28D9; font-weight: 600; background: #EDE9FE; border: 1px solid #DDD6FE; padding: 4px 10px; border-radius: 6px;">
-          🎁 <span>Este botellón nuevo incluirá su recarga de agua por cortesía al añadirse al carrito.</span>
-        </div>
-      </div>
-
-      <!-- Carrito de Compras -->
-      <div class="table-container mb-md" id="carrito-container" style="display: none;">
-        <table class="table table-sm">
-          <thead>
-            <tr>
-              <th style="padding-left: var(--space-md);">Producto</th>
-              <th style="text-align:center; width: 70px;">Cant.</th>
-              <th style="text-align:right; width: 95px;">Precio</th>
-              <th style="text-align:right; width: 110px;">Subtotal</th>
-              <th style="text-align:right; width: 45px; padding-right: var(--space-md);"></th>
-            </tr>
-          </thead>
-          <tbody id="carrito-tbody"></tbody>
-        </table>
-      </div>
-
-
-      <!-- Delivery y Pendiente de Entrega en misma fila -->
-      <div class="flex items-center gap-lg mb-md" style="flex-wrap: wrap; background: #f8fafc; padding: 10px var(--space-md); border-radius: 8px; border: 1px solid var(--color-border); justify-content: space-between; align-items: center;">
-        <div class="flex items-center gap-lg" style="flex-wrap: wrap;">
-          <label class="form-check" style="margin-bottom: 0;">
-            <input type="checkbox" id="check-delivery"/>
-            <span>Delivery</span>
-          </label>
-          <div id="container-monto-delivery" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <select class="form-control" id="tipo-tarifa-delivery" style="width: 175px; font-weight: 600;" title="Seleccionar zona o tipo de delivery">
-              ${tarifasDelivery.map((t, idx) => `
-                <option value="${t.id}" data-precio="${t.precio}" ${idx === 0 ? 'selected' : ''}>
-                  ${t.id === 'local' ? '📍' : (t.id === 'afuera' ? '🚗' : '🚚')} ${Utils.escapeHtml(t.nombre)} ($${Utils.formatNumber(t.precio, true)})
-                </option>
-              `).join('')}
-            </select>
-            <div style="position: relative; width: 65px;">
-              <input type="number" class="form-control" id="cant-delivery" value="1" min="1" step="1" title="Cantidad de viajes" style="padding-left: 20px;" placeholder="Viajes"/>
-              <span style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--color-text-secondary);">x</span>
+      <div class="pos-main-split">
+        <!-- COLUMNA IZQUIERDA: Clientes y Productos en Pedido (Arriba) -->
+        <div class="pos-left-column">
+          <!-- Barra Cliente -->
+          <div class="pos-client-bar">
+            <div style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: center;">
+              <div class="search-container" style="position: relative; display: flex; align-items: center;">
+                <input type="text" class="form-control" id="search-cliente-input" placeholder="🔍 Cliente: Nombre o RIF (o General)..." autocomplete="off" style="height: 36px; font-size: 12.5px; padding-right: 90px; border-radius: 6px;"/>
+                <span id="cliente-balance-badge" style="position: absolute; right: 6px; font-size: 11px; pointer-events: none; z-index: 2;"></span>
+                <input type="hidden" name="clienteId" id="hidden-cliente-id" value=""/>
+                <div id="search-cliente-results" class="search-results"></div>
+              </div>
+              <button type="button" class="btn" id="btn-quick-new-cliente" style="height: 36px; white-space: nowrap; padding: 0 9px; font-size: 12px; background: var(--color-success-light); color: var(--color-success); border: 1px solid var(--color-success-light); font-weight: 700; border-radius: 6px;" title="Registrar nuevo cliente">+ Nuevo</button>
+              <button type="button" class="btn btn-secondary" id="btn-quick-abono" style="height: 36px; white-space: nowrap; padding: 0 9px; font-size: 12px; font-weight: 700; border-radius: 6px;" title="Registrar abono de cliente">💵 Abono</button>
+              <button type="button" class="btn btn-secondary" id="btn-quick-propina" style="height: 36px; white-space: nowrap; padding: 0 9px; font-size: 12px; font-weight: 700; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;" title="Registrar propina">🎁</button>
             </div>
-            <div style="position: relative; width: 95px;">
-              <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="0.00" title="Precio por viaje en dólares" style="padding-left: 18px;"/>
-              <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--color-text-secondary);">$</span>
-            </div>
-            <select class="form-control" id="repartidor-delivery" style="width: 140px;" title="Asignar repartidor">
-              <option value="">Sin repartidor</option>
-              ${repartidores.map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
-            </select>
           </div>
-          <label class="form-check" style="margin-bottom: 0; margin-left: 10px;">
-            <input type="checkbox" id="check-pendiente-entrega"/>
-            <span style="color: var(--color-warning-dark); font-weight: 500;">⏳ Pendiente por Entregar</span>
-          </label>
-        </div>
-        <div style="flex: 2; margin: 0;">
-          <div class="alert-panel success" style="margin: 0; justify-content: space-between; padding: 10px 20px; border-radius: 8px; align-items: center; display: flex;">
-            <span style="font-weight: 700; font-size: 16px;">Total a Cobrar:</span>
-            <div id="total-venta" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right;">
-              <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
-              <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">$0.00</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Fila 3: Condición y Pagos -->
-      <div class="form-row" style="align-items: flex-start;">
-        <div class="form-group" style="flex: 1.3;">
-          <label class="form-label" style="margin-bottom: 6px;">Condición de Operación</label>
-          <div class="flex gap-md" style="padding-top: 4px; flex-wrap: wrap;">
-            <label class="form-check" style="cursor: pointer;">
-              <input type="radio" name="tipo" value="contado" checked/>
-              <span>🟢 Contado</span>
-            </label>
-            <label class="form-check" style="cursor: pointer;">
-              <input type="radio" name="tipo" value="credito"/>
-              <span>🟠 Crédito</span>
-            </label>
-            <label class="form-check" style="cursor: pointer;">
-              <input type="radio" name="tipo" value="convenio"/>
-              <span>🤝 Convenio</span>
-            </label>
-            <label class="form-check" style="cursor: pointer;">
-              <input type="radio" name="tipo" value="garantia"/>
-              <span>🔄 Garantía</span>
-            </label>
-            <label class="form-check" style="cursor: pointer;">
-              <input type="radio" name="tipo" value="cortesia"/>
-              <span>🎁 Cortesía</span>
-            </label>
+          <!-- Productos en Pedido (Scrollable) -->
+          <div class="pos-order-table-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 700; font-size: 13px; color: #1E293B;">🛒 Productos en Pedido</span>
+              <button type="button" id="btn-vaciar-carrito" style="background: transparent; border: none; color: #EF4444; font-size: 11.5px; font-weight: 700; cursor: pointer; display: none; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 4px;" title="Vaciar todos los productos del pedido">
+                🗑️ Vaciar
+              </button>
+            </div>
+            
+            <div class="table-container mb-sm" id="carrito-container" style="border: 1px solid var(--color-border); border-radius: 8px; background: #fff;">
+              <table class="table table-sm" style="margin-bottom: 0;">
+                <thead>
+                  <tr style="background: #f8fafc;">
+                    <th style="padding-left: 8px; font-size: 11px;">Producto</th>
+                    <th style="text-align:center; width: 115px; font-size: 11px;">Cant.</th>
+                    <th style="text-align:right; width: 80px; font-size: 11px;">Subtotal</th>
+                    <th style="text-align:right; width: 28px; padding-right: 6px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="carrito-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
-        
-        <div class="form-group" style="flex: 2; border-left: 1px solid var(--color-border); padding-left: var(--space-md);">
-          <div id="seccion-pagos">
-            <div id="container-btn-saldo-favor" style="display:none; margin-bottom: 12px;"></div>
-            <div class="flex items-center justify-between mb-sm" style="margin-bottom: 15px;">
-              <label class="form-label" style="margin:0">Métodos de Pago</label>
-              <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta">+ Añadir</button>
-            </div>
-            <div id="pagos-list">
-              <div class="pago-row" style="display: grid; grid-template-columns: 1.5fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: var(--space-xs);">
-                <div class="form-group" style="margin-bottom: 0;">
-                  <select class="form-control pago-metodo">
-                    ${metodosActivos.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
-                  </select>
-                </div>
-                <div class="form-group" style="margin-bottom: 0;">
-                  <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00"/>
-                </div>
-                <!-- Div invisible para mantener el grid alineado con los botones de borrar -->
-                <div style="width: 40px;"></div>
-                
-                <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
-                  <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
-                </div>
+
+        <!-- COLUMNA DERECHA: Catálogo Arriba (Máx 3 Columnas) + Delivery a Registro Abajo Fijo -->
+        <div class="pos-right-column">
+          <!-- Catálogo de Productos (Arriba) -->
+          <div class="pos-catalog-section">
+            <div class="pos-header">
+              <div class="pos-category-tabs" id="pos-category-tabs">
+                <button type="button" class="pos-cat-pill active" data-cat="recarga">
+                  <span>💧</span> Recargas
+                </button>
+                <button type="button" class="pos-cat-pill" data-cat="producto">
+                  <span>📦</span> Productos
+                </button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <input type="text" id="pos-search-input" class="form-control" placeholder="🔍 Buscar..." style="height: 36px; font-size: 12.5px; width: 135px; max-width: 150px; padding: 4px 10px; border-radius: 18px; border: 1.5px solid #CBD5E1; background: #fff; box-sizing: border-box; outline: none;"/>
               </div>
             </div>
-            <div class="alert-panel info mt-sm" id="pago-diff-panel" style="display:none; justify-content: space-between; padding: 8px;">
-               <span>Abono Extra:</span>
-               <strong id="pago-diff-monto">$0.00</strong>
+
+            <div class="pos-products-grid" id="pos-products-grid">
+              <!-- Renderizado dinámico de fichas (3 columnas) -->
             </div>
           </div>
 
-          <div id="seccion-info-credito" style="display:none; padding: 15px; background: var(--color-bg-secondary); border-radius: var(--radius-md); font-size: 14px; color: var(--color-text-secondary); margin-bottom: 15px;">
-            ℹ️ Esta venta se registrará bajo modalidad de <strong id="texto-tipo-venta">Crédito</strong> (sin pago inmediato).
-          </div>
-          
-          <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-            <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="padding: 10px 20px; font-size: 16px; width: 250px;">Registrar Venta</button>
+          <!-- De Delivery hasta Registro (Abajo Fijo) -->
+          <div class="pos-checkout-section">
+            <!-- Delivery en una sola fila -->
+            <div style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 8px; padding: 2px 8px; margin-bottom: 4px; min-height: 26px; display: flex; align-items: center;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: nowrap; width: 100%;">
+                <label class="form-check" style="margin: 0; min-height: auto; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+                  <input type="checkbox" id="check-delivery"/>
+                  <span style="font-weight: 700; font-size: 12px;">🚚 Delivery</span>
+                </label>
+
+                <div id="container-monto-delivery" style="display: none; align-items: center; gap: 5px; flex: 1; min-width: 0;">
+                  <select class="form-control" id="tipo-tarifa-delivery" style="flex: 1.2; min-width: 95px; font-size: 11px; height: 28px; padding: 2px 6px;" title="Zona">
+                    ${tarifasDelivery.map((t, idx) => `
+                      <option value="${t.id}" data-precio="${t.precio}" ${idx === 0 ? 'selected' : ''}>
+                        ${t.id === 'local' ? '📍' : (t.id === 'afuera' ? '🚗' : '🚚')} ${Utils.escapeHtml(t.nombre)} ($${Utils.formatNumber(t.precio, true)})
+                      </option>
+                    `).join('')}
+                  </select>
+                  <div style="position: relative; width: 44px; flex-shrink: 0;">
+                    <input type="number" class="form-control" id="cant-delivery" value="1" min="1" step="1" title="Viajes" style="padding-left: 14px; padding-right: 2px; font-size: 11px; height: 28px; text-align: center;"/>
+                    <span style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%); font-size: 9.5px; color: var(--color-text-secondary);">x</span>
+                  </div>
+                  <div style="position: relative; width: 62px; flex-shrink: 0;">
+                    <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="0.00" title="Precio por viaje" style="padding-left: 13px; padding-right: 2px; font-size: 11px; height: 28px; text-align: center;"/>
+                    <span style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--color-text-secondary);">$</span>
+                  </div>
+                  <select class="form-control" id="repartidor-delivery" style="flex: 1.1; min-width: 95px; font-size: 11px; height: 28px; padding: 2px 6px;" title="Repartidor">
+                    <option value="">Sin repartidor</option>
+                    ${repartidores.map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
+                  </select>
+                </div>
+
+                <label class="form-check" style="margin: 0; min-height: auto; cursor: pointer; white-space: nowrap; flex-shrink: 0; margin-left: auto;">
+                  <input type="checkbox" id="check-pendiente-entrega"/>
+                  <span style="color: var(--color-warning-dark); font-weight: 600; font-size: 11.5px;">⏳ Pendiente</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Condición de Operación -->
+            <div style="margin-bottom: 4px;">
+              <div class="flex gap-sm" style="flex-wrap: wrap; align-items: center;">
+                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
+                  <input type="radio" name="tipo" value="contado" checked/>
+                  <span>Contado</span>
+                </label>
+                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
+                  <input type="radio" name="tipo" value="credito"/>
+                  <span>Crédito</span>
+                </label>
+                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
+                  <input type="radio" name="tipo" value="convenio"/>
+                  <span>Convenio</span>
+                </label>
+                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
+                  <input type="radio" name="tipo" value="garantia"/>
+                  <span>Garantía</span>
+                </label>
+                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
+                  <input type="radio" name="tipo" value="cortesia"/>
+                  <span>Cortesía</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Métodos de Pago -->
+            <div id="seccion-pagos">
+              <div id="container-btn-saldo-favor" style="display:none; margin-bottom: 6px;"></div>
+              <div id="pagos-list">
+                <div class="pago-row" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
+                  <label class="form-label" style="margin: 0; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
+                  <div class="form-group" style="margin-bottom: 0; flex: 1.2; min-width: 130px;">
+                    <select class="form-control pago-metodo" style="height: 32px; font-size: 11.5px;">
+                      ${metodosActivos.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 80px;">
+                    <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00" style="height: 32px; font-size: 12px;"/>
+                  </div>
+                  <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta" style="font-size: 11px; height: 32px; padding: 0 9px; white-space: nowrap; flex-shrink: 0;" title="Añadir otro método de pago">+ Añadir</button>
+                  <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
+                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Calculadora de Vuelto -->
+              <div id="panel-vuelto-calculadora" style="display:none; background: #ECFDF5; border: 1.5px dashed #10B981; border-radius: 6px; padding: 5px 10px; margin-top: 4px; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-size: 14px;">💵</span>
+                  <div>
+                    <div style="font-size: 10px; font-weight: 700; color: #065F46; text-transform: uppercase;">Vuelto a Entregar:</div>
+                    <div style="font-size: 9.5px; color: #047857;">Monto recibido supera total</div>
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div id="txt-vuelto-usd" style="font-size: 15px; font-weight: 800; color: #065F46; line-height: 1.1;">$0.00</div>
+                  <div id="txt-vuelto-bs" style="font-size: 10.5px; font-weight: 700; color: #047857; line-height: 1.1;">Bs 0,00</div>
+                </div>
+              </div>
+
+              <div class="alert-panel info mt-xs" id="pago-diff-panel" style="display:none; justify-content: space-between; padding: 4px 8px; font-size: 11px;">
+                 <span>Abono Extra a cuenta:</span>
+                 <strong id="pago-diff-monto">$0.00</strong>
+              </div>
+            </div>
+
+            <div id="seccion-info-credito" style="display:none; padding: 8px; background: var(--color-bg-secondary); border-radius: var(--radius-md); font-size: 11.5px; color: var(--color-text-secondary); margin-bottom: 6px;">
+              ℹ️ Esta venta se registrará bajo modalidad de <strong id="texto-tipo-venta">Crédito</strong> (sin cobro inmediato).
+            </div>
+
+            <!-- Total a Cobrar y Botón Registrar Venta -->
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1.5px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+              <div>
+                <span style="font-size: 11px; font-weight: 700; color: var(--color-text-secondary); display: block; line-height: 1;">Total a Cobrar:</span>
+                <div id="total-venta" style="display: flex; align-items: baseline; gap: 6px; margin-top: 2px;">
+                  <span style="font-size: 22px; font-weight: 800; color: #065f46; line-height: 1;">Bs 0,00</span>
+                  <span style="font-size: 13px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1;">$0.00</span>
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="flex: 1; max-width: 220px; height: 42px; font-size: 14.5px; font-weight: 800; border-radius: 8px; box-shadow: 0 4px 12px rgba(45,106,79,0.25);">Registrar Venta</button>
+            </div>
           </div>
         </div>
       </div>
-    </form>
   `;
 
   const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
@@ -679,38 +982,117 @@ export function renderNuevaVentaForm(container) {
   const lecturaHoy = store.getLecturaCaudalimetro(todayStr);
 
   const formHtml = `
-    <div style="padding: 0 0 20px 0;">
-      <div class="page-header" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <h1 class="page-title">Punto de Venta</h1>
-          <p class="page-subtitle">Registro de recargas y facturación</p>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-          ${moduloCaudalimetro ? `
-            <div id="widget-caudalimetro-pv" style="display: flex; align-items: center; gap: 10px; background: var(--color-surface, #fff); border: 1.5px solid #10B981; border-radius: 10px; padding: 6px 14px; box-shadow: var(--shadow-sm); cursor: pointer;" title="Haga clic para registrar o actualizar la lectura del reloj">
-              <div style="font-size: 22px;">⏱️</div>
-              <div>
-                <div style="font-size: 11px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.5px;">
-                  Reloj Medidor (${unidadCaudalimetro})
-                </div>
-                <div style="font-size: 13px; font-weight: 800; color: #0F172A;">
-                  ${lecturaHoy.inicial !== null ? `Ini: ${lecturaHoy.inicial.toLocaleString()}` : 'Ini: <span style="color:#DC2626;">Sin registrar</span>'} 
-                  ${lecturaHoy.final !== null ? `· Fin: ${lecturaHoy.final.toLocaleString()} (<strong>${lecturaHoy.litrosReloj.toLocaleString()} L</strong>)` : ''}
-                </div>
-              </div>
-              <button type="button" id="btn-abrir-modal-caudalimetro" class="btn btn-xs btn-primary" style="margin-left: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px;">
-                ${lecturaHoy.inicial === null ? '📝 Abrir Tienda' : (lecturaHoy.final === null ? '📝 Anotar Cierre' : '✏️ Editar')}
-              </button>
+    <div style="padding: 0 0 8px 0;">
+      <form id="form-venta">
+        <div class="page-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h1 class="page-title" style="margin-bottom: 0;">Punto de Venta</h1>
+          </div>
+          
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <!-- Tasa de Cambio -->
+            <div style="display: flex; align-items: center; gap: 6px; background: #ffffff; border: 1px solid var(--color-border); padding: 4px 10px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+              <label for="input-tasa" style="margin: 0; font-size: 11.5px; font-weight: 700; color: var(--color-text-secondary); white-space: nowrap; cursor: pointer;">Tasa (Bs/$):</label>
+              <input type="text" class="form-control" id="input-tasa" value="${Utils.formatNumber(store.getConfig('tasaCambio') || 40.00, true)}" style="width: 105px; height: 32px; font-size: 13.5px; font-weight: 700; padding: 2px 6px; text-align: center; border-radius: 6px;" required/>
             </div>
-          ` : ''}
+
+            <!-- Fecha de Venta -->
+            <div style="display: flex; align-items: center; gap: 6px; background: #ffffff; border: 1px solid var(--color-border); padding: 4px 10px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+              <label for="input-fecha" style="margin: 0; font-size: 11.5px; font-weight: 700; color: var(--color-text-secondary); white-space: nowrap; cursor: pointer;">Fecha:</label>
+              <input type="date" class="form-control" name="fecha" id="input-fecha" value="${Utils.todayISO()}" style="width: 135px; height: 32px; font-size: 12.5px; font-weight: 600; padding: 2px 6px; border-radius: 6px;" required/>
+            </div>
+
+            <!-- Disponibilidad del Agua -->
+            <div class="alert-panel info" style="margin: 0; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px; height: 42px;" title="Litros de agua disponibles en tanque">
+              <span style="font-size: 14px;">💧 Disp:</span>
+              <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(inventario.litros)} L</strong>
+            </div>
+
+            <!-- Botón Pantalla Completa -->
+            <button type="button" id="btn-toggle-fullscreen" class="btn" style="width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; background: #ffffff; border: 1.5px solid var(--color-primary, #2D6A4F); color: var(--color-primary, #2D6A4F); cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: all 0.2s ease;" title="Alternar Pantalla Completa">
+              <span class="fs-icon" style="display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+              </span>
+            </button>
+
+            ${moduloCaudalimetro ? `
+              <div id="widget-caudalimetro-pv" style="display: flex; align-items: center; gap: 8px; background: var(--color-surface, #fff); border: 1.5px solid #10B981; border-radius: 10px; padding: 4px 12px; height: 42px; box-shadow: var(--shadow-sm); cursor: pointer;" title="Haga clic para registrar o actualizar la lectura del reloj">
+                <div style="font-size: 18px;">⏱️</div>
+                <div>
+                  <div style="font-size: 10px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1;">
+                    Reloj (${unidadCaudalimetro})
+                  </div>
+                  <div style="font-size: 12px; font-weight: 800; color: #0F172A; line-height: 1.2;">
+                    ${lecturaHoy.inicial !== null ? `Ini: ${lecturaHoy.inicial.toLocaleString()}` : 'Ini: <span style="color:#DC2626;">Sin reg</span>'} 
+                    ${lecturaHoy.final !== null ? `· Fin: ${lecturaHoy.final.toLocaleString()} (<strong>${lecturaHoy.litrosReloj.toLocaleString()} L</strong>)` : ''}
+                  </div>
+                </div>
+                <button type="button" id="btn-abrir-modal-caudalimetro" class="btn btn-xs btn-primary" style="margin-left: 4px; padding: 3px 8px; font-size: 11px; font-weight: 700; border-radius: 6px;">
+                  ${lecturaHoy.inicial === null ? 'Abrir' : (lecturaHoy.final === null ? 'Cierre' : 'Editar')}
+                </button>
+              </div>
+            ` : ''}
+          </div>
         </div>
-      </div>
-      ${content}
+        ${content}
+      </form>
     </div>
   `;
   container.innerHTML = formHtml;
   const modal = container;
 
+  const btnFs = modal.querySelector('#btn-toggle-fullscreen');
+  if (btnFs) {
+    function isFullScreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    }
+    function updateBtnState() {
+      const fs = isFullScreen();
+      const icon = btnFs.querySelector('.fs-icon');
+      if (icon) {
+        icon.innerHTML = fs
+          ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M10 14l-7 7"/></svg>`
+          : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`;
+      }
+      btnFs.title = fs ? 'Salir de pantalla completa' : 'Ver a pantalla completa';
+      if (fs) {
+        btnFs.style.background = '#e8f5e9';
+      } else {
+        btnFs.style.background = '#ffffff';
+      }
+    }
+
+    btnFs.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!isFullScreen()) {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(err => console.log('Fullscreen error:', err));
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          docEl.msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
+    });
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+      document.addEventListener(evt, updateBtnState);
+    });
+    updateBtnState();
+  }
 
   const widgetCaudalimetro = modal.querySelector('#widget-caudalimetro-pv');
   if (widgetCaudalimetro) {
@@ -721,18 +1103,71 @@ export function renderNuevaVentaForm(container) {
     });
   }
   
+  function parseTasaValue(valStr) {
+    if (typeof valStr === 'number') return valStr;
+    if (!valStr) return 0;
+    let s = String(valStr).trim().replace(/\s+/g, '');
+    if (s.includes('.') && s.includes(',')) {
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    } else if (s.includes(',')) {
+      s = s.replace(',', '.');
+    }
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
+  }
+
+  function getTasaActual() {
+    const el = modal.querySelector('#input-tasa');
+    const val = el ? parseTasaValue(el.value) : 0;
+    return val > 0 ? val : (store.getConfig('tasaCambio') || 40.00);
+  }
+
   const inputTasa = modal.querySelector('#input-tasa');
   if (inputTasa) {
-    inputTasa.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      if (!isNaN(val) && val > 0) {
+    inputTasa.addEventListener('focus', () => {
+      inputTasa.select();
+    });
+
+    inputTasa.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        inputTasa.blur();
+      }
+    });
+
+    inputTasa.addEventListener('input', () => {
+      const val = parseTasaValue(inputTasa.value);
+      if (val > 0) {
         store.setConfig('tasaCambio', val);
-        if (typeof syncPrecioSeleccionado === 'function') {
-          syncPrecioSeleccionado();
+        if (typeof renderPosFichas === 'function') {
+          renderPosFichas();
         }
         if (typeof renderCarrito === 'function') {
           renderCarrito();
         }
+      }
+    });
+
+    inputTasa.addEventListener('blur', () => {
+      const val = parseTasaValue(inputTasa.value);
+      if (val > 0) {
+        store.setConfig('tasaCambio', val);
+        inputTasa.value = Utils.formatNumber(val, true);
+        if (typeof renderPosFichas === 'function') {
+          renderPosFichas();
+        }
+        if (typeof renderCarrito === 'function') {
+          renderCarrito();
+        }
+        if (typeof actualizarInfoPagos === 'function') {
+          actualizarInfoPagos();
+        }
+      } else {
+        const fallback = store.getConfig('tasaCambio') || 40.00;
+        inputTasa.value = Utils.formatNumber(fallback, true);
       }
     });
   }
@@ -786,6 +1221,25 @@ export function renderNuevaVentaForm(container) {
         return;
       }
 
+      // 🛑 Validación de stock para productos físicos
+      const allTiposStock = store.getConfig('tiposBotellon') || [];
+      for (const item of carrito) {
+        if (item.categoria === 'producto' && item.tipoBotellonId) {
+          const prod = allTiposStock.find(p => String(p.id) === String(item.tipoBotellonId));
+          if (prod && prod.stock !== undefined && prod.stock !== null) {
+            const stockActual = parseInt(prod.stock) || 0;
+            if (stockActual <= 0) {
+              showToast(`El producto "${item.nombre}" está agotado y no puede ser procesado`, 'error');
+              return;
+            }
+            if (item.cantidad > stockActual) {
+              showToast(`Stock insuficiente para "${item.nombre}". Pedido: ${item.cantidad}, Disponible: ${stockActual}`, 'error');
+              return;
+            }
+          }
+        }
+      }
+
       const { totalUSD, totalBs } = calcularTotalesVenta();
       let totalVenta = isSinCobro ? 0 : totalUSD;
       let totalBotellones = 0;
@@ -806,7 +1260,7 @@ export function renderNuevaVentaForm(container) {
       let totalPagadoBs = 0;
       let saldoFavorUsado = 0;
       if (tipo === 'contado') {
-        const tasaActual = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+        const tasaActual = getTasaActual();
         overlay.querySelectorAll('.pago-row').forEach(row => {
           const metodo = row.querySelector('.pago-metodo').value;
           const rawMonto = row.querySelector('.pago-monto').value || '0';
@@ -869,7 +1323,7 @@ export function renderNuevaVentaForm(container) {
       const isPendiente = !!(checkPendiente && checkPendiente.checked);
       const estadoEntrega = isPendiente ? 'pendiente' : 'entregado';
       
-      const tasaCambio = parseFloat(modal.querySelector('#input-tasa').value) || (store.getConfig('tasaCambio') || 40);
+      const tasaCambio = getTasaActual();
       store.setConfig('tasaCambio', tasaCambio); // memorizar
 
       let detallesFinales = [];
@@ -996,15 +1450,9 @@ export function renderNuevaVentaForm(container) {
       if (hId) hId.value = '';
       actualizarBalanceBadge();
 
-      // Reset producto seleccionado al valor por defecto (primer item de la lista)
-      const selectProd = modal.querySelector('#select-tipo-botellon');
-      const inputCantProd = modal.querySelector('#input-botellones');
-      if (selectProd) {
-        selectProd.selectedIndex = 0;
-        if (inputCantProd) inputCantProd.value = '1';
-        if (typeof syncPrecioSeleccionado === 'function') {
-          syncPrecioSeleccionado();
-        }
+      // Reset fichas y badges
+      if (typeof actualizarBadgesFichas === 'function') {
+        actualizarBadgesFichas();
       }
 
       // Reset condition to Contado and clear credit banner
@@ -1042,6 +1490,8 @@ export function renderNuevaVentaForm(container) {
   const carritoContainer = modal.querySelector('#carrito-container');
   const carritoTbody = modal.querySelector('#carrito-tbody');
   const totalDisplay = modal.querySelector('#total-venta');
+  const diffPanel = modal.querySelector('#pago-diff-panel');
+  const diffMonto = modal.querySelector('#pago-diff-monto');
   
   function isTipoSinCobro(tipoVal) {
     return tipoVal === 'convenio' || tipoVal === 'garantia' || tipoVal === 'cortesia';
@@ -1049,7 +1499,7 @@ export function renderNuevaVentaForm(container) {
 
   function calcularTotalesVenta() {
     const currentTipo = modal.querySelector('input[name="tipo"]:checked')?.value || 'contado';
-    const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
+    const tasa = getTasaActual();
 
     if (isTipoSinCobro(currentTipo)) {
       return { tasa, totalUSD: 0, totalBs: 0 };
@@ -1102,6 +1552,34 @@ export function renderNuevaVentaForm(container) {
       delivMontoTotal = dVal * cVal;
     }
 
+    const btnVaciar = modal.querySelector('#btn-vaciar-carrito');
+    if (btnVaciar) {
+      btnVaciar.style.display = (carrito.length > 0) ? 'inline-flex' : 'none';
+      if (!btnVaciar._hasListener) {
+        btnVaciar._hasListener = true;
+        btnVaciar.addEventListener('click', () => {
+          if (carrito.length === 0) return;
+          openModal({
+            title: 'Vaciar Pedido',
+            content: `
+              <div style="text-align: center; padding: 10px 0;">
+                <div style="font-size: 36px; margin-bottom: 8px;">🗑️</div>
+                <p style="font-size: 14.5px; font-weight: 700; color: #1E293B; margin-bottom: 6px;">¿Desea vaciar todos los productos del pedido?</p>
+                <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0;">Se quitarán los productos agregados a la lista actual.</p>
+              </div>
+            `,
+            saveLabel: 'Sí, vaciar',
+            onSave: () => {
+              carrito.length = 0;
+              closeModal();
+              renderCarrito();
+              actualizarBadgesFichas();
+            }
+          });
+        });
+      }
+    }
+
     if (carrito.length === 0) {
       if (isDelivChecked && delivMontoTotal > 0) {
         const { totalUSD, totalBs } = calcularTotalesVenta();
@@ -1114,17 +1592,16 @@ export function renderNuevaVentaForm(container) {
         carritoContainer.style.display = 'block';
         carritoTbody.innerHTML = `
           <tr style="background: rgba(2, 132, 199, 0.05); border-bottom: 1.5px dashed #BAE6FD;">
-            <td style="padding-left: var(--space-md);">
-              <div style="font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 6px;">
-                <span>🛵</span> Servicio de Delivery (${Utils.escapeHtml(selTarifaNombre)})
+            <td style="padding: 6px 6px 6px 8px; vertical-align: middle;">
+              <div style="font-weight: 700; color: #0284C7; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                <span>🛵</span> Delivery (${Utils.escapeHtml(selTarifaNombre)})
               </div>
-              <small style="color: var(--color-text-secondary); font-size: 11px;">Cobro exclusivo de flete / traslado</small>
+              <div style="color: var(--color-text-secondary); font-size: 10.5px;">${cantDeliv ? cantDeliv.value : 1} viaje(s) a ${Utils.formatCurrency(parseFloat(inputDeliv.value) || 0)}</div>
             </td>
-            <td style="text-align: center; width: 70px; font-weight: 700; color: #0369A1;">${cantDeliv ? cantDeliv.value : 1}</td>
-            <td style="text-align: right; width: 95px; font-weight: 600;">${Utils.formatCurrency(parseFloat(inputDeliv.value) || 0)}</td>
-            <td style="text-align: right; width: 110px; font-weight: 800; color: #0284C7;">${Utils.formatCurrency(totalUSD)}</td>
-            <td style="text-align: right; width: 45px; padding-right: var(--space-md);">
-              <button type="button" id="btn-cancel-deliv-solo" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:0; line-height:1;" title="Quitar Delivery">✕</button>
+            <td style="text-align: center; width: 115px; font-weight: 700; color: #0369A1; font-size: 12px; vertical-align: middle;">${cantDeliv ? cantDeliv.value : 1}</td>
+            <td style="text-align: right; width: 75px; font-weight: 800; color: #0284C7; font-size: 12px; vertical-align: middle;">${Utils.formatCurrency(totalUSD)}</td>
+            <td style="text-align: right; width: 28px; padding-right: 6px; vertical-align: middle;">
+              <button type="button" id="btn-cancel-deliv-solo" style="background:transparent; color:#ef4444; border:none; font-size:16px; font-weight:bold; cursor:pointer; padding:0; line-height:1;" title="Quitar Delivery">✕</button>
             </td>
           </tr>
         `;
@@ -1138,8 +1615,8 @@ export function renderNuevaVentaForm(container) {
           });
         }
         totalDisplay.innerHTML = `
-          <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs ${Utils.formatNumber(totalBs, true)}</span>
-          <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">${Utils.formatCurrency(totalUSD)}</span>
+          <span style="font-size: 26px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs ${Utils.formatNumber(totalBs, true)}</span>
+          <span style="font-size: 13.5px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">${Utils.formatCurrency(totalUSD)}</span>
         `;
         actualizarPagosAutom(totalUSD, totalBs);
         if (typeof actualizarBotonSaldoFavor === 'function') {
@@ -1148,13 +1625,22 @@ export function renderNuevaVentaForm(container) {
         return;
       }
 
-      carritoContainer.style.display = 'none';
-      carritoTbody.innerHTML = '';
+      carritoContainer.style.display = 'block';
+      carritoTbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 26px 10px; color: var(--color-text-secondary);">
+            <div style="font-size: 24px; margin-bottom: 4px; opacity: 0.5;">🛒</div>
+            <div style="font-size: 12px; font-weight: 600; color: #475569;">El pedido está vacío</div>
+            <div style="font-size: 11px; opacity: 0.75;">Toque los productos a la izquierda para agregarlos</div>
+          </td>
+        </tr>
+      `;
       totalDisplay.innerHTML = `
-        <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
-        <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">$0.00</span>
+        <span style="font-size: 26px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs 0,00</span>
+        <span style="font-size: 13.5px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">$0.00</span>
       `;
       actualizarPagosAutom(0, 0);
+      actualizarInfoPagos();
       return;
     }
     
@@ -1180,49 +1666,58 @@ export function renderNuevaVentaForm(container) {
       if (isBotellonFisico && (cortesiaActiva || item.aguaCortesia)) {
         if (item.aguaCortesia) {
           badgeInfoHTML = `
-            <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <span class="badge" style="background:#EDE9FE; color:#6D28D9; border: 1px solid #DDD6FE; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">
-                🎁 Incluye Agua de Cortesía (${item.litrosAguaPorUnidad || 20}L)
+            <div style="margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+              <span class="badge" style="background:#EDE9FE; color:#6D28D9; border: 1px solid #DDD6FE; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;">
+                🎁 Agua Gratis (${item.litrosAguaPorUnidad || 20}L)
               </span>
               <button type="button" class="btn-toggle-cortesia" data-index="${index}" 
-                style="background: #ffffff; border: 1px solid #CBD5E1; color: #475569; border-radius: 5px; font-size: 11px; font-weight: 600; padding: 1px 7px; cursor: pointer; transition: background 0.15s;" 
+                style="background: #ffffff; border: 1px solid #CBD5E1; color: #475569; border-radius: 4px; font-size: 10px; font-weight: 600; padding: 0 5px; cursor: pointer;" 
                 title="Haga clic para desmarcar el agua y vender solo el envase">
-                ✕ Quitar agua
+                ✕ Quitar
               </button>
             </div>
           `;
         } else if (cortesiaActiva) {
           badgeInfoHTML = `
-            <div style="margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <span class="badge" style="background:#F1F5F9; color:#64748B; border: 1px solid #CBD5E1; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px;">
-                ⚠️ Solo envase vacío (Sin agua)
+            <div style="margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+              <span class="badge" style="background:#F1F5F9; color:#64748B; border: 1px solid #CBD5E1; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">
+                ⚠️ Solo envase
               </span>
               <button type="button" class="btn-toggle-cortesia" data-index="${index}" 
-                style="background: #EDE9FE; border: 1px solid #C4B5FD; color: #6D28D9; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 1px 7px; cursor: pointer; transition: background 0.15s;" 
+                style="background: #EDE9FE; border: 1px solid #C4B5FD; color: #6D28D9; border-radius: 4px; font-size: 10px; font-weight: 700; padding: 0 5px; cursor: pointer;" 
                 title="Haga clic para marcar e incluir agua de cortesía gratis">
-                🎁 Incluir agua gratis
+                🎁 +Agua
               </button>
             </div>
           `;
         }
       } else if (item.esCortesia) {
-        badgeInfoHTML = '<div style="margin-top: 2px;"><span class="badge" style="background:#EDE9FE; color:#6D28D9; font-size: 10px; padding: 2px 5px; border-radius: 4px;">🎁 Cortesía</span></div>';
+        badgeInfoHTML = '<div style="margin-top: 2px;"><span class="badge" style="background:#EDE9FE; color:#6D28D9; font-size: 10px; padding: 1px 5px; border-radius: 4px;">🎁 Cortesía</span></div>';
       }
 
       return `
         <tr>
-          <td style="padding-left: var(--space-md);">
-            <div style="font-weight:600;">
+          <td style="padding: 6px 6px 6px 8px; vertical-align: middle;">
+            <div style="font-weight: 600; font-size: 12px; line-height: 1.25; color: #1e293b;">
               ${Utils.escapeHtml(item.nombre)}
             </div>
+            <div style="font-size: 10.5px; color: var(--color-text-secondary); margin-top: 2px;">
+              ${precioUnitarioDisplay} c/u ${isItemBs && !item.esCortesia ? '<span style="color:#2563EB;">(Fijo en Bs)</span>' : ''}
+            </div>
             ${badgeInfoHTML}
-            ${isItemBs && !item.esCortesia ? '<span style="font-size:10px; color:#2563EB;">(Fijo en Bs)</span>' : ''}
           </td>
-          <td style="text-align:center; width: 70px;">${item.cantidad}</td>
-          <td style="text-align:right; width: 95px;">${precioUnitarioDisplay}</td>
-          <td style="text-align:right; width: 110px; font-weight:bold;">${subtotalDisplay}</td>
-          <td style="text-align:right; width: 45px; padding-right: var(--space-md); white-space:nowrap;">
-            <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:18px; font-weight:bold; cursor:pointer; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:flex-end; width:100%;" title="Eliminar">✕</button>
+          <td style="text-align:center; width: 115px; vertical-align: middle; padding: 4px 2px;">
+            <div style="display:inline-flex; align-items:center; gap:3px; justify-content:center;">
+              <button type="button" class="btn-qty-minus" data-index="${index}" style="width:24px; height:26px; border-radius:4px; border:1px solid #CBD5E1; background:#fff; cursor:pointer; font-weight:bold; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center; color:#334155; padding:0;" title="Restar 1">-</button>
+              <input type="number" class="input-qty-direct" data-index="${index}" value="${item.cantidad}" min="1" step="1" style="width: 52px; height: 26px; text-align: center; font-weight: 700; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; color: #1e293b; outline: none; -moz-appearance: textfield;" />
+              <button type="button" class="btn-qty-plus" data-index="${index}" style="width:24px; height:26px; border-radius:4px; border:1px solid #CBD5E1; background:#fff; cursor:pointer; font-weight:bold; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center; color:#334155; padding:0;" title="Sumar 1">+</button>
+            </div>
+          </td>
+          <td style="text-align:right; width: 75px; vertical-align: middle; font-weight:bold; font-size: 12px; padding: 4px 4px;">
+            ${subtotalDisplay}
+          </td>
+          <td style="text-align:right; width: 28px; padding-right: 6px; vertical-align: middle; white-space:nowrap;">
+            <button type="button" class="btn-remove-cart" data-index="${index}" style="background:transparent; color:#ef4444; border:none; font-size:16px; font-weight:bold; cursor:pointer; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:4px;" title="Eliminar">✕</button>
           </td>
         </tr>
       `;
@@ -1230,8 +1725,8 @@ export function renderNuevaVentaForm(container) {
     
     const { totalUSD, totalBs } = calcularTotalesVenta();
     totalDisplay.innerHTML = `
-      <span style="font-size: 34px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs ${Utils.formatNumber(totalBs, true)}</span>
-      <span style="font-size: 17px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">${Utils.formatCurrency(totalUSD)}</span>
+      <span style="font-size: 26px; font-weight: 800; line-height: 1.1; color: #065f46;">Bs ${Utils.formatNumber(totalBs, true)}</span>
+      <span style="font-size: 13.5px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1.1;">${Utils.formatCurrency(totalUSD)}</span>
     `;
     
     carritoTbody.querySelectorAll('.btn-remove-cart').forEach(btn => {
@@ -1239,6 +1734,36 @@ export function renderNuevaVentaForm(container) {
         const idx = parseInt(btn.dataset.index);
         carrito.splice(idx, 1);
         renderCarrito();
+        actualizarBadgesFichas();
+      });
+    });
+
+    carritoTbody.querySelectorAll('.btn-qty-minus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.index);
+        modificarCantidadCarrito(idx, -1);
+      });
+    });
+
+    carritoTbody.querySelectorAll('.btn-qty-plus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.index);
+        modificarCantidadCarrito(idx, 1);
+      });
+    });
+
+    carritoTbody.querySelectorAll('.input-qty-direct').forEach(input => {
+      input.addEventListener('change', () => {
+        const idx = parseInt(input.dataset.index);
+        fijarCantidadCarrito(idx, input.value);
+      });
+      input.addEventListener('focus', () => {
+        input.select();
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          input.blur();
+        }
       });
     });
 
@@ -1258,6 +1783,7 @@ export function renderNuevaVentaForm(container) {
     if (typeof actualizarBotonSaldoFavor === 'function') {
       actualizarBotonSaldoFavor();
     }
+    actualizarBadgesFichas();
   }
   
   function actualizarBalanceBadge() {
@@ -1412,89 +1938,148 @@ export function renderNuevaVentaForm(container) {
     }
   });
 
-  const selectTipo = modal.querySelector('#select-tipo-botellon');
-  const inputBot = modal.querySelector('#input-botellones');
-  const inputPrecio = modal.querySelector('#input-precio');
-  const diffPanel = modal.querySelector('#pago-diff-panel');
-  const diffMonto = modal.querySelector('#pago-diff-monto');
-
-  function syncPrecioSeleccionado() {
-    if (!selectTipo || !inputPrecio) return;
-    const opt = selectTipo.options[selectTipo.selectedIndex];
-    if (!opt) return;
-    const isBs = opt.dataset.moneda === 'VES' || opt.dataset.moneda === 'Bs';
-    const precioBase = parseFloat(opt.dataset.precio) || 0;
-    const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
-    
-    if (isBs) {
-      const precioUSD = tasa > 0 ? (precioBase / tasa) : 0;
-      inputPrecio.value = precioUSD.toFixed(2);
-      inputPrecio.title = `Fijo en Bs (${Utils.formatNumber(precioBase, true)}) convertido a $ a tasa ${Utils.formatNumber(tasa, true)}`;
-    } else {
-      inputPrecio.value = precioBase.toFixed(2);
-      inputPrecio.title = `Fijo en dólares ($)`;
-    }
-
-    const infoCortesia = modal.querySelector('#info-cortesia-producto');
-    if (infoCortesia) {
-      const cortesiaActiva = store.getConfig('cortesiaBotellonNuevo') === true;
-      const cat = opt.dataset.categoria || 'relleno';
-      const rawNom = opt.dataset.nombre || opt.textContent.split('(')[0].trim();
-      const esBotellonFisico = (cat === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNom);
-      infoCortesia.style.display = (cortesiaActiva && esBotellonFisico) ? 'block' : 'none';
-    }
-  }
-
-  if (selectTipo) {
-    selectTipo.addEventListener('change', syncPrecioSeleccionado);
-    syncPrecioSeleccionado();
-  }
-
   function extraerLitrosDeNombre(nombre) {
     const match = (nombre || '').match(/(\d+)\s*(?:l|lt|lts|litro|litros)?/i);
     return match ? parseFloat(match[1]) : 20;
   }
 
-  function agregarItemAlCarrito() {
-    const cantidad = parseInt(inputBot.value);
-    const precioInputVal = parseFloat(inputPrecio.value);
-    
-    if (!cantidad || cantidad < 1 || isNaN(precioInputVal) || precioInputVal < 0) {
-      showToast('Cantidad o precio inválido', 'error');
-      return;
+  function modificarCantidadCarrito(idx, delta) {
+    if (!carrito[idx]) return;
+    const item = carrito[idx];
+    if (delta > 0 && item.categoria === 'producto' && item.tipoBotellonId) {
+      const allTipos = store.getConfig('tiposBotellon') || [];
+      const t = allTipos.find(p => String(p.id) === String(item.tipoBotellonId));
+      if (t && t.stock !== undefined && t.stock !== null) {
+        const stockDisp = parseInt(t.stock) || 0;
+        if ((item.cantidad || 0) + delta > stockDisp) {
+          showToast(`Stock máximo alcanzado para "${item.nombre}": ${stockDisp} unidad(es)`, 'warning');
+          return;
+        }
+      }
     }
-    
-    const opt = selectTipo.options[selectTipo.selectedIndex];
-    if (!opt) return;
+    const nuevo = (item.cantidad || 0) + delta;
+    if (nuevo <= 0) {
+      carrito.splice(idx, 1);
+    } else {
+      item.cantidad = nuevo;
+      item.subtotal = item.cantidad * item.precioUnitario;
+      if (item.esBotellonFisico) {
+        item.litros = item.aguaCortesia ? (item.cantidad * (item.litrosAguaPorUnidad || 20)) : 0;
+      } else {
+        item.litros = item.cantidad * (item.litrosAguaPorUnidad || 20);
+      }
+    }
+    renderCarrito();
+    actualizarBadgesFichas();
+  }
+
+  function fijarCantidadCarrito(idx, cantidadExacta) {
+    if (!carrito[idx]) return;
+    const item = carrito[idx];
+    let cant = parseInt(cantidadExacta);
+    if (isNaN(cant) || cant <= 0) {
+      carrito.splice(idx, 1);
+    } else {
+      if (item.categoria === 'producto' && item.tipoBotellonId) {
+        const allTipos = store.getConfig('tiposBotellon') || [];
+        const t = allTipos.find(p => String(p.id) === String(item.tipoBotellonId));
+        if (t && t.stock !== undefined && t.stock !== null) {
+          const stockDisp = parseInt(t.stock) || 0;
+          if (stockDisp <= 0) {
+            showToast(`El producto "${item.nombre}" está agotado`, 'warning');
+            carrito.splice(idx, 1);
+            renderCarrito();
+            actualizarBadgesFichas();
+            return;
+          }
+          if (cant > stockDisp) {
+            showToast(`Cantidad supera el stock disponible (${stockDisp}). Se ajustó al máximo.`, 'warning');
+            cant = stockDisp;
+          }
+        }
+      }
+      item.cantidad = cant;
+      item.subtotal = cant * item.precioUnitario;
+      if (item.esBotellonFisico) {
+        item.litros = item.aguaCortesia ? (cant * (item.litrosAguaPorUnidad || 20)) : 0;
+      } else {
+        item.litros = cant * (item.litrosAguaPorUnidad || 20);
+      }
+    }
+    renderCarrito();
+    actualizarBadgesFichas();
+  }
+
+  function actualizarBadgesFichas() {
+    const cards = modal.querySelectorAll('.pos-product-card');
+    if (!cards.length) return;
+
+    const qtyMap = {};
+    carrito.forEach(item => {
+      qtyMap[item.tipoBotellonId] = (qtyMap[item.tipoBotellonId] || 0) + item.cantidad;
+    });
+
+    cards.forEach(card => {
+      const id = card.dataset.id;
+      const qty = qtyMap[id] || 0;
+      let badge = card.querySelector('.pos-card-qty-badge');
+      if (qty > 0) {
+        card.classList.add('in-cart');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'pos-card-qty-badge';
+          card.appendChild(badge);
+        }
+        badge.textContent = qty;
+      } else {
+        card.classList.remove('in-cart');
+        if (badge) badge.remove();
+      }
+    });
+  }
+
+  function agregarItemPorFicha(tipoId, cantidad = 1) {
+    const tiposBotellon = store.getConfig('tiposBotellon') || [];
+    const t = tiposBotellon.find(item => String(item.id) === String(tipoId));
+    if (!t) return;
 
     const cortesiaActiva = store.getConfig('cortesiaBotellonNuevo') === true;
-    const tipoBotellonId = opt.value;
-    const rawNombre = opt.dataset.nombre || opt.textContent.split('(')[0].trim();
-    const categoria = opt.dataset.categoria || 'relleno';
+    const tipoBotellonId = t.id;
+    const rawNombre = t.nombre || '';
+    const categoria = t.categoria === 'producto' ? 'producto' : 'relleno';
+
+    // 🛑 Verificación de stock para productos físicos
+    if (categoria === 'producto' && t.stock !== undefined && t.stock !== null) {
+      const stockDisp = parseInt(t.stock) || 0;
+      if (stockDisp <= 0) {
+        showToast(`El producto "${rawNombre}" está agotado`, 'warning');
+        return;
+      }
+      const existente = carrito.find(item => String(item.tipoBotellonId) === String(tipoBotellonId));
+      const cantActual = existente ? (existente.cantidad || 0) : 0;
+      if (cantActual + cantidad > stockDisp) {
+        showToast(`Stock insuficiente para "${rawNombre}". Disponible: ${stockDisp} (en pedido: ${cantActual})`, 'warning');
+        return;
+      }
+    }
     const esBotellonFisico = (categoria === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNombre);
     const tieneCortesia = cortesiaActiva && esBotellonFisico;
     const litrosCapacidad = esBotellonFisico 
       ? extraerLitrosDeNombre(rawNombre) 
-      : (parseFloat(opt.dataset.litros) || 20);
+      : (parseFloat(t.litros) || 20);
 
-    const monedaOriginal = opt.dataset.moneda || 'USD';
-    const precioBase = parseFloat(opt.dataset.precio) || 0;
-    const tasa = parseFloat(modal.querySelector('#input-tasa')?.value) || (store.getConfig('tasaCambio') || 40.00);
+    const isBsProducto = (t.moneda === 'VES' || t.moneda === 'Bs');
+    const monedaOriginal = isBsProducto ? 'VES' : 'USD';
+    const precioBase = parseFloat(t.precio) || 0;
+    const tasa = getTasaActual();
 
-    const isBsProducto = (monedaOriginal === 'VES' || monedaOriginal === 'Bs');
-    const precioCalculadoUSD = isBsProducto ? (tasa > 0 ? +(precioBase / tasa).toFixed(2) : 0) : precioBase;
-    
-    // Si el usuario no modificó el precio convertido, mantenemos la moneda fija en Bs exacta
-    const esFijoBs = isBsProducto && Math.abs(precioInputVal - precioCalculadoUSD) <= 0.01;
-    const finalMonedaOriginal = esFijoBs ? 'VES' : 'USD';
-    const finalPrecioBase = esFijoBs ? precioBase : precioInputVal;
-    const precioUnitario = esFijoBs ? (tasa > 0 ? (precioBase / tasa) : 0) : precioInputVal;
-    
+    const precioUnitario = isBsProducto ? (tasa > 0 ? (precioBase / tasa) : 0) : precioBase;
+
     const existenteIdx = carrito.findIndex(item => 
-      item.tipoBotellonId === tipoBotellonId && 
-      item.monedaOriginal === finalMonedaOriginal
+      String(item.tipoBotellonId) === String(tipoBotellonId) && 
+      item.monedaOriginal === monedaOriginal
     );
-    
+
     if (existenteIdx !== -1) {
       carrito[existenteIdx].cantidad += cantidad;
       carrito[existenteIdx].subtotal = carrito[existenteIdx].cantidad * carrito[existenteIdx].precioUnitario;
@@ -1510,25 +2095,148 @@ export function renderNuevaVentaForm(container) {
         nombre: rawNombre,
         cantidad,
         esBotellonFisico,
-        aguaCortesia: tieneCortesia, // solo por cortesía si la opción está activada en Configuración
+        aguaCortesia: tieneCortesia,
         litrosAguaPorUnidad: litrosCapacidad,
-        monedaOriginal: finalMonedaOriginal,
-        precioBase: finalPrecioBase,
+        monedaOriginal,
+        precioBase,
         precioUnitario,
         subtotal: cantidad * precioUnitario,
         litros: tieneCortesia ? (litrosCapacidad * cantidad) : (esBotellonFisico ? 0 : cantidad * litrosCapacidad)
       });
     }
-    
-    inputBot.value = '1';
-    if (selectTipo) {
-      selectTipo.selectedIndex = 0;
-      syncPrecioSeleccionado();
-    }
+
     renderCarrito();
+    actualizarBadgesFichas();
   }
 
-  modal.querySelector('#btn-add-item')?.addEventListener('click', () => agregarItemAlCarrito());
+  let currentCategoriaFiltro = 'recarga';
+  let currentSearchQuery = '';
+
+  function renderPosFichas() {
+    const grid = modal.querySelector('#pos-products-grid');
+    if (!grid) return;
+
+    const tiposBotellon = store.getConfig('tiposBotellon') || [];
+    const tasa = getTasaActual();
+    const cortesiaActiva = store.getConfig('cortesiaBotellonNuevo') === true;
+
+    let filtered = tiposBotellon;
+    if (currentCategoriaFiltro === 'recarga') {
+      filtered = filtered.filter(t => t.categoria !== 'producto');
+    } else if (currentCategoriaFiltro === 'producto') {
+      filtered = filtered.filter(t => t.categoria === 'producto');
+    }
+
+    if (currentSearchQuery.trim()) {
+      const q = currentSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t => (t.nombre || '').toLowerCase().includes(q));
+    }
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="pos-empty-state">
+          <div style="font-size: 28px; margin-bottom: 6px;">🔍</div>
+          <div style="font-weight: 600; font-size: 14px;">No se encontraron productos</div>
+          <div style="font-size: 12px; margin-top: 4px; color: var(--color-text-secondary);">Prueba seleccionando otra categoría o cambiando la búsqueda</div>
+        </div>
+      `;
+      return;
+    }
+
+    const qtyMap = {};
+    carrito.forEach(item => {
+      qtyMap[item.tipoBotellonId] = (qtyMap[item.tipoBotellonId] || 0) + item.cantidad;
+    });
+
+    grid.innerHTML = filtered.map(t => {
+      const isProducto = t.categoria === 'producto';
+      const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
+      const precioBase = parseFloat(t.precio) || 0;
+      const rawNombre = t.nombre || '';
+      const esBotellonFisico = isProducto && /(?:botell[oó]n|botellones)/i.test(rawNombre);
+      const tieneCortesia = cortesiaActiva && esBotellonFisico;
+      const litros = esBotellonFisico ? extraerLitrosDeNombre(rawNombre) : (parseFloat(t.litros) || 20);
+      const qtyInCart = qtyMap[t.id] || 0;
+      const stock = isProducto && t.stock !== undefined && t.stock !== null ? parseInt(t.stock) : null;
+      const isAgotado = isProducto && stock !== null && stock <= 0;
+
+      let precioPrimario = '';
+      let precioSecundario = '';
+      if (isBs) {
+        const precioUSD = tasa > 0 ? (precioBase / tasa) : 0;
+        precioPrimario = `Bs ${Utils.formatNumber(precioBase, true)}`;
+        precioSecundario = `$ ${Utils.formatNumber(precioUSD, true)}`;
+      } else {
+        const precioBs = precioBase * tasa;
+        precioPrimario = `$ ${Utils.formatNumber(precioBase, true)}`;
+        precioSecundario = `Bs ${Utils.formatNumber(precioBs, true)}`;
+      }
+
+      return `
+        <div class="pos-product-card ${qtyInCart > 0 ? 'in-cart' : ''} ${isAgotado ? 'is-agotado' : ''}" data-id="${t.id}" title="${Utils.escapeHtml(rawNombre)}${isAgotado ? ' (Agotado)' : ''}">
+          ${qtyInCart > 0 ? `<span class="pos-card-qty-badge">${qtyInCart}</span>` : ''}
+          <div class="pos-card-top-row">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <div class="pos-card-icon ${isProducto ? 'producto' : 'recarga'}">
+                ${isProducto ? '📦' : '💧'}
+              </div>
+              ${!isProducto ? `<span class="pos-tag-litros">${litros}L</span>` : ''}
+              ${esBotellonFisico ? `<span class="pos-tag-litros">${litros}L</span>` : ''}
+              ${isProducto && stock !== null ? `
+                <span class="pos-tag-stock ${stock === 0 ? 'empty' : (stock <= 5 ? 'low' : '')}">
+                  ${stock === 0 ? 'Agotado' : `Stock: ${stock}`}
+                </span>
+              ` : ''}
+            </div>
+            ${tieneCortesia ? `<span class="pos-tag-cortesia" title="Incluye primera recarga de agua gratis">🎁 Agua Gratis</span>` : ''}
+          </div>
+          <div class="pos-card-title" title="${Utils.escapeHtml(rawNombre)}">${Utils.escapeHtml(rawNombre)}</div>
+          <div class="pos-card-footer">
+            <div>
+              <div class="pos-card-price-primary">${precioPrimario}</div>
+              <div class="pos-card-price-secondary">${precioSecundario}</div>
+            </div>
+            <div class="pos-card-add-btn" title="${isAgotado ? 'Producto agotado' : 'Agregar al pedido'}">${isAgotado ? '🚫' : '+'}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('.pos-product-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        if (card.classList.contains('is-agotado')) {
+          const tiposBotellon = store.getConfig('tiposBotellon') || [];
+          const t = tiposBotellon.find(item => String(item.id) === String(id));
+          showToast(`El producto "${t?.nombre || 'seleccionado'}" está agotado y no tiene stock disponible`, 'warning');
+          return;
+        }
+        agregarItemPorFicha(id, 1);
+      });
+    });
+  }
+
+  // Configuración de pestañas de categoría y buscador
+  const catPills = modal.querySelectorAll('.pos-cat-pill');
+  catPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      catPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentCategoriaFiltro = pill.dataset.cat || 'recarga';
+      renderPosFichas();
+    });
+  });
+
+  const searchFichasInput = modal.querySelector('#pos-search-input');
+  if (searchFichasInput) {
+    searchFichasInput.addEventListener('input', (e) => {
+      currentSearchQuery = e.target.value || '';
+      renderPosFichas();
+    });
+  }
+
+  // Render inicial de fichas POS
+  renderPosFichas();
 
   function actualizarPagosAutom(totalUSD, totalBs) {
     const pagosMontoInputs = modal.querySelectorAll('.pago-monto');
@@ -1627,23 +2335,24 @@ export function renderNuevaVentaForm(container) {
             // Fila 1: Saldo a favor ($saldoFavor)
             const row1 = document.createElement('div');
             row1.className = 'pago-row';
-            row1.style.display = 'grid';
-            row1.style.gridTemplateColumns = '1.5fr 1fr 40px';
-            row1.style.gap = '8px';
+            row1.style.display = 'flex';
             row1.style.alignItems = 'center';
-            row1.style.marginBottom = 'var(--space-xs)';
+            row1.style.gap = '6px';
+            row1.style.marginBottom = '4px';
+            row1.style.flexWrap = 'wrap';
             row1.innerHTML = `
-              <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control pago-metodo">
+              <label class="form-label" style="margin: 0; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
+              <div class="form-group" style="margin-bottom: 0; flex: 1.2; min-width: 130px;">
+                <select class="form-control pago-metodo" style="height: 32px; font-size: 11.5px;">
                   ${metodosDisponibles.map(m => `<option value="${m.id}" ${m.id === 'saldo_favor' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
                 </select>
               </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${saldoFavor.toFixed(2)}" placeholder="0.00"/>
+              <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 80px;">
+                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${saldoFavor.toFixed(2)}" placeholder="0.00" style="height: 32px; font-size: 12px;"/>
               </div>
-              <div style="width: 40px;"></div>
-              <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+              <div style="width: 32px; flex-shrink: 0;"></div>
+              <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
+                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
               </div>
             `;
             pagosList.appendChild(row1);
@@ -1651,23 +2360,24 @@ export function renderNuevaVentaForm(container) {
             // Fila 2: Resto a pagar (default punto en Bs)
             const row2 = document.createElement('div');
             row2.className = 'pago-row';
-            row2.style.display = 'grid';
-            row2.style.gridTemplateColumns = '1.5fr 1fr 40px';
-            row2.style.gap = '8px';
+            row2.style.display = 'flex';
             row2.style.alignItems = 'center';
-            row2.style.marginBottom = 'var(--space-xs)';
+            row2.style.gap = '6px';
+            row2.style.marginBottom = '4px';
+            row2.style.flexWrap = 'wrap';
             row2.innerHTML = `
-              <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control pago-metodo">
+              <div style="width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--color-text-secondary); text-align: right; padding-right: 2px;">+ Resto:</div>
+              <div class="form-group" style="margin-bottom: 0; flex: 1.2; min-width: 130px;">
+                <select class="form-control pago-metodo" style="height: 32px; font-size: 11.5px;">
                   ${metodosDisponibles.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
                 </select>
               </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${diffBs.toFixed(2)}" placeholder="0.00"/>
+              <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 80px;">
+                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${diffBs.toFixed(2)}" placeholder="0.00" style="height: 32px; font-size: 12px;"/>
               </div>
-              <button type="button" class="btn btn-danger btn-remove-pago" style="height: 38px; width: 40px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 16px;">✕</button>
-              <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+              <button type="button" class="btn btn-danger btn-remove-pago" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;">✕</button>
+              <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
+                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
               </div>
             `;
             pagosList.appendChild(row2);
@@ -1683,23 +2393,24 @@ export function renderNuevaVentaForm(container) {
             // Fila 1: Paga total con saldo a favor
             const row1 = document.createElement('div');
             row1.className = 'pago-row';
-            row1.style.display = 'grid';
-            row1.style.gridTemplateColumns = '1.5fr 1fr 40px';
-            row1.style.gap = '8px';
+            row1.style.display = 'flex';
             row1.style.alignItems = 'center';
-            row1.style.marginBottom = 'var(--space-xs)';
+            row1.style.gap = '6px';
+            row1.style.marginBottom = '4px';
+            row1.style.flexWrap = 'wrap';
             row1.innerHTML = `
-              <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control pago-metodo">
+              <label class="form-label" style="margin: 0; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
+              <div class="form-group" style="margin-bottom: 0; flex: 1.2; min-width: 130px;">
+                <select class="form-control pago-metodo" style="height: 32px; font-size: 11.5px;">
                   ${metodosDisponibles.map(m => `<option value="${m.id}" ${m.id === 'saldo_favor' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
                 </select>
               </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${totalUSD.toFixed(2)}" placeholder="0.00"/>
+              <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 80px;">
+                <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${totalUSD.toFixed(2)}" placeholder="0.00" style="height: 32px; font-size: 12px;"/>
               </div>
-              <div style="width: 40px;"></div>
-              <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+              <div style="width: 32px; flex-shrink: 0;"></div>
+              <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
+                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
               </div>
             `;
             pagosList.appendChild(row1);
@@ -1734,8 +2445,24 @@ export function renderNuevaVentaForm(container) {
       }
     });
 
+    // Calculadora de Vuelto / Cambio dinámico ($ y Bs)
+    const panelVuelto = modal.querySelector('#panel-vuelto-calculadora');
+    const txtVueltoUSD = modal.querySelector('#txt-vuelto-usd');
+    const txtVueltoBs = modal.querySelector('#txt-vuelto-bs');
+    const hayExceso = (totalUSD > 0) && (totalPagosDolares > (totalUSD + 0.009) || totalPagosBs > (totalBs + 0.1));
+
+    if (hayExceso) {
+      const vueltoUSD = Math.max(0, totalPagosDolares - totalUSD);
+      const vueltoBs = tasa > 0 ? vueltoUSD * tasa : Math.max(0, totalPagosBs - totalBs);
+      if (panelVuelto) panelVuelto.style.display = 'flex';
+      if (txtVueltoUSD) txtVueltoUSD.textContent = Utils.formatCurrency(vueltoUSD);
+      if (txtVueltoBs) txtVueltoBs.textContent = `Bs ${Utils.formatNumber(vueltoBs, true)}`;
+    } else {
+      if (panelVuelto) panelVuelto.style.display = 'none';
+    }
+
     const clienteId = hiddenId.value;
-    if (clienteId && (totalPagosDolares > (totalUSD + 0.01) || totalPagosBs > (totalBs + 0.50))) {
+    if (clienteId && hayExceso) {
       diffMonto.textContent = Utils.formatCurrency(Math.max(0, totalPagosDolares - totalUSD));
       diffPanel.style.display = 'flex';
     } else {
@@ -1768,24 +2495,25 @@ export function renderNuevaVentaForm(container) {
 
     const row = document.createElement('div');
     row.className = 'pago-row';
-    row.style.display = 'grid';
-    row.style.gridTemplateColumns = '1.5fr 1fr 40px';
-    row.style.gap = '8px';
+    row.style.display = 'flex';
     row.style.alignItems = 'center';
-    row.style.marginBottom = 'var(--space-xs)';
+    row.style.gap = '6px';
+    row.style.marginBottom = '4px';
+    row.style.flexWrap = 'wrap';
     row.innerHTML = `
-      <div class="form-group" style="margin-bottom: 0;">
-        <select class="form-control pago-metodo">
+      <div style="width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--color-text-secondary); text-align: right; padding-right: 2px;">+ Pago:</div>
+      <div class="form-group" style="margin-bottom: 0; flex: 1.2; min-width: 130px;">
+        <select class="form-control pago-metodo" style="height: 32px; font-size: 11.5px;">
           ${metodosDisponibles.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group" style="margin-bottom: 0;">
-        <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${defaultVal}" placeholder="0.00"/>
+      <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 80px;">
+        <input type="number" class="form-control pago-monto" step="0.01" min="0" value="${defaultVal}" placeholder="0.00" style="height: 32px; font-size: 12px;"/>
       </div>
-      <button type="button" class="btn btn-danger btn-remove-pago" style="height: 38px; width: 40px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 16px;">✕</button>
+      <button type="button" class="btn btn-danger btn-remove-pago" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;" title="Quitar pago">✕</button>
       
-      <div class="form-group pago-ref-container" style="grid-column: 1 / -1; margin-bottom: 0; display: none;">
-        <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia"/>
+      <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
+        <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
       </div>
     `;
     modal.querySelector('#pagos-list').appendChild(row);
@@ -1834,9 +2562,6 @@ export function renderNuevaVentaForm(container) {
       actualizarInfoPagos();
     }
   });
-
-  selectTipo.addEventListener('change', syncPrecioSeleccionado);
-  syncPrecioSeleccionado();
 
   const radiosTipo = modal.querySelectorAll('input[name="tipo"]');
   const seccionPagos = modal.querySelector('#seccion-pagos');
