@@ -636,9 +636,10 @@ export function renderNuevaVentaForm(container) {
         .pos-card-top-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 6px;
-          margin-bottom: 6px;
+          gap: 5px;
+          margin-bottom: 4px;
+          flex-wrap: nowrap;
+          overflow: hidden;
         }
         .pos-card-icon {
           width: 28px;
@@ -676,6 +677,7 @@ export function renderNuevaVentaForm(container) {
           line-height: 1.2;
           display: inline-flex;
           align-items: center;
+          flex-shrink: 0;
         }
         .pos-tag-stock {
           background: #F1F5F9;
@@ -687,6 +689,8 @@ export function renderNuevaVentaForm(container) {
           line-height: 1.2;
           display: inline-flex;
           align-items: center;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
         .pos-tag-stock.low {
           background: #FEF3C7;
@@ -699,12 +703,16 @@ export function renderNuevaVentaForm(container) {
         .pos-tag-cortesia {
           background: #EDE9FE;
           color: #6D28D9;
-          font-size: 9.5px;
-          font-weight: 700;
-          padding: 2px 5px;
-          border-radius: 4px;
-          line-height: 1.2;
-          white-space: nowrap;
+          font-size: 13px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          line-height: 1;
+          flex-shrink: 0;
+          cursor: help;
         }
         .pos-card-footer {
           display: flex;
@@ -2176,19 +2184,16 @@ export function renderNuevaVentaForm(container) {
         <div class="pos-product-card ${qtyInCart > 0 ? 'in-cart' : ''} ${isAgotado ? 'is-agotado' : ''}" data-id="${t.id}" title="${Utils.escapeHtml(rawNombre)}${isAgotado ? ' (Agotado)' : ''}">
           ${qtyInCart > 0 ? `<span class="pos-card-qty-badge">${qtyInCart}</span>` : ''}
           <div class="pos-card-top-row">
-            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <div class="pos-card-icon ${isProducto ? 'producto' : 'recarga'}">
-                ${isProducto ? '📦' : '💧'}
-              </div>
-              ${!isProducto ? `<span class="pos-tag-litros">${litros}L</span>` : ''}
-              ${esBotellonFisico ? `<span class="pos-tag-litros">${litros}L</span>` : ''}
-              ${isProducto && stock !== null ? `
-                <span class="pos-tag-stock ${stock === 0 ? 'empty' : (stock <= 5 ? 'low' : '')}">
-                  ${stock === 0 ? 'Agotado' : `Stock: ${stock}`}
-                </span>
-              ` : ''}
+            <div class="pos-card-icon ${isProducto ? 'producto' : 'recarga'}">
+              ${isProducto ? '📦' : '💧'}
             </div>
-            ${tieneCortesia ? `<span class="pos-tag-cortesia" title="Incluye primera recarga de agua gratis">🎁 Agua Gratis</span>` : ''}
+            ${!isProducto ? `<span class="pos-tag-litros">${litros}L</span>` : ''}
+            ${esBotellonFisico ? `<span class="pos-tag-litros">${litros}L</span>` : ''}
+            ${isProducto && stock !== null ? `
+              <span class="pos-tag-stock ${stock === 0 ? 'empty' : (stock <= 5 ? 'low' : '')}">
+                ${stock === 0 ? 'Agotado' : `Stock: ${stock}`}
+              </span>
+            ` : ''}
           </div>
           <div class="pos-card-title" title="${Utils.escapeHtml(rawNombre)}">${Utils.escapeHtml(rawNombre)}</div>
           <div class="pos-card-footer">
@@ -2196,7 +2201,10 @@ export function renderNuevaVentaForm(container) {
               <div class="pos-card-price-primary">${precioPrimario}</div>
               <div class="pos-card-price-secondary">${precioSecundario}</div>
             </div>
-            <div class="pos-card-add-btn" title="${isAgotado ? 'Producto agotado' : 'Agregar al pedido'}">${isAgotado ? '🚫' : '+'}</div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+              ${tieneCortesia ? `<span class="pos-tag-cortesia" title="Incluye primera recarga de agua gratis">🎁</span>` : ''}
+              <div class="pos-card-add-btn" title="${isAgotado ? 'Producto agotado' : 'Agregar al pedido'}">${isAgotado ? '🚫' : '+'}</div>
+            </div>
           </div>
         </div>
       `;
