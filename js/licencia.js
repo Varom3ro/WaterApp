@@ -173,11 +173,13 @@ export const Licencia = {
     if (!licenciaLocal) return;
     try {
       const user = JSON.parse(licenciaLocal);
+      const s = storeInstance || (window.__app_store || null);
+
+      // Inyección automática de Catálogo Remoto
       if (user.catalogo_inicial && Array.isArray(user.catalogo_inicial) && user.catalogo_inicial.length > 0) {
         const versionAplicada = localStorage.getItem('catalogo_remoto_aplicado');
         const hashActual = JSON.stringify(user.catalogo_inicial);
         if (versionAplicada !== hashActual) {
-          const s = storeInstance || (window.__app_store || null);
           if (s) {
             s.setConfig('tiposBotellon', user.catalogo_inicial);
             localStorage.setItem('catalogo_remoto_aplicado', hashActual);
@@ -185,8 +187,30 @@ export const Licencia = {
           }
         }
       }
+
+      // Inyección automática de Logotipo y Nombre Remoto
+      if (user.logo_empresa && typeof user.logo_empresa === 'string') {
+        const logoAplicado = localStorage.getItem('logo_remoto_aplicado');
+        if (logoAplicado !== user.logo_empresa) {
+          if (s) {
+            s.setConfig('empresaLogo', user.logo_empresa);
+            localStorage.setItem('logo_remoto_aplicado', user.logo_empresa);
+            console.log('[Licencia] Logotipo remoto inyectado exitosamente');
+          }
+        }
+      }
+
+      if (user.nombre_empresa && typeof user.nombre_empresa === 'string') {
+        const nombreAplicado = localStorage.getItem('nombre_remoto_aplicado');
+        if (nombreAplicado !== user.nombre_empresa) {
+          if (s) {
+            s.setConfig('empresaNombre', user.nombre_empresa);
+            localStorage.setItem('nombre_remoto_aplicado', user.nombre_empresa);
+          }
+        }
+      }
     } catch (e) {
-      console.warn('[Licencia] Error al aplicar catálogo remoto:', e);
+      console.warn('[Licencia] Error al aplicar catálogo/logo remoto:', e);
     }
   },
 
