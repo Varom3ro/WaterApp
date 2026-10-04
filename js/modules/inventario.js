@@ -24,8 +24,14 @@ export function renderInventario(container) {
   // Calcular balance
   const totalCisternas = cisternas.reduce((sum, c) => sum + c.capacidad, 0);
   const ventas = store.getAll('ventas');
-  const totalVendido = ventas.reduce((sum, v) => sum + (v.botellones * 20), 0);
-  const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
+  const totalVendido = ventas.reduce((sum, v) => sum + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+  const totalMermaLavado = ventas.reduce((sum, v) => {
+    if (v.litrosMermaLavado !== undefined) return sum + (parseFloat(v.litrosMermaLavado) || 0);
+    const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+    return sum + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+  }, 0);
+  const totalMermaManual = mermas.reduce((sum, m) => sum + (parseFloat(m.litros) || 0), 0);
+  const totalMerma = Math.round((totalMermaLavado + totalMermaManual) * 100) / 100;
 
   container.innerHTML = `
     <div class="page-header">
@@ -166,7 +172,7 @@ export function renderInventario(container) {
         <div class="mt-lg" style="padding:var(--space-md);background:var(--color-bg);border-radius:var(--radius-md);font-size:var(--font-size-sm)">
           <strong>Fórmula de Balance de Agua:</strong><br/>
           Inv. Inicial + Cisternas - Ventas - Merma = Inv. Teórico<br/>
-          <span class="text-muted">Merma total registrada: ${Utils.formatNumber(totalMerma)} L</span>
+          <span class="text-muted">Merma total: ${Utils.formatNumber(totalMerma)} L (Lavado de botellones: ${Utils.formatNumber(totalMermaLavado)} L + Manuales: ${Utils.formatNumber(totalMermaManual)} L)</span>
         </div>
       </div>
 

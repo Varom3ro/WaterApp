@@ -221,7 +221,12 @@ export async function syncToCloud(isManual = false) {
       const d = new Date(m.fecha);
       return d >= dayStart && d <= dayEnd;
     });
-    const litrosMermasHoy = mermasHoy.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
+    const mermasLavadoHoy = ventasHoy.reduce((s, v) => {
+      if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+      const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+      return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+    }, 0);
+    const litrosMermasHoy = Math.round((mermasHoy.reduce((s, m) => s + (parseFloat(m.litros) || 0), 0) + mermasLavadoHoy) * 100) / 100;
 
     // Últimos movimientos (ventas + mermas)
     // 🛡️ Ordenar cronológicamente ANTES de extraer para asegurar que siempre se tomen las ventas más recientes

@@ -3,7 +3,7 @@
 // ============================================
 
 export const Utils = {
-  VERSION: '2.8.28',
+  VERSION: '2.8.29',
 
   // Generar ID único
   generateId() {
@@ -214,5 +214,14 @@ export const Utils = {
       img.onerror = () => resolve(source);
       img.src = source;
     });
+  },
+
+  // Calcular merma de agua por lavado de botellones
+  // Base por defecto: 1 litro de merma por cada 20 litros recargados (5%)
+  calcularMermaLavado(litros, mermaPor20L = 1.0) {
+    const l = parseFloat(litros) || 0;
+    if (l <= 0) return 0;
+    const factor = (parseFloat(mermaPor20L) || 1.0) / 20;
+    return Math.round(l * factor * 1000) / 1000;
   }
 };

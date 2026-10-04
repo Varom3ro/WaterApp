@@ -339,10 +339,25 @@ class Store {
         return inv;
     }
 
+    getMermaLavadoConfig() {
+        const activo = this.getConfig('moduloMermaLavado') !== false;
+        const base20L = parseFloat(this.getConfig('mermaLavadoBase20L')) || 1.0;
+        return { activo, base20L, factor: base20L / 20 };
+    }
+
+    calcularMermaLavado(litros) {
+        const cfg = this.getMermaLavadoConfig();
+        if (!cfg.activo) return 0;
+        const l = parseFloat(litros) || 0;
+        if (l <= 0) return 0;
+        return Math.round(l * cfg.factor * 1000) / 1000;
+    }
+
     descontarVenta(botellones, litrosPorBotellon = 20) {
         const inv = this.getInventarioActual();
         const litros = botellones * litrosPorBotellon;
-        inv.litros = Math.max(0, inv.litros - litros);
+        const merma = this.calcularMermaLavado(litros);
+        inv.litros = Math.max(0, inv.litros - (litros + merma));
         this.setConfig('inventario', inv);
         return inv;
     }
@@ -838,6 +853,12 @@ class Store {
         }
         if (this.getConfig('unidadCaudalimetro') === undefined) {
             this.setConfig('unidadCaudalimetro', 'L');
+        }
+        if (this.getConfig('moduloMermaLavado') === undefined) {
+            this.setConfig('moduloMermaLavado', true);
+        }
+        if (this.getConfig('mermaLavadoBase20L') === undefined) {
+            this.setConfig('mermaLavadoBase20L', 1.0);
         }
     }
 

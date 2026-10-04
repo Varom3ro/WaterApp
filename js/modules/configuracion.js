@@ -15,6 +15,8 @@ export function renderConfiguracion(container) {
   const moduloCaudalimetro = store.getConfig('moduloCaudalimetro') || false;
   const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
   const cortesiaBotellonNuevo = store.getConfig('cortesiaBotellonNuevo') === true;
+  const moduloMermaLavado = store.getConfig('moduloMermaLavado') !== false;
+  const mermaLavadoBase20L = parseFloat(store.getConfig('mermaLavadoBase20L')) || 1.0;
   const metodosPago = store.getMetodosPago(false);
 
   let usuarioEmail = 'Licencia Local';
@@ -465,6 +467,45 @@ export function renderConfiguracion(container) {
 
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text-secondary); line-height: 1.4;">
           💡 <em>Al estar <strong>Activado</strong>, al seleccionar cualquier botellón de la lista de productos en el Punto de Venta se incluirá el agua de cortesía gratis (descontando los litros de agua del tanque sin costo extra) y con la opción de quitarla en el carrito. Al estar <strong>Desactivado</strong>, los botellones se venderán como envases vacíos normales sin recarga de agua.</em>
+      </div>
+
+      <!-- Merma de Agua por Lavado de Botellones -->
+      <div class="card full-width" style="border-left: 4px solid #0284C7;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>🧼</span> Merma de Agua por Lavado de Botellones
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Calcula y descuenta automáticamente el agua utilizada en el enjuague y lavado al realizar cualquier recarga de agua, asegurando un cuadre exacto con el reloj medidor (caudalímetro) y el nivel del tanque.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="label-status-merma-lavado" style="font-size: 13px; font-weight: 700; color: ${moduloMermaLavado ? '#15803D' : '#64748B'};">
+              ${moduloMermaLavado ? '🟢 Activado' : '⚪ Desactivado'}
+            </span>
+            <label style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0; cursor: pointer;">
+              <input type="checkbox" id="toggle-merma-lavado" ${moduloMermaLavado ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+              <span id="slider-merma-lavado" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${moduloMermaLavado ? '#15803D' : '#CBD5E1'}; transition: .3s; border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+                <span id="slider-knob-merma-lavado" style="position: absolute; content: ''; height: 20px; width: 20px; left: ${moduloMermaLavado ? '27px' : '3px'}; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div id="merma-lavado-config-body" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--color-border); display: ${moduloMermaLavado ? 'block' : 'none'};">
+          <div class="form-row" style="align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div class="form-group" style="max-width: 300px; margin-bottom: 0;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600;">Merma base para Botellón de 20 Litros:</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" id="input-merma-base-20l" class="form-control" style="height: 38px; width: 110px;" step="0.1" min="0" max="5" value="${mermaLavadoBase20L}">
+                <span style="font-weight: 600; font-size: 13px; color: #475569;">Litro(s) de merma</span>
+              </div>
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary); max-width: 580px; line-height: 1.4;">
+              💡 <em>Tasa de cálculo: <strong>${((mermaLavadoBase20L / 20) * 100).toFixed(1)}%</strong> sobre el volumen recargado. Aplica proporcionalmente a todos los litrajes (ej. 20L = ${mermaLavadoBase20L}L, 19L = ${(19 * (mermaLavadoBase20L / 20)).toFixed(2)}L, 12L = ${(12 * (mermaLavadoBase20L / 20)).toFixed(2)}L, 5L = ${(5 * (mermaLavadoBase20L / 20)).toFixed(2)}L, 2L = ${(2 * (mermaLavadoBase20L / 20)).toFixed(2)}L, 1.5L = ${(1.5 * (mermaLavadoBase20L / 20)).toFixed(3)}L).</em>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -643,6 +684,47 @@ export function renderConfiguracion(container) {
 
       showToast(activo ? '🎁 Cortesía de agua en botellones nuevos activada' : 'Cortesía de agua en botellones nuevos desactivada', activo ? 'success' : 'info');
       if (typeof syncToCloud === 'function') syncToCloud();
+    });
+  }
+
+  // Merma de Lavado Toggle & Base 20L
+  const toggleMermaLavado = container.querySelector('#toggle-merma-lavado');
+  const labelStatusMermaLavado = container.querySelector('#label-status-merma-lavado');
+  const sliderMermaLavado = container.querySelector('#slider-merma-lavado');
+  const sliderKnobMermaLavado = container.querySelector('#slider-knob-merma-lavado');
+  const mermaConfigBody = container.querySelector('#merma-lavado-config-body');
+  const inputMermaBase20L = container.querySelector('#input-merma-base-20l');
+
+  if (toggleMermaLavado) {
+    toggleMermaLavado.addEventListener('change', (e) => {
+      const activo = e.target.checked;
+      store.setConfig('moduloMermaLavado', activo);
+      if (labelStatusMermaLavado) {
+        labelStatusMermaLavado.textContent = activo ? '🟢 Activado' : '⚪ Desactivado';
+        labelStatusMermaLavado.style.color = activo ? '#15803D' : '#64748B';
+      }
+      if (sliderMermaLavado) {
+        sliderMermaLavado.style.backgroundColor = activo ? '#15803D' : '#CBD5E1';
+      }
+      if (sliderKnobMermaLavado) {
+        sliderKnobMermaLavado.style.left = activo ? '27px' : '3px';
+      }
+      if (mermaConfigBody) {
+        mermaConfigBody.style.display = activo ? 'block' : 'none';
+      }
+      showToast(activo ? '🧼 Cálculo de merma por lavado activado' : 'Merma por lavado desactivada', activo ? 'success' : 'info');
+      if (typeof syncToCloud === 'function') syncToCloud();
+    });
+  }
+
+  if (inputMermaBase20L) {
+    inputMermaBase20L.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val >= 0) {
+        store.setConfig('mermaLavadoBase20L', val);
+        showToast(`Merma base actualizada a ${val} L por cada 20 L (${((val / 20) * 100).toFixed(1)}%)`, 'success');
+        if (typeof syncToCloud === 'function') syncToCloud();
+      }
     });
   }
 
