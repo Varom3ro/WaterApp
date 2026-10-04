@@ -678,8 +678,13 @@ function renderRendimiento(content, range) {
   }) : mermasAll;
 
   const totalComprado = cisternas.reduce((sum, c) => sum + c.capacidad, 0);
-  const totalVendido = ventas.reduce((sum, v) => sum + (v.botellones * 20), 0);
-  const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
+  const totalVendido = ventas.reduce((sum, v) => sum + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+  const mermasLavado = ventas.reduce((s, v) => {
+    if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+    const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+    return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+  }, 0);
+  const totalMerma = Math.round((mermas.reduce((sum, m) => sum + m.litros, 0) + mermasLavado) * 100) / 100;
   const eficiencia = totalComprado > 0 ? Math.round((totalVendido / totalComprado) * 100) : 0;
 
   content.innerHTML = `
@@ -731,10 +736,15 @@ function renderRendimiento(content, range) {
         if (lect.inicial !== null || lect.final !== null) {
           const vDia = ventasAll.filter(v => v.fecha && v.fecha.startsWith(fStr));
           const lFact = vDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+          const lLavado = vDia.reduce((s, v) => {
+            if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+            const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+            return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+          }, 0);
           const mDia = mermasAll.filter(m => m.fecha && m.fecha.startsWith(fStr));
           const lMerm = mDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
-          const totSist = lFact + lMerm;
-          const diff = lect.litrosReloj - totSist;
+          const totSist = Math.round((lFact + lLavado + lMerm) * 100) / 100;
+          const diff = Math.round((lect.litrosReloj - totSist) * 100) / 100;
           diasArray.push({
             fecha: fStr,
             lect,
@@ -1127,7 +1137,12 @@ function getConsolidatedReportHTML(range, periodoLabel) {
 
   // Stats agua
   const totalCompradoAgua = cisternas.reduce((sum, c) => sum + c.capacidad, 0);
-  const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
+  const mermasLavadoPDF = ventas.reduce((s, v) => {
+    if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+    const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+    return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+  }, 0);
+  const totalMerma = Math.round((mermas.reduce((sum, m) => sum + m.litros, 0) + mermasLavadoPDF) * 100) / 100;
   const eficiencia = totalCompradoAgua > 0 ? Math.round((totalLitrosVendidos / totalCompradoAgua) * 100) : 0;
 
   const listProdResumen = sortProductosResumen(Object.entries(productoResumen));
@@ -1580,11 +1595,16 @@ function exportConsolidatedCSV(range, periodoLabel) {
   csv += `=== 5. BALANCE Y RENDIMIENTO DEL AGUA ===\n`;
   csv += `Concepto;Litros;Detalles\n`;
   const totalCompradoAgua = cisternas.reduce((sum, c) => sum + c.capacidad, 0);
-  const totalMerma = mermas.reduce((sum, m) => sum + m.litros, 0);
+  const mermasLavadoCSV = ventas.reduce((s, v) => {
+    if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+    const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+    return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+  }, 0);
+  const totalMerma = Math.round((mermas.reduce((sum, m) => sum + m.litros, 0) + mermasLavadoCSV) * 100) / 100;
   const eficiencia = totalCompradoAgua > 0 ? Math.round((totalLitrosVendidos / totalCompradoAgua) * 100) : 0;
   csv += `Total Agua Comprada (Cisternas);${totalCompradoAgua};${cisternas.length} cisternas recibidas\n`;
   csv += `Total Agua Despachada (Ventas);${totalLitrosVendidos};${ventas.length} ventas procesadas\n`;
-  csv += `Merma Registrada (Lavado);${totalMerma};Lavado y purgas\n`;
+  csv += `Merma Total (Lavado + Manuales);${totalMerma};Lavado de envases y purgas\n`;
   csv += `Eficiencia Operativa;${eficiencia}%;(Agua Vendida / Agua Comprada)\n`;
 
   // Descarga del archivo

@@ -1263,6 +1263,9 @@ export function renderNuevaVentaForm(container) {
         }
       });
 
+      const litrosMermaLavado = store.calcularMermaLavado ? store.calcularMermaLavado(totalLitros) : Utils.calcularMermaLavado(totalLitros);
+      const totalSalidaAgua = Math.round((totalLitros + litrosMermaLavado) * 1000) / 1000;
+
       const pagos = [];
       let totalPagadoUSD = 0;
       let totalPagadoBs = 0;
@@ -1362,6 +1365,8 @@ export function renderNuevaVentaForm(container) {
         detalles: detallesFinales,
         botellones: totalBotellones,
         litrosTotales: totalLitros,
+        litrosMermaLavado,
+        litrosSalidaTanque: totalSalidaAgua,
         delivery: isSinCobro ? 0 : montoDelivery,
         deliveryCant: isDelivActive && !isSinCobro ? cantValue : 0,
         deliveryTipo: isDelivActive && !isSinCobro ? deliveryTipo : null,
@@ -1378,9 +1383,9 @@ export function renderNuevaVentaForm(container) {
 
       store.save('ventas', venta);
       
-      // Descontar inventario de agua
+      // Descontar inventario de agua (agua despachada + merma de lavado)
       const inv = store.getInventarioActual();
-      inv.litros = Math.max(0, inv.litros - totalLitros);
+      inv.litros = Math.max(0, inv.litros - totalSalidaAgua);
       store.setConfig('inventario', inv);
 
       // Descontar inventario de productos físicos
@@ -2842,9 +2847,11 @@ function deleteVenta(id) {
     onSave: () => {
       const venta = store.getById('ventas', id);
       if (venta) {
-        // Restore inventory based on recorded liters
+        // Restore inventory based on recorded liters and washing loss
         const inv = store.getInventarioActual();
-        inv.litros += (venta.litrosTotales || venta.botellones * 20);
+        const litrosRestaurar = parseFloat(venta.litrosSalidaTanque) ||
+          ((parseFloat(venta.litrosTotales) || (venta.botellones * 20)) + (parseFloat(venta.litrosMermaLavado) || ((parseFloat(venta.litrosTotales) || (venta.botellones * 20)) * 0.05)));
+        inv.litros = Math.min(inv.capacidadTanque || Infinity, inv.litros + litrosRestaurar);
         store.setConfig('inventario', inv);
 
         // Restore stock of physical products

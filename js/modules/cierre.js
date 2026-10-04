@@ -245,10 +245,15 @@ function renderCierreContent(fecha) {
 
   const ventasDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
   const litrosFacturados = ventasDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+  const mermasLavadoDia = ventasDia.reduce((s, v) => {
+    if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+    const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+    return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+  }, 0);
   const mermasDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
   const litrosMermas = mermasDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
-  const totalAguaSistema = litrosFacturados + litrosMermas;
-  const diffAgua = lecturaCaud.litrosReloj - totalAguaSistema;
+  const totalAguaSistema = Math.round((litrosFacturados + mermasLavadoDia + litrosMermas) * 100) / 100;
+  const diffAgua = Math.round((lecturaCaud.litrosReloj - totalAguaSistema) * 100) / 100;
 
   container.innerHTML = `
     <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--color-border); padding-bottom: 15px;">
@@ -297,16 +302,28 @@ function renderCierreContent(fecha) {
                 <td style="text-align: right;"><span class="badge badge-success">Flujo Físico</span></td>
               </tr>
               <tr>
-                <td>💧 Ventas Facturadas (Sistema)</td>
+                <td>💧 Ventas Facturadas (Entregadas a Clientes)</td>
                 <td style="text-align: right;">-</td>
                 <td style="text-align: right;">${litrosFacturados.toLocaleString()} Litros</td>
                 <td style="text-align: right;"><span class="badge badge-info">${ventasDia.length} ventas</span></td>
               </tr>
               <tr>
-                <td>🧹 Mermas / Lavado Reportadas</td>
+                <td>🧼 Merma de Lavado de Botellones</td>
+                <td style="text-align: right;">-</td>
+                <td style="text-align: right;">${mermasLavadoDia.toLocaleString()} Litros</td>
+                <td style="text-align: right;"><span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 600;">Enjuague</span></td>
+              </tr>
+              <tr>
+                <td>🧹 Mermas Manuales (Tanque / Filtros)</td>
                 <td style="text-align: right;">-</td>
                 <td style="text-align: right;">${litrosMermas.toLocaleString()} Litros</td>
                 <td style="text-align: right;"><span class="badge badge-warning">${mermasDia.length} mermas</span></td>
+              </tr>
+              <tr style="background: #F8FAFC; font-weight: 600;">
+                <td>📊 Total Agua Justificada por Sistema</td>
+                <td style="text-align: right;">-</td>
+                <td style="text-align: right;">${totalAguaSistema.toLocaleString()} Litros</td>
+                <td style="text-align: right;"><span class="badge badge-secondary">Facturado + Mermas</span></td>
               </tr>
             </tbody>
             <tfoot>
@@ -779,10 +796,15 @@ export function getMatricialReportHTML(fecha) {
         const lectCaud = store.getLecturaCaudalimetro(fecha);
         const vDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
         const lFact = vDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
+        const lLavado = vDia.reduce((s, v) => {
+          if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+          const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+          return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+        }, 0);
         const mDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
         const lMerm = mDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
-        const totSist = lFact + lMerm;
-        const dAgua = lectCaud.litrosReloj - totSist;
+        const totSist = Math.round((lFact + lLavado + lMerm) * 100) / 100;
+        const dAgua = Math.round((lectCaud.litrosReloj - totSist) * 100) / 100;
 
         return `
         <!-- Resumen Caudalímetro -->
@@ -802,8 +824,22 @@ export function getMatricialReportHTML(fecha) {
               <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.litrosReloj.toLocaleString()} L</td>
             </tr>
             <tr>
-              <td style="padding: 3px 0;">AGUA JUSTIFICADA (VENTAS + MERMAS):</td>
-              <td style="text-align: right; padding: 3px 0;">${totSist.toLocaleString()} L</td>
+              <td style="padding: 3px 0;">VENTAS DESPACHADAS:</td>
+              <td style="text-align: right; padding: 3px 0;">${lFact.toLocaleString()} L</td>
+            </tr>
+            <tr>
+              <td style="padding: 3px 0;">MERMA DE LAVADO ESTIMADA:</td>
+              <td style="text-align: right; padding: 3px 0;">${lLavado.toLocaleString()} L</td>
+            </tr>
+            ${lMerm > 0 ? `
+            <tr>
+              <td style="padding: 3px 0;">MERMAS MANUALES:</td>
+              <td style="text-align: right; padding: 3px 0;">${lMerm.toLocaleString()} L</td>
+            </tr>
+            ` : ''}
+            <tr style="border-top: 1px dotted #000;">
+              <td style="padding: 3px 0; font-weight: bold;">AGUA JUSTIFICADA POR SISTEMA:</td>
+              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${totSist.toLocaleString()} L</td>
             </tr>
             <tr style="border-top: 1px solid #000; font-weight: bold;">
               <td style="padding: 4px 0;">DIFERENCIA DE AGUA:</td>
