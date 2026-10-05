@@ -509,7 +509,11 @@ export async function restoreFromCloud(emailParam = null) {
       return { success: false, message: 'No se encontró una copia de seguridad en la nube para esta cuenta.' };
     }
 
-    const ok = store.importData(backupInfo.backup);
+    if (!store.db) {
+      await store.init();
+    }
+
+    const ok = await store.importData(backupInfo.backup);
     if (!ok) {
       return { success: false, message: 'Error al procesar el archivo de respaldo.' };
     }

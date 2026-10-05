@@ -1247,10 +1247,13 @@ export function renderConfiguracion(container) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (store.importData(ev.target.result)) {
+    reader.onload = async (ev) => {
+      const ok = await store.importData(ev.target.result);
+      if (ok) {
         showToast('Importación correcta', 'success');
         setTimeout(() => location.reload(), 1000);
+      } else {
+        showToast('Error al importar archivo de respaldo', 'danger');
       }
     };
     reader.readAsText(file);
