@@ -19,6 +19,16 @@ import { renderReportes } from './modules/reportes.js';
 import { renderConfiguracion } from './modules/configuracion.js';
 import { renderCierreCaja } from './modules/cierre.js';
 
+// 🛡️ Blindaje global contra cierre de ventana en PWA de escritorio Windows al presionar F5 o Ctrl+R:
+// Se captura a nivel de captura global inmediatamente al iniciar el script.
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.reload();
+    }
+}, true);
+
 class App {
     constructor() {
         this.init();
