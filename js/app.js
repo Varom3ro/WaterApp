@@ -246,11 +246,15 @@ class App {
             toggleSidebar(true);
         });
 
-        // Atajo de teclado: Ctrl+B o Alt+M para alternar el menú
+        // Atajos de teclado: Ctrl+B / Alt+M (menú) y F5 / Ctrl+R (recarga protegida en PWA)
         window.addEventListener('keydown', (e) => {
             if ((e.ctrlKey && e.key.toLowerCase() === 'b') || (e.altKey && e.key.toLowerCase() === 'm')) {
                 e.preventDefault();
                 toggleSidebar();
+            }
+            if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+                e.preventDefault();
+                window.location.reload();
             }
         });
 
