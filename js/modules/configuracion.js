@@ -509,29 +509,55 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
-      <!-- Seguridad y Contraseña -->
+      <!-- Seguridad y Roles de Acceso -->
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">🔐 Seguridad y Contraseña de Acceso</h3>
+          <h3 class="card-title">🔐 Seguridad y Contraseñas de Acceso</h3>
         </div>
-        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Personaliza la clave de ingreso para la caja y administración.</p>
-        <div style="display: flex; flex-direction: column; gap: var(--space-sm); max-width: 320px;">
-          <div class="form-group mb-sm">
-            <label class="form-label" style="font-size: var(--font-size-xs);">Contraseña Actual</label>
-            <input type="password" id="input-pwd-actual" class="form-control" placeholder="Clave actual (por defecto admins)" />
+        <p class="text-muted mb-md" style="font-size:var(--font-size-sm)">Gestiona las credenciales del Administrador (Dueño) y del Operario (Punto de Venta).</p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-lg);">
+          <!-- Clave Admin -->
+          <div style="background: var(--color-bg); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--color-border);">
+            <h4 style="font-size: 14px; font-weight: 700; color: var(--color-primary-900); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <span>🛡️</span> Contraseña de Administrador (Dueño)
+            </h4>
+            <p class="text-muted" style="font-size: 11.5px; margin-bottom: 12px;">Acceso total a finanzas, reportes, ganancias, configuración y anulación de ventas.</p>
+            <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+              <div class="form-group mb-xs">
+                <label class="form-label" style="font-size: var(--font-size-xs);">Contraseña Actual</label>
+                <input type="password" id="input-pwd-actual" class="form-control" placeholder="Clave actual (defecto admins)" style="font-size: 13px;" />
+              </div>
+              <div class="form-group mb-xs">
+                <label class="form-label" style="font-size: var(--font-size-xs);">Nueva Contraseña</label>
+                <input type="password" id="input-pwd-nueva" class="form-control" placeholder="Nueva clave (mín. 4 caracteres)" style="font-size: 13px;" />
+              </div>
+              <div class="form-group mb-xs">
+                <label class="form-label" style="font-size: var(--font-size-xs);">Confirmar Contraseña</label>
+                <input type="password" id="input-pwd-confirmar" class="form-control" placeholder="Repite la nueva clave" style="font-size: 13px;" />
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-save-password" style="width: 100%; margin-top: 6px;">
+                🔑 Actualizar Clave Admin
+              </button>
+            </div>
           </div>
-          <div class="form-group mb-sm">
-            <label class="form-label" style="font-size: var(--font-size-xs);">Nueva Contraseña</label>
-            <input type="password" id="input-pwd-nueva" class="form-control" placeholder="Nueva clave (mín. 4 caracteres)" />
-          </div>
-          <div class="form-group mb-sm">
-            <label class="form-label" style="font-size: var(--font-size-xs);">Confirmar Nueva Contraseña</label>
-            <input type="password" id="input-pwd-confirmar" class="form-control" placeholder="Repite la nueva clave" />
-          </div>
-          <div style="margin-top: 6px;">
-            <button class="btn btn-primary" id="btn-save-password" style="width: 100%;">
-              🔑 Actualizar Contraseña
-            </button>
+
+          <!-- PIN Operario -->
+          <div style="background: var(--color-bg); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--color-border);">
+            <h4 style="font-size: 14px; font-weight: 700; color: #854D0E; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <span>🟡</span> PIN de Operario (Cajero)
+            </h4>
+            <p class="text-muted" style="font-size: 11.5px; margin-bottom: 12px;">Permite operar ventas, cobrar deudas y registrar cisternas de agua sin ver ganancias ni métricas.</p>
+            <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+              <div class="form-group mb-xs">
+                <label class="form-label" style="font-size: var(--font-size-xs);">Nuevo PIN / Clave de Operario</label>
+                <input type="text" id="input-operario-pin" class="form-control" value="${store.getOperarioPassword ? store.getOperarioPassword() : '1234'}" placeholder="Ej: 1234" style="font-size: 15px; font-weight: 700; letter-spacing: 2px;" />
+              </div>
+              <p class="text-muted" style="font-size: 11px; margin-top: 2px;">PIN por defecto: <code>1234</code>. Puede contener números o letras.</p>
+              <button class="btn btn-secondary btn-sm" id="btn-save-operario-pin" style="width: 100%; margin-top: 18px; background: #FEF9C3; border-color: #FDE047; color: #854D0E; font-weight: 700;">
+                💾 Guardar PIN de Operario
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -944,6 +970,24 @@ export function renderConfiguracion(container) {
       if (inputActual) inputActual.value = '';
       if (inputNueva) inputNueva.value = '';
       if (inputConfirmar) inputConfirmar.value = '';
+    });
+  }
+
+  const btnSaveOperarioPin = container.querySelector('#btn-save-operario-pin');
+  if (btnSaveOperarioPin) {
+    btnSaveOperarioPin.addEventListener('click', () => {
+      const inputPin = container.querySelector('#input-operario-pin');
+      const pinVal = inputPin ? inputPin.value.trim() : '';
+
+      if (!pinVal || pinVal.length < 2) {
+        showToast('El PIN de operario debe tener al menos 2 dígitos', 'warning');
+        if (inputPin) inputPin.focus();
+        return;
+      }
+
+      store.setOperarioPassword(pinVal);
+      showToast('¡PIN de Operario actualizado correctamente!', 'success');
+      if (typeof syncToCloud === 'function') syncToCloud();
     });
   }
 

@@ -157,7 +157,7 @@ export function renderInventario(container) {
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">Nivel del Tanque</h3>
-          <button class="btn btn-sm btn-secondary" id="btn-config-tanque">⚙️ Configurar</button>
+          ${!store.isOperario() ? '<button class="btn btn-sm btn-secondary" id="btn-config-tanque">⚙️ Configurar</button>' : ''}
         </div>
         ${nivelPct <= 10 ? '<div class="alert-panel danger mb-md">⚠️ ¡Nivel crítico! Solicitar cisterna urgente.</div>' : ''}
         ${nivelPct > 10 && nivelPct <= 30 ? '<div class="alert-panel warning mb-md">⚡ Nivel bajo. Considere solicitar cisterna.</div>' : ''}
@@ -239,7 +239,10 @@ export function renderInventario(container) {
   // Events
   container.querySelector('#btn-nueva-cisterna').addEventListener('click', () => openCisternaModal());
   container.querySelector('#btn-registrar-merma').addEventListener('click', () => openMermaModal());
-  container.querySelector('#btn-config-tanque').addEventListener('click', openConfigTanqueModal);
+  const btnConfigTanque = container.querySelector('#btn-config-tanque');
+  if (btnConfigTanque) {
+    btnConfigTanque.addEventListener('click', openConfigTanqueModal);
+  }
 
   const btnEntradaStockGen = container.querySelector('#btn-entrada-stock-general');
   if (btnEntradaStockGen) {
@@ -392,43 +395,84 @@ function openAjustarStockModal(selectedId = null, container = null) {
   });
 }
 
+function verificarAdminParaAccion(motivo, onAutorizado) {
+  if (store.isAdmin()) {
+    onAutorizado();
+    return;
+  }
+  openModal({
+    title: '🔒 Autorización de Administrador',
+    content: `
+      <div style="padding: 10px 0;">
+        <p style="font-size: 13.5px; color: var(--color-danger); margin-bottom: 8px; font-weight: 600;">
+          ⚠️ ${motivo}
+        </p>
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 12px;">
+          Esta operación está protegida. Ingrese la contraseña del Administrador:
+        </p>
+        <input type="password" id="input-auth-admin-pwd" class="form-control" placeholder="Contraseña de Administrador" autofocus style="font-size: 15px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-modal-save')?.click()"/>
+      </div>
+    `,
+    saveLabel: 'Autorizar Operación',
+    onSave: (overlay) => {
+      const pwd = overlay.querySelector('#input-auth-admin-pwd')?.value || '';
+      if (store.checkAdminPassword(pwd)) {
+        closeModal();
+        onAutorizado();
+      } else {
+        showToast('Contraseña de administrador incorrecta', 'danger');
+        const inp = overlay.querySelector('#input-auth-admin-pwd');
+        if (inp) { inp.value = ''; inp.focus(); }
+      }
+    }
+  });
+  setTimeout(() => {
+    const inp = document.getElementById('input-auth-admin-pwd');
+    if (inp) inp.focus();
+  }, 150);
+}
+
 function deleteCisterna(id, container) {
   const c = store.getById('cisternas', id);
   if (!c) return;
-  openModal({
-    title: 'Confirmar Eliminación',
-    content: `¿Eliminar registro de cisterna de ${Utils.formatNumber(c.capacidad)}L? Se restará del tanque.`,
-    saveLabel: 'Eliminar',
-    onSave: () => {
-      store.delete('cisternas', id);
-      store.agregarCisterna(-c.capacidad);
-      syncToCloud();
-      closeModal();
-      renderInventario(container);
-      showToast('Cisterna eliminada', 'success');
-    }
+  verificarAdminParaAccion('Eliminar registro de cisterna', () => {
+    openModal({
+      title: 'Confirmar Eliminación',
+      content: `¿Eliminar registro de cisterna de ${Utils.formatNumber(c.capacidad)}L? Se restará del tanque.`,
+      saveLabel: 'Eliminar',
+      onSave: () => {
+        store.delete('cisternas', id);
+        store.agregarCisterna(-c.capacidad);
+        syncToCloud();
+        closeModal();
+        renderInventario(container);
+        showToast('Cisterna eliminada', 'success');
+      }
+    });
   });
 }
 
 function deleteMerma(id, container) {
   const m = store.getById('mermas', id);
   if (!m) return;
-  openModal({
-    title: 'Confirmar Eliminación',
-    content: `¿Eliminar registro de merma de ${Utils.formatNumber(m.litros)}L? Se devolverá al tanque.`,
-    saveLabel: 'Eliminar',
-    onSave: () => {
-      store.delete('mermas', id);
-      store.registrarMerma(-m.litros);
-      syncToCloud();
-      closeModal();
-      renderInventario(container);
-      showToast('Merma eliminada', 'success');
-    }
+  verificarAdminParaAccion('Eliminar registro de merma', () => {
+    openModal({
+      title: 'Confirmar Eliminación',
+      content: `¿Eliminar registro de merma de ${Utils.formatNumber(m.litros)}L? Se devolverá al tanque.`,
+      saveLabel: 'Eliminar',
+      onSave: () => {
+        store.delete('mermas', id);
+        store.registrarMerma(-m.litros);
+        syncToCloud();
+        closeModal();
+        renderInventario(container);
+        showToast('Merma eliminada', 'success');
+      }
+    });
   });
 }
 
-function openCisternaModal(id = null) {
+export function openCisternaModal(id = null, onComplete = null) {
   const isEdit = !!id;
   const c = isEdit ? store.getById('cisternas', id) : {};
 
@@ -446,16 +490,16 @@ function openCisternaModal(id = null) {
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Nota (opcional)</label>
-        <input type="text" class="form-control" name="nota" value="${c.nota || ''}" placeholder="Proveedor, observación..."/>
+        <label class="form-label">Nota u Observación (opcional)</label>
+        <input type="text" class="form-control" name="nota" value="${c.nota || ''}" placeholder="Ej: Camión blanco, chofer Carlos..."/>
       </div>
     </form>
   `;
 
   openModal({
-    title: 'Registrar Cisterna',
+    title: '🚚 Registrar Ingreso de Cisterna (Agua al Tanque)',
     content,
-    saveLabel: 'Registrar Entrada',
+    saveLabel: 'Registrar Entrada de Agua',
     onSave: (overlay) => {
       const form = overlay.querySelector('#form-cisterna');
       const fd = new FormData(form);
@@ -480,13 +524,19 @@ function openCisternaModal(id = null) {
         };
         store.save('cisternas', cisterna);
         store.agregarCisterna(capacidad);
-        showToast(`Cisterna de ${Utils.formatNumber(capacidad)}L registrada`, 'success');
+        showToast(`✅ Cisterna de ${Utils.formatNumber(capacidad)}L ingresada al tanque`, 'success');
       }
 
       syncToCloud();
       closeModal();
-      const main = document.querySelector('.main-content');
-      if (main) renderInventario(main);
+      if (typeof onComplete === 'function') {
+        onComplete(capacidad);
+      } else {
+        const main = document.querySelector('.main-content');
+        if (main && window.location.hash.includes('inventario')) {
+          renderInventario(main);
+        }
+      }
     }
   });
 }

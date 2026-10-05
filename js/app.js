@@ -45,6 +45,14 @@ class App {
             return;
         }
 
+        // Si es operario e intenta entrar a una ruta restringida (reportes o configuracion), redirigir a Inicio (Punto de Venta)
+        if (store.isOperario()) {
+            const currentHash = window.location.hash || '#/inicio';
+            if (['#/reportes', '#/configuracion'].includes(currentHash)) {
+                window.location.hash = '#/inicio';
+            }
+        }
+
         this.renderLayout();
         this.registerRoutes();
 
@@ -55,6 +63,13 @@ class App {
 
         // Update active state on route change
         window.addEventListener('hashchange', () => {
+            if (store.isOperario()) {
+                const h = window.location.hash;
+                if (['#/reportes', '#/configuracion'].includes(h)) {
+                    window.location.hash = '#/inicio';
+                    return;
+                }
+            }
             this.updateActiveLink();
             this.updateTitle();
             syncToCloud();
@@ -69,12 +84,12 @@ class App {
                 <div class="card" style="width: 100%; max-width: 400px; text-align: center; padding: 2rem; margin: 1rem;">
                     <img src="./img/logo.png" alt="Tu Empresa Logo" style="width: 80px; height: 80px; margin: 0 auto 1.5rem; object-fit: contain;" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%231B4332%22 stroke-width=%222%22><path d=%22M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z%22/></svg>'">
                     <h1 style="color:var(--color-primary-900); font-size:1.8rem; margin-bottom:0.5rem; font-weight: bold;">Tu Empresa</h1>
-                    <p style="color:var(--color-text-muted); margin-bottom: 2rem; font-size: 0.9rem;">Sistema de Gestión de Agua Potable</p>
+                    <p style="color:var(--color-text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">Sistema de Gestión de Agua Potable</p>
                     
                     <div class="form-group" style="text-align: left;">
-                        <label class="form-label">Contraseña de Acceso</label>
+                        <label class="form-label" style="font-weight: 600;">Contraseña o PIN de Acceso</label>
                         <div style="position: relative;">
-                            <input type="password" id="login-password" class="form-control" style="padding-right: 45px;" placeholder="Ingrese la contraseña" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()">
+                            <input type="password" id="login-password" class="form-control" style="padding-right: 45px;" placeholder="Ingrese contraseña o PIN (Operario: 1234)" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()">
                             <button type="button" id="toggle-password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--color-text-muted); cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center;">
                                 <svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -83,9 +98,12 @@ class App {
                             </button>
                         </div>
                     </div>
-                    <p id="login-error" style="color: var(--color-danger); font-size: 0.85rem; display: none; margin-bottom: 1rem; text-align: left;">Contraseña incorrecta</p>
+                    <div style="font-size: 0.75rem; color: var(--color-text-muted); text-align: left; margin-top: -8px; margin-bottom: 12px;">
+                        💡 <em>Ingrese clave de Dueño/Admin o PIN de Operario para Punto de Venta</em>
+                    </div>
+                    <p id="login-error" style="color: var(--color-danger); font-size: 0.85rem; display: none; margin-bottom: 1rem; text-align: left;">Contraseña o PIN incorrecto</p>
                     
-                    <button id="btn-login" class="btn btn-primary" style="width:100%; margin-top: 1rem;">Ingresar al Sistema</button>
+                    <button id="btn-login" class="btn btn-primary" style="width:100%; margin-top: 0.5rem; height: 42px; font-weight: 600;">Ingresar al Sistema</button>
                     
                     <div style="margin-top: 1.25rem; text-align: center;">
                         <a href="https://wa.me/584166315114?text=Hola,%20olvid%C3%A9%20la%20contrase%C3%B1a%20de%20acceso%20de%20mi%20caja%20en%20WaterApp.%20%C2%BFMe%20pueden%20ayudar?" target="_blank" style="font-size: 0.82rem; color: var(--color-primary-800); text-decoration: none; font-weight: 500;">
@@ -111,8 +129,11 @@ class App {
 
         document.getElementById('btn-login').addEventListener('click', () => {
             const pwd = document.getElementById('login-password').value;
-            if (store.checkPassword(pwd)) {
+            const authRes = store.verifyLogin(pwd);
+            if (authRes.success) {
                 sessionStorage.setItem('isAuthenticated', 'true');
+                store.setUserRole(authRes.role);
+                window.location.hash = '#/inicio';
                 this.init();
             } else {
                 document.getElementById('login-error').style.display = 'block';
@@ -172,10 +193,13 @@ class App {
             btnLogout.addEventListener('click', (e) => {
                 e.preventDefault();
                 sessionStorage.removeItem('isAuthenticated');
+                sessionStorage.removeItem('userRole');
+                store.setUserRole(null);
                 if (window.Android && typeof Android.closeApp === 'function') {
                     window.Android.closeApp();
                 } else {
-                    window.location.reload();
+                    window.location.hash = '';
+                    this.renderLogin();
                 }
             });
         }

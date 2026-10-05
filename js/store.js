@@ -286,7 +286,7 @@ class Store {
         ];
     }
 
-    // ---- Security / Password ----
+    // ---- Security / Password & Roles ----
 
     _hashStr(str) {
         let hash = 5381;
@@ -297,7 +297,33 @@ class Store {
         return 'h_' + (hash >>> 0).toString(16);
     }
 
-    checkPassword(enteredPassword) {
+    getUserRole() {
+        return sessionStorage.getItem('userRole') || 'admin';
+    }
+
+    setUserRole(role) {
+        sessionStorage.setItem('userRole', role === 'operario' ? 'operario' : 'admin');
+    }
+
+    isAdmin() {
+        return this.getUserRole() === 'admin';
+    }
+
+    isOperario() {
+        return this.getUserRole() === 'operario';
+    }
+
+    getOperarioPassword() {
+        return this.getConfig('operarioPassword') || '1234';
+    }
+
+    setOperarioPassword(newPin) {
+        const clean = (newPin || '').trim();
+        this.setConfig('operarioPassword', clean);
+        return true;
+    }
+
+    checkAdminPassword(enteredPassword) {
         const clean = (enteredPassword || '').trim();
         const inputHash = this._hashStr(clean);
 
@@ -312,6 +338,28 @@ class Store {
             return inputHash === 'h_f12fc8e' || inputHash === 'h_f1728ec1';
         }
         return clean === stored || inputHash === stored;
+    }
+
+    checkPassword(enteredPassword) {
+        return this.checkAdminPassword(enteredPassword);
+    }
+
+    verifyLogin(enteredPassword) {
+        const clean = (enteredPassword || '').trim();
+        if (!clean) return { success: false, role: null };
+
+        // 1. Probar clave de Administrador
+        if (this.checkAdminPassword(clean)) {
+            return { success: true, role: 'admin' };
+        }
+
+        // 2. Probar clave / PIN de Operario
+        const opPass = this.getOperarioPassword();
+        if (clean === opPass || this._hashStr(clean) === opPass) {
+            return { success: true, role: 'operario' };
+        }
+
+        return { success: false, role: null };
     }
 
     setPassword(newPassword) {
@@ -456,6 +504,8 @@ class Store {
     }
 
 
+    // ---- Cierre de Caja, Arqueos y Turnos ----
+
     getArqueo(fecha) {
         const target = (fecha || '').trim();
         let arqueos = this.cache['arqueos'];
@@ -506,6 +556,169 @@ class Store {
         arqueos = arqueos.filter(a => (a.fecha || '').trim() !== target);
         this.cache['arqueos'] = arqueos;
         localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqueos));
+    }
+
+    // ---- Múltiples Turnos de Caja (Cierres por Turno) ----
+
+    getTurnos(fecha) {
+        const target = (fecha || '').trim();
+        let turnos = this.cache['turnosCaja'];
+        if (!turnos) {
+            try {
+                turnos = JSON.parse(localStorage.getItem('tuempresa_turnos') || '[]');
+            } catch (e) {
+                turnos = [];
+            }
+            this.cache['turnosCaja'] = turnos;
+        }
+        let list = turnos.filter(t => (t.fecha || '').trim() === target);
+
+        // Auto-migración si existe un arqueo previo cerrado pero no hay turnos guardados
+        if (list.length === 0) {
+            let arqueos = this.cache['arqueos'];
+            if (!arqueos) {
+                try {
+                    arqueos = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+                } catch(e) { arqueos = []; }
+            }
+            const arqueoLegado = arqueos.find(a => (a.fecha || '').trim() === target);
+            if (arqueoLegado && arqueoLegado.declaracion) {
+                const sistemaTotal = this.getCierreCaja(target);
+                const tMigrado = {
+                    id: 'turno_legado_' + target,
+                    fecha: target,
+                    numeroTurno: 1,
+                    inicio: target + 'T00:00:00',
+                    fin: arqueoLegado.fechaHora || Utils.nowISO(),
+                    declaracion: arqueoLegado.declaracion,
+                    sistema: sistemaTotal,
+                    observaciones: arqueoLegado.observaciones || 'Cierre registrado previamente',
+                    cerradoPor: 'admin',
+                    fechaHora: arqueoLegado.fechaHora || Utils.nowISO()
+                };
+                turnos.push(tMigrado);
+                this.cache['turnosCaja'] = turnos;
+                localStorage.setItem('tuempresa_turnos', JSON.stringify(turnos));
+                list = [tMigrado];
+            }
+        }
+
+        list.sort((a, b) => (a.numeroTurno || 1) - (b.numeroTurno || 1));
+        return list;
+    }
+
+    updateTurnoObservacion(turnoId, nuevaObservacion) {
+        let turnos = this.cache['turnosCaja'];
+        if (!turnos) {
+            try {
+                turnos = JSON.parse(localStorage.getItem('tuempresa_turnos') || '[]');
+            } catch(e) { turnos = []; }
+        }
+        const idx = turnos.findIndex(t => t.id === turnoId);
+        if (idx !== -1) {
+            turnos[idx].observaciones = nuevaObservacion;
+            this.cache['turnosCaja'] = turnos;
+            localStorage.setItem('tuempresa_turnos', JSON.stringify(turnos));
+            this._sincronizarArqueoConsolidado(turnos[idx].fecha);
+            return true;
+        }
+        return false;
+    }
+
+    getTurnoActivoInfo(fecha) {
+        const target = (fecha || '').trim();
+        const turnos = this.getTurnos(target);
+        const numeroTurno = turnos.length + 1;
+        
+        let inicio = target + 'T00:00:00';
+        if (turnos.length > 0) {
+            inicio = turnos[turnos.length - 1].fin || turnos[turnos.length - 1].fechaHora || inicio;
+        }
+        const fin = Utils.nowISO();
+        const cierreSistema = this.getCierreCaja(target, inicio, fin);
+
+        return {
+            numeroTurno,
+            inicio,
+            fin,
+            cierreSistema,
+            tieneTurnosPrevios: turnos.length > 0,
+            turnosCerrados: turnos
+        };
+    }
+
+    saveTurnoCierre(fecha, declaracion, observaciones = '', caudalimetro = null) {
+        const target = (fecha || '').trim();
+        const info = this.getTurnoActivoInfo(target);
+        let turnos = this.cache['turnosCaja'];
+        if (!turnos) {
+            try {
+                turnos = JSON.parse(localStorage.getItem('tuempresa_turnos') || '[]');
+            } catch (e) {
+                turnos = [];
+            }
+        }
+
+        const nuevoTurno = {
+            id: 'turno_' + Utils.generateId(),
+            fecha: target,
+            numeroTurno: info.numeroTurno,
+            inicio: info.inicio,
+            fin: Utils.nowISO(),
+            declaracion: declaracion,
+            sistema: info.cierreSistema,
+            observaciones: observaciones,
+            cerradoPor: this.getUserRole() || 'operario',
+            fechaHora: Utils.nowISO(),
+            caudalimetro: caudalimetro
+        };
+
+        turnos.push(nuevoTurno);
+        this.cache['turnosCaja'] = turnos;
+        localStorage.setItem('tuempresa_turnos', JSON.stringify(turnos));
+
+        this._sincronizarArqueoConsolidado(target);
+        return nuevoTurno;
+    }
+
+    deleteUltimoTurno(fecha) {
+        const target = (fecha || '').trim();
+        let turnos = this.cache['turnosCaja'];
+        if (!turnos) {
+            try {
+                turnos = JSON.parse(localStorage.getItem('tuempresa_turnos') || '[]');
+            } catch (e) {
+                turnos = [];
+            }
+        }
+        const delDia = turnos.filter(t => (t.fecha || '').trim() === target);
+        if (delDia.length > 0) {
+            const ultimo = delDia[delDia.length - 1];
+            turnos = turnos.filter(t => t.id !== ultimo.id);
+            this.cache['turnosCaja'] = turnos;
+            localStorage.setItem('tuempresa_turnos', JSON.stringify(turnos));
+        }
+
+        this._sincronizarArqueoConsolidado(target);
+        return true;
+    }
+
+    _sincronizarArqueoConsolidado(fecha) {
+        const turnos = this.getTurnos(fecha);
+        if (turnos.length === 0) {
+            this.deleteArqueo(fecha);
+            return;
+        }
+        const consolidado = {};
+        turnos.forEach(t => {
+            if (t.declaracion) {
+                Object.keys(t.declaracion).forEach(k => {
+                    consolidado[k] = (consolidado[k] || 0) + (parseFloat(t.declaracion[k]) || 0);
+                });
+            }
+        });
+        const obs = turnos.map(t => `[Turno ${t.numeroTurno}]: ${t.observaciones || 'Sin observaciones'}`).join(' | ');
+        this.saveArqueo(fecha, consolidado, obs);
     }
 
     // ---- Métodos de Pago Personalizados ----
@@ -606,20 +819,29 @@ class Store {
 
     // ---- Cierre de Caja y Arqueo ----
 
-    getCierreCaja(fecha) {
+    getCierreCaja(fecha, desdeFechaHora = null, hastaFechaHora = null) {
         const day = new Date(fecha + 'T00:00:00');
         const nextDay = new Date(day);
         nextDay.setDate(nextDay.getDate() + 1);
 
-        const ventas = this.getAll('ventas').filter(v => {
-            const d = new Date(v.fecha);
-            return d >= day && d < nextDay;
-        });
+        const desde = desdeFechaHora ? new Date(desdeFechaHora) : null;
+        const hasta = hastaFechaHora ? new Date(hastaFechaHora) : null;
 
-        const abonos = this.getAll('abonos').filter(a => {
-            const d = new Date(a.fecha);
+        const esInicioDia = !desdeFechaHora || desdeFechaHora.endsWith('T00:00:00');
+
+        const matchRango = (itemFecha) => {
+            if (!itemFecha) return false;
+            const d = new Date(itemFecha);
+            if (desde && hasta) {
+                return (esInicioDia ? d >= desde : d > desde) && d <= hasta;
+            } else if (desde) {
+                return esInicioDia ? d >= desde : d > desde;
+            }
             return d >= day && d < nextDay;
-        });
+        };
+
+        const ventas = this.getAll('ventas').filter(v => matchRango(v.fecha));
+        const abonos = this.getAll('abonos').filter(a => matchRango(a.fecha));
 
         const allMethods = this.getMetodosPago(false);
 
@@ -704,11 +926,8 @@ class Store {
             cierre.bs[mId] += monto * tasa;
         }
 
-        // Procesar propinas digitales / bancarias recibidas hoy (Punto de venta, Pago móvil, etc.)
-        const propinas = this.getAll('propinas').filter(p => {
-            const d = new Date(p.fecha);
-            return d >= day && d < nextDay;
-        });
+        // Procesar propinas digitales / bancarias recibidas en el turno/período (Punto de venta, Pago móvil, etc.)
+        const propinas = this.getAll('propinas').filter(p => matchRango(p.fecha));
 
         let totalPropinasUSD = 0;
         let totalPropinasBs = 0;
@@ -859,6 +1078,9 @@ class Store {
         }
         if (this.getConfig('mermaLavadoBase20L') === undefined) {
             this.setConfig('mermaLavadoBase20L', 1.0);
+        }
+        if (this.getConfig('operarioPassword') === undefined) {
+            this.setConfig('operarioPassword', '1234');
         }
     }
 

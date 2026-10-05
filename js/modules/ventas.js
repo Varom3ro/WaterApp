@@ -9,8 +9,13 @@ import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { getMatricialReportHTML } from './cierre.js';
 import { syncToCloud } from '../cloud-sync.js';
+import { openCisternaModal } from './inventario.js';
 
 export function renderVentas(container, showFichas = true) {
+  const isOp = store.isOperario();
+  const shouldShowFichas = showFichas && !isOp;
+  const showAccionesCol = !isOp;
+
   container.innerHTML = `
     <div class="page-header" style="margin-bottom: 20px;">
       <div>
@@ -42,7 +47,7 @@ export function renderVentas(container, showFichas = true) {
       </div>
     </div>
 
-    ${showFichas ? '<!-- Fichas de Totales por Método de Pago --><div id="ventas-totales-fichas" style="margin-bottom: 20px;"></div>' : ''}
+    ${shouldShowFichas ? '<!-- Fichas de Totales por Método de Pago --><div id="ventas-totales-fichas" style="margin-bottom: 20px;"></div>' : ''}
 
     <!-- Table -->
     <div class="card">
@@ -57,7 +62,7 @@ export function renderVentas(container, showFichas = true) {
               <th>Tipo</th>
               <th>Pago</th>
               <th>Entrega</th>
-              ${showFichas ? '<th>Acciones</th>' : ''}
+              ${showAccionesCol ? '<th>Acciones</th>' : ''}
             </tr>
           </thead>
           <tbody id="ventas-tbody"></tbody>
@@ -80,7 +85,8 @@ function renderVentasTable() {
   const tbody = document.getElementById('ventas-tbody');
   const emptyDiv = document.getElementById('ventas-empty');
   const fichasContainer = document.getElementById('ventas-totales-fichas');
-  const showAcciones = !!fichasContainer;
+  const isOp = store.isOperario();
+  const showAcciones = !isOp && !!fichasContainer;
   if (!tbody) return;
 
   let ventas = store.getAll('ventas').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -185,7 +191,8 @@ function renderVentasTable() {
     totalesPropinas.bs += mBs;
   });
 
-  if (fichasContainer) {
+  if (fichasContainer && !isOp) {
+    fichasContainer.style.display = 'block';
     fichasContainer.innerHTML = `
       <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; overflow-x: auto; padding-bottom: 2px;">
         <!-- Ficha Efectivo USD -->
@@ -1016,6 +1023,11 @@ export function renderNuevaVentaForm(container) {
               <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(inventario.litros)} L</strong>
             </div>
 
+            <!-- Botón Ingreso de Cisterna (Llenar Tanque) -->
+            <button type="button" id="btn-ingreso-cisterna-pv" class="btn btn-secondary" style="height: 42px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; font-weight: 700; border-radius: 8px; font-size: 13px; background: #ECFDF5; border: 1.5px solid #10B981; color: #047857;" title="Registrar llegada de cisterna (llenar tanque)">
+              🚚 <span>+ Cisterna</span>
+            </button>
+
             <!-- Botón Pantalla Completa -->
             <button type="button" id="btn-toggle-fullscreen" class="btn" style="width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; background: #ffffff; border: 1.5px solid var(--color-primary, #2D6A4F); color: var(--color-primary, #2D6A4F); cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: all 0.2s ease;" title="Alternar Pantalla Completa">
               <span class="fs-icon" style="display: flex; align-items: center; justify-content: center;">
@@ -1106,6 +1118,15 @@ export function renderNuevaVentaForm(container) {
   if (widgetCaudalimetro) {
     widgetCaudalimetro.addEventListener('click', () => {
       openModalCaudalimetro(todayStr, () => {
+        renderNuevaVentaForm(container);
+      });
+    });
+  }
+
+  const btnCisternaPV = modal.querySelector('#btn-ingreso-cisterna-pv');
+  if (btnCisternaPV) {
+    btnCisternaPV.addEventListener('click', () => {
+      openCisternaModal(null, () => {
         renderNuevaVentaForm(container);
       });
     });
@@ -2840,13 +2861,14 @@ function openAbonoModal() {
 }
 
 function deleteVenta(id) {
-  openModal({
-    title: 'Eliminar Venta',
-    content: '<p>¿Estás seguro de que deseas eliminar esta venta?</p><p class="text-muted mt-md">Se restaurará el inventario correspondiente.</p>',
-    saveLabel: 'Eliminar',
-    onSave: () => {
-      const venta = store.getById('ventas', id);
-      if (venta) {
+  const proceedWithDelete = () => {
+    openModal({
+      title: 'Eliminar Venta',
+      content: '<p>¿Estás seguro de que deseas eliminar esta venta?</p><p class="text-muted mt-md">Se restaurará el inventario correspondiente.</p>',
+      saveLabel: 'Eliminar',
+      onSave: () => {
+        const venta = store.getById('ventas', id);
+        if (venta) {
         // Restore inventory based on recorded liters and washing loss
         const inv = store.getInventarioActual();
         const litrosRestaurar = parseFloat(venta.litrosSalidaTanque) ||
@@ -2893,6 +2915,42 @@ function deleteVenta(id) {
       renderVentasTable();
     }
   });
+  };
+
+  if (store.isOperario()) {
+    openModal({
+      title: '🔒 Autorización de Administrador',
+      content: `
+        <div style="padding: 10px 0;">
+          <p style="font-size: 13.5px; color: var(--color-danger); margin-bottom: 8px; font-weight: 600;">
+            ⚠️ Anular o eliminar venta registrada
+          </p>
+          <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 12px;">
+            Esta operación cancela una venta ya cobrada. Ingrese la contraseña del Administrador:
+          </p>
+          <input type="password" id="input-delete-admin-pwd" class="form-control" placeholder="Contraseña de Administrador" autofocus style="font-size: 15px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-modal-save')?.click()"/>
+        </div>
+      `,
+      saveLabel: 'Autorizar Eliminación',
+      onSave: (overlay) => {
+        const pwd = overlay.querySelector('#input-delete-admin-pwd')?.value || '';
+        if (store.checkAdminPassword(pwd)) {
+          closeModal();
+          proceedWithDelete();
+        } else {
+          showToast('Contraseña de administrador incorrecta', 'danger');
+          const inp = overlay.querySelector('#input-delete-admin-pwd');
+          if (inp) { inp.value = ''; inp.focus(); }
+        }
+      }
+    });
+    setTimeout(() => {
+      const inp = document.getElementById('input-delete-admin-pwd');
+      if (inp) inp.focus();
+    }, 150);
+  } else {
+    proceedWithDelete();
+  }
 }
 
 export function openModalCaudalimetro(fecha = Utils.todayISO(), onSaved = null) {
