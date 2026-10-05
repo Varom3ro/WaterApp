@@ -2,6 +2,8 @@
 // Tu Empresa - Router (Hash-based)
 // ============================================
 
+import { store } from './store.js';
+
 class Router {
     constructor() {
         this.routes = {};
@@ -24,7 +26,17 @@ class Router {
     }
 
     _handleRoute() {
-        const hash = window.location.hash.slice(1) || '/inicio';
+        let hash = window.location.hash.slice(1) || '/inicio';
+
+        // Proteger rutas administrativas contra rol operario
+        if (store.isOperario() && ['/reportes', '/configuracion'].includes(hash)) {
+            hash = '/inicio';
+            if (window.location.hash !== '#/inicio') {
+                window.location.hash = '#/inicio';
+                return;
+            }
+        }
+
         const route = this.routes[hash];
 
         if (route && this.container) {

@@ -1,9 +1,12 @@
 import { store } from '../store.js';
 import { Utils } from '../utils.js';
+import { openModal, closeModal } from './modal.js';
+import { showToast } from './toast.js';
 
 export function renderSidebar() {
   const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
+  const isOperario = store.isOperario();
 
   let usuarioEmail = 'Licencia Local';
   let diasRestantesText = '';
@@ -17,6 +20,65 @@ export function renderSidebar() {
       diasRestantesText = `${diffDays} días restantes`;
     }
   } catch (e) {}
+
+  // Handler para cambiar de operario a admin o viceversa
+  window.__openModalCambiarRol = () => {
+    if (store.isOperario()) {
+      openModal({
+        title: '🔑 Acceso de Administrador',
+        content: `
+          <div style="padding: 10px 0;">
+            <p style="font-size: 13.5px; color: var(--color-text-secondary); margin-bottom: 12px;">
+              Ingrese la <strong>Contraseña de Administrador</strong> para desbloquear todas las funciones y métricas:
+            </p>
+            <div class="form-group mb-sm">
+              <input type="password" id="input-modal-admin-pwd" class="form-control" placeholder="Contraseña de Dueño/Admin" autofocus style="font-size: 15px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-modal-confirm-role')?.click()"/>
+            </div>
+          </div>
+        `,
+        saveLabel: 'Verificar e Ingresar',
+        onSave: (overlay) => {
+          const pwd = overlay.querySelector('#input-modal-admin-pwd')?.value || '';
+          if (store.checkAdminPassword(pwd)) {
+            store.setUserRole('admin');
+            closeModal();
+            showToast('¡Modo Administrador activado!', 'success');
+            setTimeout(() => window.location.reload(), 200);
+          } else {
+            showToast('Contraseña de administrador incorrecta', 'danger');
+            const inp = overlay.querySelector('#input-modal-admin-pwd');
+            if (inp) { inp.value = ''; inp.focus(); }
+          }
+        }
+      });
+      setTimeout(() => {
+        const inp = document.getElementById('input-modal-admin-pwd');
+        if (inp) inp.focus();
+      }, 150);
+    } else {
+      openModal({
+        title: '👤 Cambiar a Modo Operario (Caja)',
+        content: `
+          <div style="padding: 10px 0;">
+            <p style="font-size: 14px; margin-bottom: 8px;">
+              ¿Deseas bloquear las funciones administrativas y pasar la sesión a <strong>Modo Operario</strong>?
+            </p>
+            <p class="text-muted" style="font-size: 12.5px;">
+              Se ocultarán las ganancias, reportes y configuración. Podrás volver a modo Administrador en cualquier momento con tu clave.
+            </p>
+          </div>
+        `,
+        saveLabel: 'Activar Modo Operario',
+        onSave: () => {
+          store.setUserRole('operario');
+          closeModal();
+          showToast('Modo Operario activado', 'info');
+          window.location.hash = '#/ventas';
+          setTimeout(() => window.location.reload(), 200);
+        }
+      });
+    }
+  };
 
   return `
     <aside class="sidebar">
@@ -43,7 +105,16 @@ export function renderSidebar() {
             </span>
           ` : ''}
         </div>
-        <div style="font-size: 11px; color: #1E293B; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; margin-top: 8px; word-break: break-all; width: 100%; display: flex; align-items: center; gap: 6px;">
+        
+        <!-- Rol de Usuario -->
+        <div style="font-size: 11px; width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 5px 8px; border-radius: 6px; ${isOperario ? 'background: #FEF9C3; border: 1px solid #FEF08A; color: #854D0E;' : 'background: #DCFCE7; border: 1px solid #BBF7D0; color: #166534;'}">
+          <span style="font-weight: 700;">${isOperario ? '🟡 Modo Operario' : '🛡️ Administrador'}</span>
+          <button type="button" onclick="window.__openModalCambiarRol()" style="border: none; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; ${isOperario ? 'background: #EAB308; color: #422006;' : 'background: #E2E8F0; color: #475569;'}" title="${isOperario ? 'Elevar a Administrador' : 'Pasar a Modo Caja'}">
+            ${isOperario ? '🔑 Dueño' : '👤 Caja'}
+          </button>
+        </div>
+
+        <div style="font-size: 11px; color: #1E293B; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; margin-top: 6px; word-break: break-all; width: 100%; display: flex; align-items: center; gap: 6px;">
           <span>👤</span>
           <span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${Utils.escapeHtml(usuarioEmail)}">
             ${Utils.escapeHtml(usuarioEmail)}
@@ -60,7 +131,16 @@ export function renderSidebar() {
               <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
           </span>
-          Inicio
+          Punto de Venta
+        </a>
+        <a class="sidebar-nav-item" data-route="/ventas" href="#/ventas">
+          <span class="nav-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
+          </span>
+          Historial Ventas
         </a>
         <a class="sidebar-nav-item" data-route="/clientes" href="#/clientes">
           <span class="nav-icon">
@@ -73,15 +153,6 @@ export function renderSidebar() {
           </span>
           Clientes
           <span class="nav-badge" id="badge-morosos" style="display:none">0</span>
-        </a>
-        <a class="sidebar-nav-item" data-route="/ventas" href="#/ventas">
-          <span class="nav-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-            </svg>
-          </span>
-          Ventas
         </a>
         <a class="sidebar-nav-item" data-route="/cierre-caja" href="#/cierre-caja">
           <span class="nav-icon">
@@ -99,8 +170,9 @@ export function renderSidebar() {
               <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
             </svg>
           </span>
-          Inventario
+          Inventario y Tanque
         </a>
+        ${!isOperario ? `
         <a class="sidebar-nav-item" data-route="/reportes" href="#/reportes">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -110,10 +182,12 @@ export function renderSidebar() {
           </span>
           Reportes
         </a>
+        ` : ''}
       </nav>
 
       <span class="sidebar-section-title" style="margin-top:var(--space-xl)">General</span>
       <nav class="sidebar-nav">
+        ${!isOperario ? `
         <a class="sidebar-nav-item" data-route="/configuracion" href="#/configuracion">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -123,6 +197,7 @@ export function renderSidebar() {
           </span>
           Configuración
         </a>
+        ` : ''}
         <a id="btn-install-pwa" class="sidebar-nav-item" onclick="if(window.triggerInstallPWA) window.triggerInstallPWA();" style="color: #047857; font-weight: 600; cursor: pointer;">
           <span class="nav-icon">📲</span>
           Instalar App

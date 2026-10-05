@@ -2,7 +2,7 @@
 // Tu Empresa - Service Worker (PWA Offline)
 // ============================================
 
-const CACHE_NAME = 'waterapp-cache-v2.8.29';
+const CACHE_NAME = 'waterapp-cache-v2.8.32';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -33,13 +33,14 @@ const ASSETS_TO_CACHE = [
   './js/modules/ventas.js'
 ];
 
-// Instalación: Cachear recursos estáticos
+// Instalación: Cachear recursos estáticos y activar inmediatamente
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Cacheando recursos de la app');
+      console.log('[SW] Cacheando recursos de la app v2.8.30');
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -59,7 +60,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Intercepción de peticiones (Fetch)
+// Intercepción de peticiones: Network First para reflejar cambios frescos al instante,
+// con fallback a Cache si no hay red (modo offline)
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -68,40 +70,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Estrategia: Cache First con fallback a Network
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Actualizar en segundo plano (Stale-While-Revalidate)
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse);
-            });
-          }
-        }).catch(() => {
-          // Ignorar error de red en segundo plano
-        });
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
         return networkResponse;
-      }).catch(() => {
-        // Si no hay red y es navegación HTML, retornar index.html
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
+      })
+      .catch(() => {
+        // Fallback a caché si no hay conexión o falla la red
+        return caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });
