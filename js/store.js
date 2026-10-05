@@ -994,19 +994,25 @@ class Store {
         return JSON.stringify(data, null, 2);
     }
 
-    importData(dataInput) {
+    async importData(dataInput) {
         try {
             const data = typeof dataInput === 'string' ? JSON.parse(dataInput) : dataInput;
             if (!data || typeof data !== 'object') return false;
+            if (!this.db) {
+                this.db = await this._openDB();
+            }
             for (const col of COLLECTIONS) {
                 if (!Array.isArray(data[col])) continue;
                 this.cache[col] = data[col];
                 // Flush cada item a IndexedDB
-                const tx = this.db.transaction(col, 'readwrite');
-                const os = tx.objectStore(col);
-                os.clear();
-                data[col].forEach(item => os.put(item));
+                if (this.db && this.db.objectStoreNames.contains(col)) {
+                    const tx = this.db.transaction(col, 'readwrite');
+                    const os = tx.objectStore(col);
+                    os.clear();
+                    data[col].forEach(item => os.put(item));
+                }
             }
+            this.isReady = true;
             return true;
         } catch (e) {
             console.error('Error al importar backup:', e);

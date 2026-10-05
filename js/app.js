@@ -30,13 +30,14 @@ class App {
     }
 
     async init() {
-        // Validar licencia de prueba antes de cualquier otra cosa
-        const licenciaValida = await Licencia.validar();
-        if (!licenciaValida) return;
-
         await store.init();
         window.__app_store = store;
         this.updateTitle();
+
+        // Validar licencia de prueba
+        const licenciaValida = await Licencia.validar();
+        if (!licenciaValida) return;
+
         Licencia.aplicarCatalogoRemotoSiExiste(store);
         syncToCloud();
 
