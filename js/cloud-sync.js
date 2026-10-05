@@ -179,9 +179,9 @@ export async function syncToCloud(isManual = false) {
     const clientes = store.getAll('clientes') || [];
 
     // 🛡️ ESCUDO PROTECTOR ANTI-SOBRESCRITURA:
-    // Si este dispositivo tiene 0 ventas, 0 clientes y tanque en 0,
-    // comprobar si la tienda ya tiene datos en la nube para NO borrar el respaldo ni el tanque con ceros.
-    if (ventas.length === 0 && clientes.length === 0 && (!inventario.litros || inventario.litros === 0) && !isManual) {
+    // Si este dispositivo tiene 0 ventas y 0 clientes (recién instalado o datos locales borrados),
+    // comprobar si la tienda ya tiene datos en la nube para NO borrar el respaldo ni los datos con ceros.
+    if (ventas.length === 0 && clientes.length === 0 && !isManual) {
       try {
         const checkRes = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
           headers: {
@@ -203,7 +203,7 @@ export async function syncToCloud(isManual = false) {
 
             if (hasBackup || remoteTotalMes > 0 || remoteLitros > 0 || remoteMovs > 0) {
               console.log('[CloudSync] 🛡️ Dispositivo vacío detectado. Se protegen datos activos de la nube (respaldo, tanque, mes).');
-              if (remoteLitros > 0 && inventario.litros === 0) {
+              if (remoteLitros > 0 && (!inventario.litros || inventario.litros === 0)) {
                 store.setConfig('inventario', remote.nivel_tanque);
               }
               return true;
@@ -426,6 +426,11 @@ export async function syncToCloud(isManual = false) {
       },
       respaldo_completo: respaldoObj
     };
+
+    // 🛡️ Nunca enviar un respaldo vacío sobre un respaldo existente en la nube
+    if ((!respaldoObj || ((!respaldoObj.ventas || respaldoObj.ventas.length === 0) && (!respaldoObj.clientes || respaldoObj.clientes.length === 0))) && !isManual) {
+      delete payload.respaldo_completo;
+    }
 
     const res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
       method: 'POST',

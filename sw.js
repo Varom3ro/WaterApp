@@ -2,7 +2,7 @@
 // Tu Empresa - Service Worker (PWA Offline)
 // ============================================
 
-const CACHE_NAME = 'waterapp-cache-v2.8.34';
+const CACHE_NAME = 'waterapp-cache-v2.8.35';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -38,7 +38,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Cacheando recursos de la app v2.8.30');
+      console.log('[SW] Cacheando recursos de la app v2.8.35');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
