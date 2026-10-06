@@ -194,6 +194,11 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
       declaracion[m.key] = parseFloat(rawVal) || 0;
     });
 
+    // 🛡️ Alias de compatibilidad para punto de venta
+    if (declaracion.punto !== undefined) {
+      declaracion.punto_de_venta = declaracion.punto;
+    }
+
     let lectCaud = null;
     if (store.getConfig('moduloCaudalimetro')) {
       const iniRaw = fd.get('caudalimetro_inicial');
@@ -228,11 +233,13 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
           <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 15px; line-height: 1.4;">
             Verifica que hayas contado y declarado todos los montos físicos de este turno. Los montos se cuadrarán exclusivamente con las ventas realizadas entre <strong>${horaInicioStr}</strong> y ahora.
           </p>
-          <div style="background: var(--color-bg); padding: 12px 14px; border-radius: 8px; font-size: 13.5px; border-left: 4px solid #10B981;">
+          <div style="background: var(--color-bg); padding: 12px 14px; border-radius: 8px; font-size: 13.5px; border-left: 4px solid #10B981; display: flex; flex-direction: column; gap: 4px;">
             <div>💵 <strong>Efectivo USD:</strong> ${Utils.formatCurrency(declaracion.efectivo_usd || 0)}</div>
-            <div style="margin-top: 4px;">🇻🇪 <strong>Efectivo Bs:</strong> Bs ${Utils.formatNumber(declaracion.efectivo_bs || 0, true)}</div>
-            <div style="margin-top: 4px;">📲 <strong>Pago Móvil:</strong> Bs ${Utils.formatNumber(declaracion.pago_movil || 0, true)}</div>
-            <div style="margin-top: 4px;">💳 <strong>Punto de Venta:</strong> Bs ${Utils.formatNumber(declaracion.punto_de_venta || 0, true)}</div>
+            <div>🇻🇪 <strong>Efectivo Bs:</strong> Bs ${Utils.formatNumber(declaracion.efectivo_bs || 0, true)}</div>
+            <div>📲 <strong>Pago Móvil:</strong> Bs ${Utils.formatNumber(declaracion.pago_movil || 0, true)}</div>
+            <div>💳 <strong>Punto de Venta:</strong> Bs ${Utils.formatNumber(declaracion.punto || declaracion.punto_de_venta || 0, true)}</div>
+            ${declaracion.transferencia ? `<div>🏦 <strong>Transferencia:</strong> Bs ${Utils.formatNumber(declaracion.transferencia || 0, true)}</div>` : ''}
+            ${methods.filter(m => !['efectivo_usd', 'efectivo_bs', 'pago_movil', 'punto', 'transferencia', 'credito', 'convenio', 'garantia', 'cortesia'].includes(m.key) && declaracion[m.key] > 0).map(m => `<div>${m.icon} <strong>${m.label}:</strong> ${m.moneda === 'USD' ? Utils.formatCurrency(declaracion[m.key]) : 'Bs ' + Utils.formatNumber(declaracion[m.key], true)}</div>`).join('')}
           </div>
         </div>
       `,
