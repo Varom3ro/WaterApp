@@ -175,7 +175,8 @@ class App {
 
     renderLayout() {
         const app = document.getElementById('app');
-        const isCollapsed = localStorage.getItem('waterapp_sidebar_collapsed') === 'true';
+        // Por defecto arranca cerrada para maximizar el área de venta
+        const isCollapsed = localStorage.getItem('waterapp_sidebar_collapsed') !== 'false';
         app.innerHTML = `
           <div class="app-layout ${isCollapsed ? 'sidebar-collapsed' : ''}" id="app-layout">
             ${renderSidebar()}
@@ -229,13 +230,9 @@ class App {
             if (shouldCollapse) {
                 appLayout.classList.add('sidebar-collapsed');
                 localStorage.setItem('waterapp_sidebar_collapsed', 'true');
-                if (backdrop) backdrop.style.display = 'none';
             } else {
                 appLayout.classList.remove('sidebar-collapsed');
                 localStorage.setItem('waterapp_sidebar_collapsed', 'false');
-                if (window.innerWidth <= 768 && backdrop) {
-                    backdrop.style.display = 'block';
-                }
             }
         };
 
@@ -253,7 +250,8 @@ class App {
             });
         });
 
-        backdrop?.addEventListener('click', () => {
+        backdrop?.addEventListener('click', (e) => {
+            e.preventDefault();
             toggleSidebar(true);
         });
 
@@ -269,14 +267,33 @@ class App {
             }
         });
 
-        // En pantallas móviles, al pulsar un enlace del menú, ocultar el sidebar
+        // Al pulsar cualquier enlace del menú, ocultar automáticamente el sidebar
         document.querySelectorAll('.sidebar-nav-item').forEach(link => {
             link.addEventListener('click', () => {
-                if (window.innerWidth <= 768 && !link.id.includes('collapse')) {
+                if (!link.id.includes('collapse')) {
                     toggleSidebar(true);
                 }
             });
         });
+
+        // En dispositivos con ratón/mouse (computadoras), auto-cerrar suavemente al salir el cursor
+        const sidebarEl = document.querySelector('.sidebar');
+        if (sidebarEl) {
+            let leaveTimer = null;
+            sidebarEl.addEventListener('mouseleave', () => {
+                if (window.matchMedia('(pointer: fine)').matches && appLayout && !appLayout.classList.contains('sidebar-collapsed')) {
+                    leaveTimer = setTimeout(() => {
+                        toggleSidebar(true);
+                    }, 350);
+                }
+            });
+            sidebarEl.addEventListener('mouseenter', () => {
+                if (leaveTimer) {
+                    clearTimeout(leaveTimer);
+                    leaveTimer = null;
+                }
+            });
+        }
     }
 
     registerRoutes() {
