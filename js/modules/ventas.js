@@ -14,36 +14,34 @@ import { openCisternaModal } from './inventario.js';
 export function renderVentas(container, showFichas = true) {
   const isOp = store.isOperario();
   const shouldShowFichas = showFichas && !isOp;
-  const showAccionesCol = !isOp;
+  // La columna Acciones solo se muestra en la vista dedicada de Historial (/ventas) para Administrador
+  // En Punto de Venta (Inicio, showFichas = false) NO se muestra la columna Acciones
+  const showAccionesCol = !isOp && showFichas;
+
+  const todasVentas = store.getAll('ventas');
+  const countPendientes = todasVentas.filter(v => v.estadoEntrega === 'pendiente').length;
 
   container.innerHTML = `
-    <div class="page-header" style="margin-bottom: 20px;">
+    <div class="page-header" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h1 class="page-title">Historial de Ventas</h1>
-        <p class="page-subtitle">Registro de todas las operaciones y cobros</p>
+        <h1 class="page-title" style="margin-bottom: 2px;">Historial de Ventas</h1>
+        <p class="page-subtitle" style="margin-bottom: 0;">Registro de todas las operaciones y cobros</p>
       </div>
-    </div>
 
-    <!-- Filters -->
-    <div class="card mb-md" style="overflow-x: auto;">
-      <div class="flex items-center gap-sm" style="flex-wrap:nowrap; justify-content: space-between; min-width: 650px;">
-        <div class="flex items-center gap-sm" style="flex-wrap:nowrap;">
-          <input type="date" class="form-control" id="filter-fecha" style="width:140px; height:38px; padding: 4px 8px;" value="${Utils.todayISO()}"/>
-          <input type="text" class="form-control" id="search-ventas" placeholder="Buscar por cliente..." style="width:200px; height:38px; padding: 4px 8px;"/>
-          <select class="form-control" id="filter-tipo-venta" style="width:145px; height:38px; padding: 4px 8px;">
-            <option value="">Todos los tipos</option>
-            <option value="contado">Contado</option>
-            <option value="credito">Crédito</option>
-            <option value="convenio">🤝 Convenio</option>
-            <option value="garantia">🔄 Garantía</option>
-            <option value="cortesia">🎁 Cortesía</option>
-          </select>
-          <select class="form-control" id="filter-estado-entrega" style="width:150px; height:38px; padding: 4px 8px;">
-            <option value="">Todas entregas</option>
-            <option value="pendiente">⏳ Pendientes</option>
-            <option value="entregado">✅ Entregados</option>
-          </select>
-        </div>
+      <div class="flex items-center gap-sm" style="flex-wrap: wrap;">
+        <div id="slot-banner-pendientes"></div>
+
+        <input type="date" class="form-control" id="filter-fecha" style="width:138px; height:38px; padding: 4px 8px; font-size: 13px;" value="${Utils.todayISO()}"/>
+        <input type="text" class="form-control" id="search-ventas" placeholder="Buscar por cliente..." style="width:180px; height:38px; padding: 4px 8px; font-size: 13px;"/>
+        <select class="form-control" id="filter-tipo-venta" style="width:145px; height:38px; padding: 4px 8px; font-size: 13px;">
+          <option value="">Todos los tipos</option>
+          <option value="contado">Contado</option>
+          <option value="credito">Crédito</option>
+          <option value="abono">💵 Abonos / Cobros</option>
+          <option value="convenio">🤝 Convenio</option>
+          <option value="garantia">🔄 Garantía</option>
+          <option value="cortesia">🎁 Cortesía</option>
+        </select>
       </div>
     </div>
 
@@ -77,8 +75,70 @@ export function renderVentas(container, showFichas = true) {
   container.querySelector('#filter-fecha').addEventListener('change', renderVentasTable);
   container.querySelector('#search-ventas').addEventListener('input', Utils.debounce(renderVentasTable, 200));
   container.querySelector('#filter-tipo-venta').addEventListener('change', renderVentasTable);
-  const filterEntrega = container.querySelector('#filter-estado-entrega');
-  if (filterEntrega) filterEntrega.addEventListener('change', renderVentasTable);
+}
+
+export function actualizarIndicadoresPendientesGlobal() {
+  const todasVentas = store.getAll('ventas') || [];
+  const pendientes = todasVentas.filter(v => v.estadoEntrega === 'pendiente');
+  const count = pendientes.length;
+
+  // 1. Actualizar botón en el header del POS si está montado
+  const btnPOS = document.getElementById('btn-pendientes-pv');
+  const slotPOS = document.getElementById('slot-pendientes-pv');
+  if (slotPOS) {
+    if (count > 0) {
+      slotPOS.innerHTML = `
+        <button type="button" id="btn-pendientes-pv" class="btn" style="height: 42px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; font-weight: 700; background: #FEF3C7; border: 1.5px solid #F59E0B; color: #92400E; cursor: pointer; box-shadow: 0 1px 2px rgba(245,158,11,0.2);" title="Tienes ${count} pedido(s) pendiente(s) de entrega física. Clic para ver y confirmar">
+          <span style="font-size: 18px; line-height: 1;">⏳</span>
+          <span style="font-size: 12.5px; font-weight: 800; background: #D97706; color: white; padding: 1px 6px; border-radius: 10px;">${count}</span>
+        </button>
+      `;
+      const newBtn = slotPOS.querySelector('#btn-pendientes-pv');
+      if (newBtn) {
+        newBtn.addEventListener('click', () => {
+          openModalPedidosPendientes(() => {
+            actualizarIndicadoresPendientesGlobal();
+            if (typeof renderVentasTable === 'function') renderVentasTable();
+          });
+        });
+      }
+    } else {
+      slotPOS.innerHTML = '';
+    }
+  } else if (btnPOS) {
+    if (count > 0) {
+      btnPOS.style.display = 'inline-flex';
+      const badge = btnPOS.querySelector('span:nth-child(2)');
+      if (badge) badge.textContent = count;
+    } else {
+      btnPOS.style.display = 'none';
+    }
+  }
+
+  // 2. Actualizar botón en Historial de Ventas si está montado
+  const slotVentas = document.getElementById('slot-banner-pendientes');
+  if (slotVentas) {
+    if (count > 0) {
+      slotVentas.innerHTML = `
+        <button type="button" id="btn-banner-pendientes" class="btn" style="background: #FEF3C7; border: 1.5px solid #F59E0B; color: #92400E; font-weight: 700; height: 38px; padding: 0 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(245,158,11,0.2);" title="Ver todos los pedidos pendientes de entrega">
+          <span style="font-size: 15px;">⏳</span>
+          <span>${count} ${count === 1 ? 'Pendiente' : 'Pendientes'}</span>
+          <span class="badge" style="background: #F59E0B; color: white; padding: 1px 6px; font-size: 11px; border-radius: 10px;">Ver todos</span>
+        </button>
+      `;
+      const btnBanner = slotVentas.querySelector('#btn-banner-pendientes');
+      if (btnBanner) {
+        btnBanner.addEventListener('click', () => {
+          openModalPedidosPendientes(() => {
+            actualizarIndicadoresPendientesGlobal();
+            if (typeof renderVentasTable === 'function') renderVentasTable();
+          });
+        });
+      }
+    } else {
+      slotVentas.innerHTML = '';
+    }
+  }
 }
 
 function renderVentasTable() {
@@ -86,10 +146,25 @@ function renderVentasTable() {
   const emptyDiv = document.getElementById('ventas-empty');
   const fichasContainer = document.getElementById('ventas-totales-fichas');
   const isOp = store.isOperario();
+  // showAcciones sólo si NO es operario y si estamos en la ventana de Ventas (fichasContainer existe)
   const showAcciones = !isOp && !!fichasContainer;
   if (!tbody) return;
 
-  let ventas = store.getAll('ventas').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  let rawVentas = store.getAll('ventas').map(v => ({ ...v, esAbono: false }));
+  let rawAbonos = store.getAll('abonos').map(a => ({
+    id: a.id,
+    clienteId: a.clienteId,
+    fecha: a.fecha,
+    total: parseFloat(a.monto) || 0,
+    tipo: 'abono',
+    metodo: a.metodo || 'efectivo_usd',
+    referencia: a.referencia || '',
+    esAbono: true,
+    estadoEntrega: 'no_aplica',
+    detalles: []
+  }));
+
+  let items = [...rawVentas, ...rawAbonos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   // Filters
   const fecha = document.getElementById('filter-fecha')?.value;
@@ -99,14 +174,14 @@ function renderVentasTable() {
   if (fecha) {
     const dayStart = new Date(fecha + 'T00:00:00');
     const dayEnd = new Date(fecha + 'T23:59:59');
-    ventas = ventas.filter(v => {
+    items = items.filter(v => {
       const d = new Date(v.fecha);
       return d >= dayStart && d <= dayEnd;
     });
   }
 
   if (search) {
-    ventas = ventas.filter(v => {
+    items = items.filter(v => {
       const cliente = store.getById('clientes', v.clienteId);
       const nombre = cliente ? cliente.nombre.toLowerCase() : 'general';
       return nombre.includes(search);
@@ -114,12 +189,7 @@ function renderVentasTable() {
   }
 
   if (tipo) {
-    ventas = ventas.filter(v => v.tipo === tipo);
-  }
-
-  const estadoEntregaFilter = document.getElementById('filter-estado-entrega')?.value;
-  if (estadoEntregaFilter) {
-    ventas = ventas.filter(v => (v.estadoEntrega || 'entregado') === estadoEntregaFilter);
+    items = items.filter(v => v.tipo === tipo);
   }
 
   // Cálculo de totales por método de pago para las fichas
@@ -135,7 +205,16 @@ function renderVentasTable() {
     totalBs: 0
   };
 
-  ventas.forEach(v => {
+  // Sumar cobros de ventas y abonos de la fecha filtrada
+  const dayStartGlobal = fecha ? new Date(fecha + 'T00:00:00') : null;
+  const dayEndGlobal = fecha ? new Date(fecha + 'T23:59:59') : null;
+  const matchFecha = (itemFecha) => {
+    if (!fecha) return true;
+    const d = new Date(itemFecha);
+    return d >= dayStartGlobal && d <= dayEndGlobal;
+  };
+
+  rawVentas.filter(v => matchFecha(v.fecha)).forEach(v => {
     const tasa = v.tasa || currentTasa;
     const isSinCobro = (v.tipo === 'convenio' || v.tipo === 'garantia' || v.tipo === 'cortesia');
     if (!isSinCobro) {
@@ -153,6 +232,15 @@ function renderVentasTable() {
           totales[metodoKey] += montoUSD;
         }
       });
+    }
+  });
+
+  // Agregar los abonos cobrados en las fichas de caja
+  rawAbonos.filter(a => matchFecha(a.fecha)).forEach(a => {
+    const metodoKey = a.metodo;
+    const montoUSD = a.total || 0;
+    if (totales.hasOwnProperty(metodoKey)) {
+      totales[metodoKey] += montoUSD;
     }
   });
 
@@ -269,7 +357,7 @@ function renderVentasTable() {
             ${Utils.formatCurrency(totales.credito)}
           </div>
           <div style="font-size: 8.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap;">
-            ${ventas.filter(v => v.tipo === 'credito').length} operaciones
+            ${rawVentas.filter(v => matchFecha(v.fecha) && v.tipo === 'credito').length} operaciones
           </div>
         </div>
 
@@ -295,7 +383,7 @@ function renderVentasTable() {
             ${Utils.formatCurrency(totales.totalUSD)}
           </div>
           <div style="font-size: 8.5px; color: rgba(255,255,255,0.8); margin-top: 1px; white-space: nowrap;">
-            Bs ${Utils.formatNumber(totales.totalBs, true)} (${ventas.length})
+            Bs ${Utils.formatNumber(totales.totalBs, true)} (${rawVentas.filter(v => matchFecha(v.fecha)).length})
           </div>
         </div>
       </div>
@@ -309,34 +397,64 @@ function renderVentasTable() {
     }
   }
 
-  if (ventas.length === 0) {
+  if (items.length === 0) {
     tbody.innerHTML = '';
-    if (emptyDiv) emptyDiv.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📋</span><span class="empty-state-text">No hay ventas para esta fecha o filtros seleccionados</span></div>';
+    if (emptyDiv) emptyDiv.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📋</span><span class="empty-state-text">No hay movimientos para esta fecha o filtros seleccionados</span></div>';
     return;
   }
 
   if (emptyDiv) emptyDiv.innerHTML = '';
 
-  tbody.innerHTML = ventas.map(v => {
+  tbody.innerHTML = items.map(v => {
     const cliente = store.getById('clientes', v.clienteId);
     const nombre = cliente ? cliente.nombre : 'Cliente General';
     const allMetodos = store.getMetodosPago(false);
+
+    if (v.esAbono) {
+      const metObj = allMetodos.find(m => m.id === v.metodo);
+      const icon = metObj ? metObj.icon : '💵';
+      const labelMetodo = metObj ? metObj.label : v.metodo;
+      const refStr = v.referencia ? ` (Ref: ${Utils.escapeHtml(v.referencia)})` : '';
+      const pagosStr = `<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">${icon}</span> <span>${labelMetodo}: <b>${Utils.formatCurrency(v.total)}</b>${refStr}</span></div>`;
+      const detallesHTML = `<div style="font-size: 0.9em;">Abono a cuenta / saldo a favor</div>`;
+      const totalDisplayHTML = `${Utils.formatCurrency(v.total)}`;
+      const tipoBadgeHTML = `<span class="badge" style="background:#DCFCE7; color:#166534; border:1px solid #BBF7D0;">Abono</span>`;
+      const entregaHTML = `<span class="badge" style="background: #F1F5F9; color: #64748B;">— No aplica —</span>`;
+
+      return `
+        <tr>
+          <td>${Utils.formatDateTime(v.fecha)}</td>
+          <td class="font-semibold">${Utils.escapeHtml(nombre)}</td>
+          <td style="line-height: 1.2;">${detallesHTML}</td>
+          <td class="font-semibold" style="line-height: 1.2;">${totalDisplayHTML}</td>
+          <td>${tipoBadgeHTML}</td>
+          <td>${pagosStr}</td>
+          <td>${entregaHTML}</td>
+          ${showAcciones ? `
+            <td>
+              <button class="btn btn-sm btn-secondary btn-delete-abono" data-id="${v.id}" data-monto="${v.total}" data-cliente="${Utils.escapeHtml(nombre)}" title="Anular Abono">🗑️</button>
+            </td>
+          ` : ''}
+        </tr>
+      `;
+    }
+
     let pagosStr = '-';
     if (v.tipo === 'credito') {
-      pagosStr = '<span class="badge badge-warning" style="font-size: 0.75em;">A Crédito</span>';
+      pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">📋</span> <span>A Crédito</span></div>';
     } else if (v.tipo === 'convenio') {
-      pagosStr = '<span class="badge badge-info" style="font-size: 0.75em;">🤝 Convenio</span>';
+      pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">🤝</span> <span>Convenio</span></div>';
     } else if (v.tipo === 'garantia') {
-      pagosStr = '<span class="badge" style="background:#FEE2E2; color:#991B1B; font-size: 0.75em; border:1px solid #FECACA;">🔄 Garantía</span>';
+      pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">🔄</span> <span>Garantía</span></div>';
     } else if (v.tipo === 'cortesia') {
-      pagosStr = '<span class="badge" style="background:#EDE9FE; color:#5B21B6; font-size: 0.75em; border:1px solid #DDD6FE;">🎁 Cortesía</span>';
+      pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">🎁</span> <span>Cortesía</span></div>';
     } else if (v.pagos && v.pagos.length > 0) {
       pagosStr = v.pagos.map(p => {
         const method = allMetodos.find(m => m.id === p.metodo);
         const icon = method ? method.icon : '';
         const name = method ? method.label : p.metodo;
         const title = p.referencia ? ` title="Ref: ${p.referencia}" style="cursor:help;"` : '';
-        return `<div${title} style="font-size: 0.8em; white-space: nowrap; line-height: 1.2;">${icon} ${name}: <b>${Utils.formatCurrency(p.monto)}</b></div>`;
+        return `<div${title} style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">${icon}</span> <span>${name}: <b>${Utils.formatCurrency(p.monto)}</b></span></div>`;
       }).join('');
     }
 
@@ -385,11 +503,11 @@ function renderVentasTable() {
     const tipoBadgeHTML = v.tipo === 'credito' 
       ? '<span class="badge badge-warning">Crédito</span>'
       : v.tipo === 'convenio' 
-        ? '<span class="badge badge-info">🤝 Convenio</span>'
+        ? '<span class="badge badge-info">Convenio</span>'
         : v.tipo === 'garantia' 
-          ? '<span class="badge" style="background:#FEE2E2; color:#991B1B; border:1px solid #FECACA;">🔄 Garantía</span>'
+          ? '<span class="badge" style="background:#FEE2E2; color:#991B1B; border:1px solid #FECACA;">Garantía</span>'
           : v.tipo === 'cortesia' 
-            ? '<span class="badge" style="background:#EDE9FE; color:#5B21B6; border:1px solid #DDD6FE;">🎁 Cortesía</span>'
+            ? '<span class="badge" style="background:#EDE9FE; color:#5B21B6; border:1px solid #DDD6FE;">Cortesía</span>'
             : '<span class="badge badge-success">Contado</span>';
 
     return `
@@ -423,6 +541,30 @@ function renderVentasTable() {
     tbody.querySelectorAll('.btn-delete-venta').forEach(btn => {
       btn.addEventListener('click', () => deleteVenta(btn.dataset.id));
     });
+
+    tbody.querySelectorAll('.btn-delete-abono').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const abonoId = btn.dataset.id;
+        const montoVal = parseFloat(btn.dataset.monto) || 0;
+        const clienteNom = btn.dataset.cliente || 'Cliente';
+        openModal({
+          title: 'Anular / Eliminar Abono',
+          content: `
+            <p>¿Estás seguro de que deseas anular este abono de <strong>${Utils.formatCurrency(montoVal)}</strong> de <strong>${clienteNom}</strong>?</p>
+            <p class="text-muted" style="font-size: 13px; margin-top: 8px;">
+              ⚠️ Esta acción eliminará el abono del sistema, actualizará el saldo del cliente y el flujo de caja.
+            </p>
+          `,
+          saveLabel: 'Sí, Anular Abono',
+          onSave: () => {
+            store.delete('abonos', abonoId);
+            closeModal();
+            showToast('Abono anulado con éxito', 'success');
+            renderVentasTable();
+          }
+        });
+      });
+    });
   }
 
   tbody.querySelectorAll('.btn-marcar-entregado').forEach(btn => {
@@ -430,7 +572,108 @@ function renderVentasTable() {
       const id = btn.dataset.id;
       store.update('ventas', id, { estadoEntrega: 'entregado', fechaEntrega: Utils.nowISO() });
       showToast('Entrega confirmada correctamente', 'success');
+      actualizarIndicadoresPendientesGlobal();
       renderVentasTable();
+    });
+  });
+}
+
+export function openModalPedidosPendientes(onUpdate) {
+  const todasVentas = store.getAll('ventas') || [];
+  const pendientes = todasVentas.filter(v => v.estadoEntrega === 'pendiente')
+    .sort((a, b) => new Date(a.fecha) - new Date(a.fecha)); // Los más antiguos primero
+
+  if (pendientes.length === 0) {
+    showToast('No hay pedidos pendientes de entrega', 'info');
+    return;
+  }
+
+  const clientesMap = {};
+  (store.getAll('clientes') || []).forEach(c => { clientesMap[c.id] = c; });
+
+  const rowsHtml = pendientes.map(v => {
+    const cli = clientesMap[v.clienteId];
+    const clienteNombre = cli ? cli.nombre : 'Cliente General';
+    const clienteTel = cli?.telefono ? ` · 📞 ${cli.telefono}` : '';
+    const clienteDir = cli?.direccion ? `<div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">📍 ${Utils.escapeHtml(cli.direccion)}</div>` : '';
+    
+    let detallesHtml = '';
+    if (v.detalles && Array.isArray(v.detalles) && v.detalles.length > 0) {
+      detallesHtml = v.detalles.map(d => `${d.cantidad}x ${Utils.escapeHtml(d.nombre || '')}`).join(', ');
+    } else {
+      detallesHtml = `${v.botellones || 0} botellones`;
+    }
+
+    const delivBadge = (v.delivery > 0 || (v.botellones === 0 && v.total > 0))
+      ? `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 11px; margin-left: 4px;">🛵 Delivery</span>`
+      : '';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--color-border);">
+        <td style="padding: 10px 8px; font-size: 12.5px; white-space: nowrap;">
+          <strong>${Utils.formatDateTime(v.fecha)}</strong>
+        </td>
+        <td style="padding: 10px 8px;">
+          <div style="font-weight: 700; font-size: 13.5px; color: var(--color-text-main);">
+            ${Utils.escapeHtml(clienteNombre)}${delivBadge}
+          </div>
+          <div style="font-size: 12px; color: var(--color-text-secondary);">${clienteTel}</div>
+          ${clienteDir}
+        </td>
+        <td style="padding: 10px 8px; font-size: 12.5px; color: var(--color-text-main);">
+          ${detallesHtml}
+        </td>
+        <td style="padding: 10px 8px; text-align: right; font-weight: 700; font-size: 13.5px; white-space: nowrap;">
+          ${Utils.formatCurrency(v.total || 0)}
+        </td>
+        <td style="padding: 10px 8px; text-align: center;">
+          <button type="button" class="btn btn-sm btn-success btn-entregar-modal-p" data-id="${v.id}" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 6px; white-space: nowrap;">
+            ✅ Marcar Entregado
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  openModal({
+    title: `⏳ Pedidos Pendientes por Entregar (${pendientes.length})`,
+    content: `
+      <div style="padding: 4px 0;">
+        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #92400E;">
+          💡 <strong>Recordatorio de Entregas:</strong> Estos pedidos fueron cobrados o cargados al sistema pero quedaron marcados como pendientes de entrega física.
+        </div>
+        
+        <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 8px;">
+          <table class="table" style="width: 100%; border-collapse: collapse; margin-bottom: 0;">
+            <thead style="background: #F8FAFC; position: sticky; top: 0; z-index: 2;">
+              <tr>
+                <th style="padding: 8px; font-size: 12px;">Fecha/Hora</th>
+                <th style="padding: 8px; font-size: 12px;">Cliente / Destino</th>
+                <th style="padding: 8px; font-size: 12px;">Detalle de Productos</th>
+                <th style="padding: 8px; font-size: 12px; text-align: right;">Total</th>
+                <th style="padding: 8px; font-size: 12px; text-align: center;">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `,
+    showSave: false
+  });
+
+  const modalEl = document.querySelector('.modal-container') || document.body;
+  modalEl.querySelectorAll('.btn-entregar-modal-p').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = btn.dataset.id;
+      store.update('ventas', id, { estadoEntrega: 'entregado', fechaEntrega: Utils.nowISO() });
+      showToast('✅ Entrega confirmada con éxito', 'success');
+      closeModal();
+      actualizarIndicadoresPendientesGlobal();
+      if (typeof onUpdate === 'function') onUpdate();
     });
   });
 }
@@ -461,9 +704,11 @@ export function renderNuevaVentaForm(container) {
       <style>
         .pos-main-split {
           display: grid;
-          grid-template-columns: 1fr 1.22fr;
+          grid-template-columns: 1fr 1.25fr;
           gap: 8px;
           align-items: stretch;
+          height: calc(100vh - 84px - 146px);
+          min-height: 360px;
         }
         .pos-left-column {
           min-width: 0;
@@ -473,8 +718,7 @@ export function renderNuevaVentaForm(container) {
           box-shadow: 0 2px 8px rgba(0,0,0,0.03);
           display: flex;
           flex-direction: column;
-          height: calc(100vh - 84px);
-          min-height: 480px;
+          height: 100%;
           overflow: hidden;
         }
         .pos-right-column {
@@ -485,44 +729,92 @@ export function renderNuevaVentaForm(container) {
           box-shadow: 0 2px 8px rgba(0,0,0,0.03);
           display: flex;
           flex-direction: column;
-          height: calc(100vh - 84px);
-          min-height: 480px;
+          height: 100%;
           overflow: hidden;
         }
         .pos-client-bar {
-          padding: 10px 12px;
+          padding: 8px 12px;
           border-bottom: 1px solid var(--color-border);
           background: #fafafa;
           flex-shrink: 0;
         }
         .pos-order-table-section {
           flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          padding: 10px 12px;
+          min-height: 0;
+        }
+        #carrito-container {
+          flex: 1;
           overflow-y: auto;
-          padding: 12px;
+          border: 1px solid var(--color-border);
+          border-radius: 8px;
+          background: #fff;
+          min-height: 0;
         }
         .pos-catalog-section {
           flex: 1;
-          overflow-y: auto;
-          padding: 12px;
-          background: #f8fafc;
-          border-bottom: 1px solid var(--color-border);
           display: flex;
           flex-direction: column;
-          min-height: 220px;
+          overflow: hidden;
+          padding: 10px 12px;
+          background: #f8fafc;
+          min-height: 0;
         }
-        .pos-checkout-section {
-          flex-shrink: 0;
+        .pos-bottom-checkout-bar {
+          margin-top: 8px;
           background: #ffffff;
-          padding: 6px 10px 8px 10px;
-          box-shadow: 0 -3px 10px rgba(0,0,0,0.03);
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          padding: 8px 14px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+          flex-shrink: 0;
         }
-        .pos-checkout-section .form-check {
+        .pos-bottom-checkout-grid {
+          display: grid;
+          grid-template-columns: 1.35fr 1fr;
+          gap: 16px;
+          align-items: center;
+        }
+        .pos-bottom-left-pane {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          min-width: 0;
+        }
+        .pos-delivery-card {
+          background: #f8fafc;
+          border: 1px solid #E2E8F0;
+          border-radius: 8px;
+          padding: 3px 8px;
+          display: flex;
+          align-items: center;
+          min-height: 28px;
+        }
+        .pos-condiciones-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .pos-bottom-right-pane {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding-left: 16px;
+          border-left: 1.5px solid var(--color-border);
+          height: 100%;
+        }
+        .pos-bottom-checkout-bar .form-check {
           min-height: auto;
           margin-bottom: 0;
           gap: 4px;
         }
-        .pos-checkout-section .form-check input[type="checkbox"],
-        .pos-checkout-section .form-check input[type="radio"] {
+        .pos-bottom-checkout-bar .form-check input[type="checkbox"],
+        .pos-bottom-checkout-bar .form-check input[type="radio"] {
           width: 16px;
           height: 16px;
           margin: 0;
@@ -774,9 +1066,7 @@ export function renderNuevaVentaForm(container) {
         @media (max-width: 960px) and (min-width: 701px) {
           .pos-main-split {
             gap: 8px;
-          }
-          .pos-left-column, .pos-right-column {
-            height: calc(100vh - 84px);
+            height: calc(100vh - 84px - 150px);
           }
           .pos-products-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -786,6 +1076,7 @@ export function renderNuevaVentaForm(container) {
         @media (max-width: 700px) {
           .pos-main-split {
             grid-template-columns: 1fr;
+            height: auto;
           }
           .pos-left-column, .pos-right-column {
             height: auto;
@@ -794,6 +1085,16 @@ export function renderNuevaVentaForm(container) {
           .pos-products-grid {
             grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
             max-height: 350px;
+          }
+          .pos-bottom-checkout-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+          .pos-bottom-right-pane {
+            border-left: none;
+            border-top: 1.5px solid var(--color-border);
+            padding-left: 0;
+            padding-top: 10px;
           }
         }
       </style>
@@ -825,7 +1126,7 @@ export function renderNuevaVentaForm(container) {
               </button>
             </div>
             
-            <div class="table-container mb-sm" id="carrito-container" style="border: 1px solid var(--color-border); border-radius: 8px; background: #fff;">
+            <div class="table-container mb-sm" id="carrito-container">
               <table class="table table-sm" style="margin-bottom: 0;">
                 <thead>
                   <tr style="background: #f8fafc;">
@@ -841,9 +1142,8 @@ export function renderNuevaVentaForm(container) {
           </div>
         </div>
 
-        <!-- COLUMNA DERECHA: Catálogo Arriba (Máx 3 Columnas) + Delivery a Registro Abajo Fijo -->
+        <!-- COLUMNA DERECHA: Catálogo Completo al 100% de Altura -->
         <div class="pos-right-column">
-          <!-- Catálogo de Productos (Arriba) -->
           <div class="pos-catalog-section">
             <div class="pos-header">
               <div class="pos-category-tabs" id="pos-category-tabs">
@@ -855,7 +1155,7 @@ export function renderNuevaVentaForm(container) {
                 </button>
               </div>
               <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                <input type="text" id="pos-search-input" class="form-control" placeholder="🔍 Buscar..." style="height: 36px; font-size: 12.5px; width: 135px; max-width: 150px; padding: 4px 10px; border-radius: 18px; border: 1.5px solid #CBD5E1; background: #fff; box-sizing: border-box; outline: none;"/>
+                <input type="text" id="pos-search-input" class="form-control" placeholder="🔍 Buscar..." style="height: 36px; font-size: 12.5px; width: 140px; max-width: 160px; padding: 4px 10px; border-radius: 18px; border: 1.5px solid #CBD5E1; background: #fff; box-sizing: border-box; outline: none;"/>
               </div>
             </div>
 
@@ -863,34 +1163,40 @@ export function renderNuevaVentaForm(container) {
               <!-- Renderizado dinámico de fichas (3 columnas) -->
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- De Delivery hasta Registro (Abajo Fijo) -->
-          <div class="pos-checkout-section">
+      <!-- BARRA INFERIOR COMPLETA RESERVADA: Liquidación a la Izquierda + Total y Registrar a la Derecha -->
+      <div class="pos-bottom-checkout-bar">
+        <div class="pos-bottom-checkout-grid">
+          
+          <!-- LADO IZQUIERDO: Delivery, Condiciones y Métodos de Pago con máxima holgura -->
+          <div class="pos-bottom-left-pane">
             <!-- Delivery en una sola fila -->
-            <div style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 8px; padding: 2px 8px; margin-bottom: 4px; min-height: 26px; display: flex; align-items: center;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: nowrap; width: 100%;">
+            <div class="pos-delivery-card">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
                 <label class="form-check" style="margin: 0; min-height: auto; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
                   <input type="checkbox" id="check-delivery"/>
-                  <span style="font-weight: 700; font-size: 12px;">🚚 Delivery</span>
+                  <span style="font-weight: 700; font-size: 12.5px;">🚚 Delivery</span>
                 </label>
 
-                <div id="container-monto-delivery" style="display: none; align-items: center; gap: 5px; flex: 1; min-width: 0;">
-                  <select class="form-control" id="tipo-tarifa-delivery" style="flex: 1.2; min-width: 95px; font-size: 11px; height: 28px; padding: 2px 6px;" title="Zona">
+                <div id="container-monto-delivery" style="display: none; align-items: center; gap: 6px; flex: 1; min-width: 0;">
+                  <select class="form-control" id="tipo-tarifa-delivery" style="flex: 1.2; min-width: 100px; font-size: 11.5px; height: 30px; padding: 2px 6px;" title="Zona">
                     ${tarifasDelivery.map((t, idx) => `
                       <option value="${t.id}" data-precio="${t.precio}" ${idx === 0 ? 'selected' : ''}>
                         ${t.id === 'local' ? '📍' : (t.id === 'afuera' ? '🚗' : '🚚')} ${Utils.escapeHtml(t.nombre)} ($${Utils.formatNumber(t.precio, true)})
                       </option>
                     `).join('')}
                   </select>
-                  <div style="position: relative; width: 44px; flex-shrink: 0;">
-                    <input type="number" class="form-control" id="cant-delivery" value="1" min="1" step="1" title="Viajes" style="padding-left: 14px; padding-right: 2px; font-size: 11px; height: 28px; text-align: center;"/>
-                    <span style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%); font-size: 9.5px; color: var(--color-text-secondary);">x</span>
+                  <div style="position: relative; width: 48px; flex-shrink: 0;">
+                    <input type="number" class="form-control" id="cant-delivery" value="1" min="1" step="1" title="Viajes" style="padding-left: 14px; padding-right: 2px; font-size: 11.5px; height: 30px; text-align: center;"/>
+                    <span style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--color-text-secondary);">x</span>
                   </div>
-                  <div style="position: relative; width: 62px; flex-shrink: 0;">
-                    <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="0.00" title="Precio por viaje" style="padding-left: 13px; padding-right: 2px; font-size: 11px; height: 28px; text-align: center;"/>
-                    <span style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--color-text-secondary);">$</span>
+                  <div style="position: relative; width: 68px; flex-shrink: 0;">
+                    <input type="number" class="form-control" id="monto-delivery" step="0.01" min="0" placeholder="0.00" title="Precio por viaje" style="padding-left: 14px; padding-right: 2px; font-size: 11.5px; height: 30px; text-align: center;"/>
+                    <span style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--color-text-secondary);">$</span>
                   </div>
-                  <select class="form-control" id="repartidor-delivery" style="flex: 1.1; min-width: 95px; font-size: 11px; height: 28px; padding: 2px 6px;" title="Repartidor">
+                  <select class="form-control" id="repartidor-delivery" style="flex: 1.1; min-width: 100px; font-size: 11.5px; height: 30px; padding: 2px 6px;" title="Repartidor">
                     <option value="">Sin repartidor</option>
                     ${repartidores.map(r => `<option value="${r.id}">${Utils.escapeHtml(r.nombre)}</option>`).join('')}
                   </select>
@@ -898,60 +1204,58 @@ export function renderNuevaVentaForm(container) {
 
                 <label class="form-check" style="margin: 0; min-height: auto; cursor: pointer; white-space: nowrap; flex-shrink: 0; margin-left: auto;">
                   <input type="checkbox" id="check-pendiente-entrega"/>
-                  <span style="color: var(--color-warning-dark); font-weight: 600; font-size: 11.5px;">⏳ Pendiente</span>
+                  <span style="color: var(--color-warning-dark); font-weight: 700; font-size: 12px;">⏳ Pendiente</span>
                 </label>
               </div>
             </div>
 
             <!-- Condición de Operación -->
-            <div style="margin-bottom: 4px;">
-              <div class="flex gap-sm" style="flex-wrap: wrap; align-items: center;">
-                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
-                  <input type="radio" name="tipo" value="contado" checked/>
-                  <span>Contado</span>
-                </label>
-                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
-                  <input type="radio" name="tipo" value="credito"/>
-                  <span>Crédito</span>
-                </label>
-                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
-                  <input type="radio" name="tipo" value="convenio"/>
-                  <span>Convenio</span>
-                </label>
-                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
-                  <input type="radio" name="tipo" value="garantia"/>
-                  <span>Garantía</span>
-                </label>
-                <label class="form-check" style="cursor: pointer; font-size: 11.5px; margin-bottom: 0;">
-                  <input type="radio" name="tipo" value="cortesia"/>
-                  <span>Cortesía</span>
-                </label>
-              </div>
+            <div class="pos-condiciones-row">
+              <label class="form-check" style="cursor: pointer; font-size: 12px; margin-bottom: 0;">
+                <input type="radio" name="tipo" value="contado" checked/>
+                <span style="font-weight: 600;">Contado</span>
+              </label>
+              <label class="form-check" style="cursor: pointer; font-size: 12px; margin-bottom: 0;">
+                <input type="radio" name="tipo" value="credito"/>
+                <span style="font-weight: 600;">Crédito</span>
+              </label>
+              <label class="form-check" style="cursor: pointer; font-size: 12px; margin-bottom: 0;">
+                <input type="radio" name="tipo" value="convenio"/>
+                <span style="font-weight: 600;">Convenio</span>
+              </label>
+              <label class="form-check" style="cursor: pointer; font-size: 12px; margin-bottom: 0;">
+                <input type="radio" name="tipo" value="garantia"/>
+                <span style="font-weight: 600;">Garantía</span>
+              </label>
+              <label class="form-check" style="cursor: pointer; font-size: 12px; margin-bottom: 0;">
+                <input type="radio" name="tipo" value="cortesia"/>
+                <span style="font-weight: 600;">Cortesía</span>
+              </label>
             </div>
 
             <!-- Métodos de Pago -->
-            <div id="seccion-pagos">
-              <div id="container-btn-saldo-favor" style="display:none; margin-bottom: 6px;"></div>
+            <div id="seccion-pagos" style="margin-top: 2px;">
+              <div id="container-btn-saldo-favor" style="display:none; margin-bottom: 4px;"></div>
               <div id="pagos-list">
-                <div class="pago-row" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
-                  <label class="form-label" style="margin: 0; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
-                  <div class="form-group" style="margin-bottom: 0; flex: 1.2; min-width: 130px;">
-                    <select class="form-control pago-metodo" style="height: 32px; font-size: 11.5px;">
+                <div class="pago-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <label class="form-label" style="margin: 0; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
+                  <div class="form-group" style="margin-bottom: 0; flex: 1.3; min-width: 140px;">
+                    <select class="form-control pago-metodo" style="height: 34px; font-size: 12px;">
                       ${metodosActivos.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
                     </select>
                   </div>
-                  <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 80px;">
-                    <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00" style="height: 32px; font-size: 12px;"/>
+                  <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 90px;">
+                    <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00" style="height: 34px; font-size: 12.5px; font-weight: 600;"/>
                   </div>
-                  <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta" style="font-size: 11px; height: 32px; padding: 0 9px; white-space: nowrap; flex-shrink: 0;" title="Añadir otro método de pago">+ Añadir</button>
+                  <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta" style="font-size: 12px; font-weight: 700; height: 34px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;" title="Añadir otro método de pago">+ Añadir</button>
                   <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
+                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11.5px;"/>
                   </div>
                 </div>
               </div>
 
               <!-- Calculadora de Vuelto -->
-              <div id="panel-vuelto-calculadora" style="display:none; background: #ECFDF5; border: 1.5px dashed #10B981; border-radius: 6px; padding: 5px 10px; margin-top: 4px; justify-content: space-between; align-items: center;">
+              <div id="panel-vuelto-calculadora" style="display:none; background: #ECFDF5; border: 1.5px dashed #10B981; border-radius: 6px; padding: 4px 10px; margin-top: 4px; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <span style="font-size: 14px;">💵</span>
                   <div>
@@ -960,7 +1264,7 @@ export function renderNuevaVentaForm(container) {
                   </div>
                 </div>
                 <div style="text-align: right;">
-                  <div id="txt-vuelto-usd" style="font-size: 15px; font-weight: 800; color: #065F46; line-height: 1.1;">$0.00</div>
+                  <div id="txt-vuelto-usd" style="font-size: 14px; font-weight: 800; color: #065F46; line-height: 1.1;">$0.00</div>
                   <div id="txt-vuelto-bs" style="font-size: 10.5px; font-weight: 700; color: #047857; line-height: 1.1;">Bs 0,00</div>
                 </div>
               </div>
@@ -971,22 +1275,26 @@ export function renderNuevaVentaForm(container) {
               </div>
             </div>
 
-            <div id="seccion-info-credito" style="display:none; padding: 8px; background: var(--color-bg-secondary); border-radius: var(--radius-md); font-size: 11.5px; color: var(--color-text-secondary); margin-bottom: 6px;">
+            <div id="seccion-info-credito" style="display:none; padding: 6px 10px; background: var(--color-bg-secondary); border-radius: var(--radius-md); font-size: 11.5px; color: var(--color-text-secondary);">
               ℹ️ Esta venta se registrará bajo modalidad de <strong id="texto-tipo-venta">Crédito</strong> (sin cobro inmediato).
             </div>
-
-            <!-- Total a Cobrar y Botón Registrar Venta -->
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1.5px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-              <div>
-                <span style="font-size: 11px; font-weight: 700; color: var(--color-text-secondary); display: block; line-height: 1;">Total a Cobrar:</span>
-                <div id="total-venta" style="display: flex; align-items: baseline; gap: 6px; margin-top: 2px;">
-                  <span style="font-size: 22px; font-weight: 800; color: #065f46; line-height: 1;">Bs 0,00</span>
-                  <span style="font-size: 13px; font-weight: 600; opacity: 0.85; color: var(--color-text-secondary); line-height: 1;">$0.00</span>
-                </div>
-              </div>
-              <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="flex: 1; max-width: 220px; height: 42px; font-size: 14.5px; font-weight: 800; border-radius: 8px; box-shadow: 0 4px 12px rgba(45,106,79,0.25);">Registrar Venta</button>
-            </div>
           </div>
+
+          <!-- LADO DERECHO: Total a Cobrar y Botón Registrar Venta con su propio espacio holgado -->
+          <div class="pos-bottom-right-pane">
+            <div style="min-width: 0;">
+              <span style="font-size: 11.5px; font-weight: 700; color: var(--color-text-secondary); display: block; line-height: 1; text-transform: uppercase; letter-spacing: 0.5px;">Total a Cobrar:</span>
+              <div id="total-venta" style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
+                <span style="font-size: 26px; font-weight: 900; color: #065f46; line-height: 1;">Bs 0,00</span>
+                <span style="font-size: 15px; font-weight: 700; opacity: 0.85; color: var(--color-text-secondary); line-height: 1;">$0.00</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-save-venta-home" style="flex: 1; max-width: 250px; min-width: 170px; height: 50px; font-size: 15.5px; font-weight: 800; border-radius: 10px; box-shadow: 0 4px 14px rgba(45,106,79,0.3); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+              <span>Registrar Venta</span>
+              <span style="font-size: 18px;">✓</span>
+            </button>
+          </div>
+
         </div>
       </div>
   `;
@@ -995,6 +1303,7 @@ export function renderNuevaVentaForm(container) {
   const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
   const todayStr = Utils.todayISO();
   const lecturaHoy = store.getLecturaCaudalimetro(todayStr);
+  const pendientesGlobales = (store.getAll('ventas') || []).filter(v => v.estadoEntrega === 'pendiente');
 
   const formHtml = `
     <div style="padding: 0 0 8px 0;">
@@ -1023,35 +1332,41 @@ export function renderNuevaVentaForm(container) {
               <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(inventario.litros)} L</strong>
             </div>
 
-            <!-- Botón Ingreso de Cisterna (Llenar Tanque) -->
-            <button type="button" id="btn-ingreso-cisterna-pv" class="btn btn-secondary" style="height: 42px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; font-weight: 700; border-radius: 8px; font-size: 13px; background: #ECFDF5; border: 1.5px solid #10B981; color: #047857;" title="Registrar llegada de cisterna (llenar tanque)">
-              🚚 <span>+ Cisterna</span>
+            <!-- Botón Ingreso de Cisterna (Solo ícono) -->
+            <button type="button" id="btn-ingreso-cisterna-pv" class="btn btn-secondary" style="width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; border-radius: 8px; background: #ECFDF5; border: 1.5px solid #10B981; color: #047857; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" title="Registrar llegada de cisterna (llenar tanque)">
+              🚚
             </button>
 
-            <!-- Botón Pantalla Completa -->
+            <!-- Botón Reloj Medidor (Solo ícono) -->
+            ${moduloCaudalimetro ? `
+              <button type="button" id="widget-caudalimetro-pv" class="btn" style="width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; position: relative; border-radius: 8px; font-size: 20px; background: #ffffff; border: 1.5px solid #10B981; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" title="Reloj Medidor (${unidadCaudalimetro}) - ${lecturaHoy.inicial !== null ? `Ini: ${lecturaHoy.inicial.toLocaleString()}` : 'Sin registrar'}${lecturaHoy.final !== null ? ` · Fin: ${lecturaHoy.final.toLocaleString()} (${lecturaHoy.litrosReloj.toLocaleString()} L)` : ''}. Clic para registrar o actualizar">
+                <span style="font-size: 20px; line-height: 1;">⏱️</span>
+                ${lecturaHoy.inicial === null ? `
+                  <span style="position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; background: #EF4444; border-radius: 50%; border: 1.5px solid #fff;" title="Pendiente registrar lectura inicial"></span>
+                ` : (lecturaHoy.final === null ? `
+                  <span style="position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; background: #F59E0B; border-radius: 50%; border: 1.5px solid #fff;" title="Lectura inicial registrada. Pendiente cierre"></span>
+                ` : `
+                  <span style="position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; background: #10B981; border-radius: 50%; border: 1.5px solid #fff;" title="Lecturas del reloj completadas"></span>
+                `)}
+              </button>
+            ` : ''}
+
+            <!-- Botón Pedidos Pendientes de Entrega (Aviso en Slot Reactivo) -->
+            <div id="slot-pendientes-pv" style="display: inline-flex;">
+              ${pendientesGlobales.length > 0 ? `
+                <button type="button" id="btn-pendientes-pv" class="btn" style="height: 42px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; font-weight: 700; background: #FEF3C7; border: 1.5px solid #F59E0B; color: #92400E; cursor: pointer; box-shadow: 0 1px 2px rgba(245,158,11,0.2);" title="Tienes ${pendientesGlobales.length} pedido(s) pendiente(s) de entrega física. Clic para ver y confirmar">
+                  <span style="font-size: 18px; line-height: 1;">⏳</span>
+                  <span style="font-size: 12.5px; font-weight: 800; background: #D97706; color: white; padding: 1px 6px; border-radius: 10px;">${pendientesGlobales.length}</span>
+                </button>
+              ` : ''}
+            </div>
+
+            <!-- Botón Pantalla Completa (Siempre al final) -->
             <button type="button" id="btn-toggle-fullscreen" class="btn" style="width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; background: #ffffff; border: 1.5px solid var(--color-primary, #2D6A4F); color: var(--color-primary, #2D6A4F); cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: all 0.2s ease;" title="Alternar Pantalla Completa">
               <span class="fs-icon" style="display: flex; align-items: center; justify-content: center;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
               </span>
             </button>
-
-            ${moduloCaudalimetro ? `
-              <div id="widget-caudalimetro-pv" style="display: flex; align-items: center; gap: 8px; background: var(--color-surface, #fff); border: 1.5px solid #10B981; border-radius: 10px; padding: 4px 12px; height: 42px; box-shadow: var(--shadow-sm); cursor: pointer;" title="Haga clic para registrar o actualizar la lectura del reloj">
-                <div style="font-size: 18px;">⏱️</div>
-                <div>
-                  <div style="font-size: 10px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1;">
-                    Reloj (${unidadCaudalimetro})
-                  </div>
-                  <div style="font-size: 12px; font-weight: 800; color: #0F172A; line-height: 1.2;">
-                    ${lecturaHoy.inicial !== null ? `Ini: ${lecturaHoy.inicial.toLocaleString()}` : 'Ini: <span style="color:#DC2626;">Sin reg</span>'} 
-                    ${lecturaHoy.final !== null ? `· Fin: ${lecturaHoy.final.toLocaleString()} (<strong>${lecturaHoy.litrosReloj.toLocaleString()} L</strong>)` : ''}
-                  </div>
-                </div>
-                <button type="button" id="btn-abrir-modal-caudalimetro" class="btn btn-xs btn-primary" style="margin-left: 4px; padding: 3px 8px; font-size: 11px; font-weight: 700; border-radius: 6px;">
-                  ${lecturaHoy.inicial === null ? 'Abrir' : (lecturaHoy.final === null ? 'Cierre' : 'Editar')}
-                </button>
-              </div>
-            ` : ''}
           </div>
         </div>
         ${content}
@@ -1127,6 +1442,15 @@ export function renderNuevaVentaForm(container) {
   if (btnCisternaPV) {
     btnCisternaPV.addEventListener('click', () => {
       openCisternaModal(null, () => {
+        renderNuevaVentaForm(container);
+      });
+    });
+  }
+
+  const btnPendientesPV = modal.querySelector('#btn-pendientes-pv');
+  if (btnPendientesPV) {
+    btnPendientesPV.addEventListener('click', () => {
+      openModalPedidosPendientes(() => {
         renderNuevaVentaForm(container);
       });
     });
@@ -2122,8 +2446,12 @@ export function renderNuevaVentaForm(container) {
       } else {
         carrito[existenteIdx].litros += (cantidad * litrosCapacidad);
       }
+      // Colocar de primero también al incrementar producto existente
+      const itemExistente = carrito.splice(existenteIdx, 1)[0];
+      carrito.unshift(itemExistente);
     } else {
-      carrito.push({
+      // Los productos nuevos se colocan siempre de primero
+      carrito.unshift({
         tipoBotellonId,
         categoria,
         nombre: rawNombre,
@@ -2140,6 +2468,8 @@ export function renderNuevaVentaForm(container) {
     }
 
     renderCarrito();
+    const cContainer = modal.querySelector('#carrito-container');
+    if (cContainer) cContainer.scrollTop = 0;
     actualizarBadgesFichas();
   }
 

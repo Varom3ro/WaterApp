@@ -2,7 +2,7 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { openModalCaudalimetro } from './ventas.js';
+import { openModalCaudalimetro, openModalPedidosPendientes } from './ventas.js';
 
 let currentActiveTab = null;
 
@@ -115,11 +115,26 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
         </span>
       </div>
 
-      <div style="background: var(--color-bg, #F8FAFC); border-left: 4px solid var(--color-primary); padding: 10px 14px; border-radius: 6px; margin-bottom: 20px; font-size: 13.5px; color: var(--color-text-main);">
+      <div style="background: var(--color-bg, #F8FAFC); border-left: 4px solid var(--color-primary); padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13.5px; color: var(--color-text-main);">
         🛒 <strong>Operaciones de este Turno:</strong> 
         ${cierreTurno.cantidadVentas} ${cierreTurno.cantidadVentas === 1 ? 'venta registrada' : 'ventas registradas'}
         ${!store.isOperario() ? ` | Esperado en Caja: <strong>${Utils.formatCurrency(cierreTurno.real_ingresado)}</strong> (Bs ${Utils.formatNumber(cierreTurno.bs?.real_ingresado || 0, true)})` : ''}
       </div>
+
+      ${(() => {
+        const pendientes = (store.getAll('ventas') || []).filter(v => v.estadoEntrega === 'pendiente');
+        if (pendientes.length === 0) return '';
+        return `
+          <div style="background: #FEF3C7; border: 1.5px solid #F59E0B; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <div style="font-size: 13px; color: #92400E; line-height: 1.35;">
+              ⚠️ <strong>Atención:</strong> Tienes <strong>${pendientes.length} ${pendientes.length === 1 ? 'pedido pendiente' : 'pedidos pendientes'}</strong> por entregar.
+            </div>
+            <button type="button" id="btn-revisar-pendientes-cierre" class="btn btn-sm" style="background: #F59E0B; color: white; font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 12px; white-space: nowrap; cursor: pointer;">
+              Revisar Entregas
+            </button>
+          </div>
+        `;
+      })()}
 
       <form id="form-arqueo">
         <div style="text-align: left; margin-bottom: 15px;">
@@ -184,6 +199,20 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
 
   setupCurrencyMasks(container);
 
+  const btnRevisarPendientes = container.querySelector('#btn-revisar-pendientes-cierre');
+  if (btnRevisarPendientes) {
+    btnRevisarPendientes.addEventListener('click', () => {
+      openModalPedidosPendientes(() => {
+        const contentDiv = document.getElementById('cierre-caja-home-content');
+        if (contentDiv) {
+          renderCierre(contentDiv, fecha, currentActiveTab);
+        } else {
+          renderCierreContent(fecha, currentActiveTab);
+        }
+      });
+    });
+  }
+
   container.querySelector('#form-arqueo').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -223,6 +252,8 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
       }
     };
 
+    const pendientesGlobales = (store.getAll('ventas') || []).filter(v => v.estadoEntrega === 'pendiente');
+
     openModal({
       title: `⚠️ Confirmar Cierre de Turno ${numTurno}`,
       content: `
@@ -230,9 +261,14 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
           <p style="font-size: 15px; font-weight: 700; color: var(--color-primary-900); margin-bottom: 8px;">
             ¿Estás seguro de que deseas procesar y finalizar el cierre del Turno ${numTurno}?
           </p>
-          <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 15px; line-height: 1.4;">
+          <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 12px; line-height: 1.4;">
             Verifica que hayas contado y declarado todos los montos físicos de este turno. Los montos se cuadrarán exclusivamente con las ventas realizadas entre <strong>${horaInicioStr}</strong> y ahora.
           </p>
+          ${pendientesGlobales.length > 0 ? `
+            <div style="background: #FEF3C7; border: 1.5px solid #F59E0B; border-radius: 8px; padding: 10px 12px; margin-bottom: 15px; font-size: 13px; color: #92400E;">
+              ⚠️ <strong>Recordatorio:</strong> Existen <strong>${pendientesGlobales.length} ${pendientesGlobales.length === 1 ? 'pedido pendiente' : 'pedidos pendientes'}</strong> de entrega física. El dinero de estas ventas ya fue contabilizado en este cuadre.
+            </div>
+          ` : ''}
           <div style="background: var(--color-bg); padding: 12px 14px; border-radius: 8px; font-size: 13.5px; border-left: 4px solid #10B981; display: flex; flex-direction: column; gap: 4px;">
             <div>💵 <strong>Efectivo USD:</strong> ${Utils.formatCurrency(declaracion.efectivo_usd || 0)}</div>
             <div>🇻🇪 <strong>Efectivo Bs:</strong> Bs ${Utils.formatNumber(declaracion.efectivo_bs || 0, true)}</div>
@@ -589,9 +625,9 @@ function renderConsolidadoZ(turnos, fecha, methods) {
         <div class="text-muted" style="font-size: 10px; margin-top: 5px;">(Por cobrar hoy)</div>
       </div>
       <div class="metric-card" style="padding: 15px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface);">
-        <div class="metric-label">Crédito Cobrado (Abonos)</div>
+        <div class="metric-label">Cobros / Abonos Recibidos</div>
         <div class="metric-value" style="font-size: var(--font-size-xl); color: var(--color-success); margin: 0;">${Utils.formatCurrency(cierreGlobal.cobros_credito)}<br><small style="font-size:0.5em; opacity:0.8; font-weight:normal; line-height:1; display:block;">Bs ${Utils.formatNumber(cierreGlobal.bs && cierreGlobal.bs.cobros_credito ? cierreGlobal.bs.cobros_credito : 0, true)}</small></div>
-        <div class="text-muted" style="font-size: 10px; margin-top: 5px;">(Recuperado hoy)</div>
+        <div class="text-muted" style="font-size: 10px; margin-top: 5px;">(Abonos a deuda o saldo a favor)</div>
       </div>
     </div>
     ` : ''}
@@ -1311,6 +1347,17 @@ export function getMatricialReportHTML(fecha) {
             <td style="padding: 4px 0;">VENTAS FACTURADAS HOY (OPERACIONES):</td>
             <td style="text-align: right; padding: 4px 0; font-weight: bold;">${cierre.cantidadVentas}</td>
           </tr>
+          ${(() => {
+            const vDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
+            const pPend = vDia.filter(v => v.estadoEntrega === 'pendiente').length;
+            if (pPend === 0) return '';
+            return `
+              <tr>
+                <td style="padding: 4px 0; color: #D97706; font-weight: bold;">⏳ PEDIDOS PENDIENTES DE ENTREGA HOY:</td>
+                <td style="text-align: right; padding: 4px 0; color: #D97706; font-weight: bold;">${pPend}</td>
+              </tr>
+            `;
+          })()}
         </table>
         <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
       </div>
