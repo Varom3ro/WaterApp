@@ -229,18 +229,18 @@ export const Licencia = {
       <div class="card" style="max-width: 460px; width: 100%; padding: var(--space-xl, 24px); background: var(--color-surface, #ffffff); color: var(--color-text-primary, #1e293b); border-radius: var(--radius-lg, 12px); box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.3)); border: 1px solid var(--color-border, #e2e8f0);">
         <div style="text-align: center; margin-bottom: var(--space-lg, 20px);">
           <div style="font-size: 44px; margin-bottom: 8px;">💧</div>
-          <h2 style="color: var(--color-primary-900, #1B4332); font-size: 22px; font-weight: 800; margin-bottom: 6px;">Acceso a WaterApp</h2>
-          <p style="color: var(--color-text-secondary, #64748b); font-size: var(--font-size-base, 14px); line-height: 1.5;">Introduce el correo electrónico registrado de tu tienda para activar o ingresar a tu sistema.</p>
+          <h2 style="color: var(--color-primary-900, #1B4332); font-size: 22px; font-weight: 800; margin-bottom: 6px;">Demostración Gratuita</h2>
+          <p style="color: var(--color-text-secondary, #64748b); font-size: var(--font-size-base, 14px); line-height: 1.5;">Introduce tu correo electrónico para activar tu período de prueba de 7 días y probar la herramienta.</p>
         </div>
         
         <div style="margin-bottom: var(--space-lg, 20px);">
-          <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px;">Correo Electrónico Registrado:</label>
+          <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px;">Correo Electrónico:</label>
           <input type="email" id="licencia-email" class="form-control" placeholder="ejemplo@correo.com" style="width: 100%; height: 44px; font-size: 15px;" required />
           <div id="licencia-error" style="color: var(--color-danger, #ef4444); font-size: 13px; margin-top: 6px; display: none;"></div>
         </div>
 
         <button id="btn-activar-licencia" class="btn btn-primary" style="width: 100%; height: 46px; font-size: 15px; font-weight: bold; cursor: pointer;">
-          🚀 Ingresar al Sistema
+          🚀 Activar Prueba de 7 Días
         </button>
       </div>
     `;
@@ -351,7 +351,7 @@ export const Licencia = {
         errorDiv.textContent = e.message || 'Ocurrió un error al verificar la licencia. Inténtalo de nuevo.';
         errorDiv.style.display = 'block';
         btn.disabled = false;
-        btn.textContent = '🚀 Ingresar al Sistema';
+        btn.textContent = '🚀 Activar Prueba de 7 Días';
       }
     });
   },
