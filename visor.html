@@ -936,19 +936,6 @@
     </div>
 
     <div class="card-login">
-      <!-- Selector Rápido de Sede para Refill H2O -->
-      <div id="login-refill-sedes" style="margin-bottom: 1.15rem; padding: 10px 12px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 12px;">
-        <div style="font-size: 0.72rem; font-weight: 800; color: #67E8F9; text-transform: uppercase; margin-bottom: 7px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
-          <span>💧</span>
-          <span>Sedes Oficiales Refill H2O:</span>
-        </div>
-        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-          <button type="button" class="btn-quick-sede" onclick="seleccionarSedeLogin('refillh2o.lcf@gmail.com')">📍 La California Sur</button>
-          <button type="button" class="btn-quick-sede" onclick="seleccionarSedeLogin('refillh2o.se@gmail.com')">📍 Santa Eduvigis</button>
-          <button type="button" class="btn-quick-sede" onclick="seleccionarSedeLogin('refillh2o.ldc@gmail.com')">📍 Los Dos Caminos</button>
-        </div>
-      </div>
-
       <div class="form-group">
         <label class="form-label">Correo de tu Tienda / Planta</label>
         <input type="email" id="login-email" class="form-control" placeholder="ejemplo@correo.com" value="" autocomplete="email" />
@@ -1004,10 +991,10 @@
       </div>
     </header>
 
-    <!-- BARRA SELECTORA DE SEDES (Exclusiva para cuentas Refill H2O) -->
+    <!-- BARRA SELECTORA DE SEDES (Exclusiva para supervisión Refill H2O) -->
     <div id="refill-sede-bar" class="refill-sede-bar" style="display: none;">
       <div class="sede-bar-header">
-        <span class="sede-bar-title">🏢 Sedes Refill H2O:</span>
+        <span class="sede-bar-title">🏢 Supervisión de Sedes Refill H2O:</span>
         <span id="sede-syncing-indicator" class="sede-syncing-indicator" style="display: none;">🔄 Cambiando sede...</span>
       </div>
       <div class="sede-pills-scroll" id="refill-sede-pills">
@@ -1230,10 +1217,11 @@
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
   let currentStoreEmail = '';
+  let supervisorAccount = localStorage.getItem('visor_supervisor_email') || '';
   let autoRefreshInterval = null;
 
   // =========================================================================
-  // GESTIÓN MULTI-SEDE REFILL H2O (EXCEPCIÓN POR SEDE)
+  // GESTIÓN MULTI-SEDE REFILL H2O (SUPERVISIÓN PARA refillh2o@gmail.com)
   // =========================================================================
   const REFILLH2O_SEDES = {
     'refillh2o.lcf@gmail.com': {
@@ -1262,9 +1250,14 @@
     }
   };
 
+  function esSupervisorRefill() {
+    return supervisorAccount === 'refillh2o@gmail.com';
+  }
+
   function esCuentaRefillH2O(email) {
     if (!email) return false;
-    return email.trim().toLowerCase().startsWith('refillh2o.');
+    const clean = email.trim().toLowerCase();
+    return clean === 'refillh2o@gmail.com' || clean.startsWith('refillh2o.');
   }
 
   function obtenerInfoSedeRefill(email) {
@@ -1294,7 +1287,8 @@
     const container = document.getElementById('refill-sede-pills');
     if (!bar || !container) return;
 
-    if (!esCuentaRefillH2O(activeEmail)) {
+    // La barra de sedes se muestra para el supervisor o cuentas Refill H2O
+    if (!esSupervisorRefill() && !esCuentaRefillH2O(activeEmail)) {
       bar.style.display = 'none';
       return;
     }
@@ -1302,8 +1296,7 @@
     bar.style.display = 'block';
 
     const sedesArray = Object.values(REFILLH2O_SEDES);
-    // Si el correo activo es de refillh2o pero no está en la lista inicial, agregarlo dinámicamente
-    if (!REFILLH2O_SEDES[activeEmail.toLowerCase()]) {
+    if (!REFILLH2O_SEDES[activeEmail.toLowerCase()] && activeEmail.startsWith('refillh2o.')) {
       const extra = obtenerInfoSedeRefill(activeEmail);
       if (extra) sedesArray.push(extra);
     }
@@ -1312,7 +1305,7 @@
       const isActive = s.email.toLowerCase() === activeEmail.toLowerCase();
       const activeClass = isActive ? 'active' : '';
       return `
-        <button type="button" class="sede-pill-btn ${activeClass}" onclick="cambiarSedeRefillH2O('${s.email}')" title="Ver métricas en vivo de ${escapeHtml(s.sede)}">
+        <button type="button" class="sede-pill-btn ${activeClass}" onclick="cambiarSedeRefillH2O('${s.email}')" title="Ver métricas de ${escapeHtml(s.sede)}">
           <span>${s.icono || '📍'}</span>
           <span>${escapeHtml(s.sede)}</span>
           <span class="pill-code">${s.codigo}</span>
@@ -1328,9 +1321,8 @@
     if (indicator) indicator.style.display = 'inline-block';
 
     currentStoreEmail = nuevoEmail;
-    localStorage.setItem('visor_owner_email', nuevoEmail);
+    localStorage.setItem('visor_refill_selected_sede', nuevoEmail);
 
-    // Actualizar visualmente la pastilla activa de inmediato
     document.querySelectorAll('.sede-pill-btn').forEach(btn => {
       if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(nuevoEmail)) {
         btn.classList.add('active');
@@ -1347,7 +1339,13 @@
         badge.style.display = 'inline-flex';
       }
       const txtOwner = document.getElementById('txt-owner-email');
-      if (txtOwner) txtOwner.textContent = nuevoEmail;
+      if (txtOwner) {
+        if (esSupervisorRefill()) {
+          txtOwner.innerHTML = `<span>👑 Supervisión: refillh2o@gmail.com · <strong style="color:#FFF;">${info.sede}</strong></span>`;
+        } else {
+          txtOwner.textContent = nuevoEmail;
+        }
+      }
     }
 
     try {
@@ -1357,20 +1355,6 @@
       console.warn('Error al cambiar de sede:', err);
     } finally {
       if (indicator) indicator.style.display = 'none';
-    }
-  }
-
-  function seleccionarSedeLogin(email) {
-    const inputEmail = document.getElementById('login-email');
-    const inputPwd = document.getElementById('login-pwd');
-    if (inputEmail) {
-      inputEmail.value = email;
-    }
-    if (inputPwd && !inputPwd.value) {
-      inputPwd.value = 'admin';
-    }
-    if (inputPwd) {
-      inputPwd.focus();
     }
   }
 
@@ -1585,9 +1569,20 @@
     btn.textContent = btnOriginalText;
 
     // Comprobación de acceso aprobada
-    currentStoreEmail = email;
     localStorage.setItem('visor_owner_email', email);
     localStorage.setItem('visor_owner_pwd', pwd);
+
+    if (email === 'refillh2o@gmail.com') {
+      supervisorAccount = 'refillh2o@gmail.com';
+      localStorage.setItem('visor_supervisor_email', 'refillh2o@gmail.com');
+      // Iniciar en la última sede seleccionada o por defecto La California Sur
+      const savedSede = localStorage.getItem('visor_refill_selected_sede');
+      currentStoreEmail = savedSede || 'refillh2o.lcf@gmail.com';
+    } else {
+      supervisorAccount = '';
+      localStorage.removeItem('visor_supervisor_email');
+      currentStoreEmail = email;
+    }
 
     // Iniciar presencia en vivo y telemetría de sesiones activas
     iniciarPresenciaEnVivo(email);
@@ -1614,6 +1609,8 @@
   document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('visor_owner_email');
     localStorage.removeItem('visor_owner_pwd');
+    localStorage.removeItem('visor_supervisor_email');
+    localStorage.removeItem('visor_refill_selected_sede');
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     if (presenciaInterval) clearInterval(presenciaInterval);
     location.reload();
@@ -1873,13 +1870,17 @@
         badgeSede.textContent = `📍 ${sedeInfo.sede}`;
         badgeSede.style.display = 'inline-flex';
       }
+      if (txtOwner) {
+        if (esSupervisorRefill()) {
+          txtOwner.innerHTML = `<span>👑 Supervisión: refillh2o@gmail.com · <strong style="color:#FFF;">${sedeInfo.sede}</strong></span>`;
+        } else {
+          txtOwner.textContent = activeEmail;
+        }
+      }
     } else {
       if (txtStoreName) txtStoreName.textContent = storeData.nombre_empresa || 'Tu Empresa';
       if (badgeSede) badgeSede.style.display = 'none';
-    }
-
-    if (txtOwner) {
-      txtOwner.textContent = activeEmail;
+      if (txtOwner) txtOwner.textContent = activeEmail;
     }
 
     // Actualizar barra de selección de sedes para Refill H2O
