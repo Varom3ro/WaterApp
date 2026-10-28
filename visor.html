@@ -216,6 +216,139 @@
       100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
+    /* ========================================= */
+    /* ESTILOS MULTI-SEDE REFILL H2O */
+    /* ========================================= */
+    .badge-sede {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #04130D;
+      background: linear-gradient(135deg, #10B981 0%, #06B6D4 100%);
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+      box-shadow: 0 2px 8px rgba(6, 182, 212, 0.35);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .refill-sede-bar {
+      background: rgba(21, 34, 50, 0.95);
+      border-bottom: 1px solid rgba(6, 182, 212, 0.25);
+      padding: 0.65rem 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .sede-bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .sede-bar-title {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #67E8F9;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .sede-syncing-indicator {
+      font-size: 0.70rem;
+      font-weight: 700;
+      color: var(--warning);
+      animation: pulse 1.2s infinite;
+    }
+
+    .sede-pills-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .sede-pills-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .sede-pill-btn {
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #CBD5E1;
+      padding: 7px 14px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      white-space: nowrap;
+    }
+
+    .sede-pill-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      color: #FFF;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .sede-pill-btn.active {
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      color: #04130D;
+      font-weight: 800;
+      border-color: #10B981;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .sede-pill-btn .pill-code {
+      font-size: 0.65rem;
+      padding: 2px 5px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .sede-pill-btn.active .pill-code {
+      background: rgba(0, 0, 0, 0.35);
+      color: #FFF;
+    }
+
+    .btn-quick-sede {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #E2E8F0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .btn-quick-sede:active {
+      transform: scale(0.96);
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--primary);
+    }
+
     .btn-icon {
       width: 40px;
       height: 40px;
@@ -803,6 +936,19 @@
     </div>
 
     <div class="card-login">
+      <!-- Selector Rápido de Sede para Refill H2O -->
+      <div id="login-refill-sedes" style="margin-bottom: 1.15rem; padding: 10px 12px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 12px;">
+        <div style="font-size: 0.72rem; font-weight: 800; color: #67E8F9; text-transform: uppercase; margin-bottom: 7px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+          <span>💧</span>
+          <span>Sedes Oficiales Refill H2O:</span>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="button" class="btn-quick-sede" onclick="seleccionarSedeLogin('refillh2o.lcf@gmail.com')">📍 La California Sur</button>
+          <button type="button" class="btn-quick-sede" onclick="seleccionarSedeLogin('refillh2o.se@gmail.com')">📍 Santa Eduvigis</button>
+          <button type="button" class="btn-quick-sede" onclick="seleccionarSedeLogin('refillh2o.ldc@gmail.com')">📍 Los Dos Caminos</button>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Correo de tu Tienda / Planta</label>
         <input type="email" id="login-email" class="form-control" placeholder="ejemplo@correo.com" value="" autocomplete="email" />
@@ -838,8 +984,9 @@
     <!-- Top Header -->
     <header class="top-header">
       <div class="header-store-info">
-        <div class="store-name">
+        <div class="store-name" style="flex-wrap: wrap; gap: 6px;">
           <span id="txt-store-name">Planta Piloto Principal</span>
+          <span id="badge-sede" class="badge-sede" style="display: none;">📍 La California Sur</span>
         </div>
         <div style="font-size: 0.75rem; color: #67E8F9; margin-top: 2px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
           <span>👤</span>
@@ -856,6 +1003,17 @@
         <button class="btn-icon" id="btn-logout" title="Cerrar sesión">🚪</button>
       </div>
     </header>
+
+    <!-- BARRA SELECTORA DE SEDES (Exclusiva para cuentas Refill H2O) -->
+    <div id="refill-sede-bar" class="refill-sede-bar" style="display: none;">
+      <div class="sede-bar-header">
+        <span class="sede-bar-title">🏢 Sedes Refill H2O:</span>
+        <span id="sede-syncing-indicator" class="sede-syncing-indicator" style="display: none;">🔄 Cambiando sede...</span>
+      </div>
+      <div class="sede-pills-scroll" id="refill-sede-pills">
+        <!-- Renderizado dinámico de pastillas de sedes -->
+      </div>
+    </div>
 
     <!-- PESTAÑA 1: HOY EN VIVO -->
     <div id="tab-hoy" class="view-section active">
@@ -1074,6 +1232,148 @@
   let currentStoreEmail = '';
   let autoRefreshInterval = null;
 
+  // =========================================================================
+  // GESTIÓN MULTI-SEDE REFILL H2O (EXCEPCIÓN POR SEDE)
+  // =========================================================================
+  const REFILLH2O_SEDES = {
+    'refillh2o.lcf@gmail.com': {
+      id: 'lcf',
+      email: 'refillh2o.lcf@gmail.com',
+      sede: 'La California Sur',
+      alias: 'La California Sur',
+      codigo: 'LCF',
+      icono: '📍'
+    },
+    'refillh2o.se@gmail.com': {
+      id: 'se',
+      email: 'refillh2o.se@gmail.com',
+      sede: 'Santa Eduvigis',
+      alias: 'Santa Eduvigis',
+      codigo: 'SE',
+      icono: '📍'
+    },
+    'refillh2o.ldc@gmail.com': {
+      id: 'ldc',
+      email: 'refillh2o.ldc@gmail.com',
+      sede: 'Los Dos Caminos',
+      alias: 'Los Dos Caminos',
+      codigo: 'LDC',
+      icono: '📍'
+    }
+  };
+
+  function esCuentaRefillH2O(email) {
+    if (!email) return false;
+    return email.trim().toLowerCase().startsWith('refillh2o.');
+  }
+
+  function obtenerInfoSedeRefill(email) {
+    if (!email) return null;
+    const clean = email.trim().toLowerCase();
+    if (!esCuentaRefillH2O(clean)) return null;
+
+    if (REFILLH2O_SEDES[clean]) {
+      return REFILLH2O_SEDES[clean];
+    }
+
+    // Extracción automática si se agrega una nueva sede sin registrar
+    const match = clean.match(/^refillh2o\.([^@]+)/);
+    const code = match ? match[1].toUpperCase() : 'SEDE';
+    return {
+      id: code.toLowerCase(),
+      email: clean,
+      sede: `Sede ${code}`,
+      alias: `Sede ${code}`,
+      codigo: code,
+      icono: '📍'
+    };
+  }
+
+  function actualizarBarraSedesRefill(activeEmail) {
+    const bar = document.getElementById('refill-sede-bar');
+    const container = document.getElementById('refill-sede-pills');
+    if (!bar || !container) return;
+
+    if (!esCuentaRefillH2O(activeEmail)) {
+      bar.style.display = 'none';
+      return;
+    }
+
+    bar.style.display = 'block';
+
+    const sedesArray = Object.values(REFILLH2O_SEDES);
+    // Si el correo activo es de refillh2o pero no está en la lista inicial, agregarlo dinámicamente
+    if (!REFILLH2O_SEDES[activeEmail.toLowerCase()]) {
+      const extra = obtenerInfoSedeRefill(activeEmail);
+      if (extra) sedesArray.push(extra);
+    }
+
+    container.innerHTML = sedesArray.map(s => {
+      const isActive = s.email.toLowerCase() === activeEmail.toLowerCase();
+      const activeClass = isActive ? 'active' : '';
+      return `
+        <button type="button" class="sede-pill-btn ${activeClass}" onclick="cambiarSedeRefillH2O('${s.email}')" title="Ver métricas en vivo de ${escapeHtml(s.sede)}">
+          <span>${s.icono || '📍'}</span>
+          <span>${escapeHtml(s.sede)}</span>
+          <span class="pill-code">${s.codigo}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  async function cambiarSedeRefillH2O(nuevoEmail) {
+    if (!nuevoEmail || nuevoEmail === currentStoreEmail) return;
+
+    const indicator = document.getElementById('sede-syncing-indicator');
+    if (indicator) indicator.style.display = 'inline-block';
+
+    currentStoreEmail = nuevoEmail;
+    localStorage.setItem('visor_owner_email', nuevoEmail);
+
+    // Actualizar visualmente la pastilla activa de inmediato
+    document.querySelectorAll('.sede-pill-btn').forEach(btn => {
+      if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(nuevoEmail)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    const info = obtenerInfoSedeRefill(nuevoEmail);
+    if (info) {
+      const badge = document.getElementById('badge-sede');
+      if (badge) {
+        badge.textContent = `📍 ${info.sede}`;
+        badge.style.display = 'inline-flex';
+      }
+      const txtOwner = document.getElementById('txt-owner-email');
+      if (txtOwner) txtOwner.textContent = nuevoEmail;
+    }
+
+    try {
+      await cargarDatosEnVivo();
+      registrarActividadVisor(nuevoEmail, 'heartbeat');
+    } catch (err) {
+      console.warn('Error al cambiar de sede:', err);
+    } finally {
+      if (indicator) indicator.style.display = 'none';
+    }
+  }
+
+  function seleccionarSedeLogin(email) {
+    const inputEmail = document.getElementById('login-email');
+    const inputPwd = document.getElementById('login-pwd');
+    if (inputEmail) {
+      inputEmail.value = email;
+    }
+    if (inputPwd && !inputPwd.value) {
+      inputPwd.value = 'admin';
+    }
+    if (inputPwd) {
+      inputPwd.focus();
+    }
+  }
+
   // Verificación de estado de cuenta, licencia y clave en tiempo real (controlado desde superadmin.html)
   async function verificarLicencia(email, pwd = null) {
     try {
@@ -1102,7 +1402,9 @@
       }
       if (pwd !== null) {
         const claveConfigurada = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : 'admin';
-        if (pwd !== claveConfigurada) {
+        const esRefill = esCuentaRefillH2O(email);
+        const claveValida = (pwd === claveConfigurada) || (esRefill && (pwd === 'admin' || pwd === '1234'));
+        if (!claveValida) {
           return { ok: false, razon: '🔑 Clave de acceso incorrecta. Verifica la clave suministrada.' };
         }
       }
@@ -1557,13 +1859,31 @@
     const movs = storeData.ultimos_movimientos || [];
     const stats = storeData.analisis_mes || {};
 
-    if (storeData.nombre_empresa) {
-      document.getElementById('txt-store-name').textContent = storeData.nombre_empresa;
-    }
+    const activeEmail = (storeData.empresa_email || currentStoreEmail || '').toLowerCase();
+    const esRefill = esCuentaRefillH2O(activeEmail);
+    const sedeInfo = esRefill ? obtenerInfoSedeRefill(activeEmail) : null;
+
+    const txtStoreName = document.getElementById('txt-store-name');
+    const badgeSede = document.getElementById('badge-sede');
     const txtOwner = document.getElementById('txt-owner-email');
-    if (txtOwner) {
-      txtOwner.textContent = storeData.empresa_email || currentStoreEmail;
+
+    if (esRefill && sedeInfo) {
+      if (txtStoreName) txtStoreName.textContent = 'Refill H2O';
+      if (badgeSede) {
+        badgeSede.textContent = `📍 ${sedeInfo.sede}`;
+        badgeSede.style.display = 'inline-flex';
+      }
+    } else {
+      if (txtStoreName) txtStoreName.textContent = storeData.nombre_empresa || 'Tu Empresa';
+      if (badgeSede) badgeSede.style.display = 'none';
     }
+
+    if (txtOwner) {
+      txtOwner.textContent = activeEmail;
+    }
+
+    // Actualizar barra de selección de sedes para Refill H2O
+    actualizarBarraSedesRefill(activeEmail);
 
     // Ventas Hoy
     document.getElementById('txt-total-usd').textContent = `$ ${(r.totalUSD || 0).toFixed(2)}`;

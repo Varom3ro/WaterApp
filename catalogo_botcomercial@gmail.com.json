@@ -1,0 +1,356 @@
+﻿{
+    "_meta":  {
+                  "origen":  "refillh2o.lcf@gmail.com",
+                  "destino":  "botcomercial@gmail.com",
+                  "fecha":  "2026-10-27T16:01:23.115Z"
+              },
+    "configuracion":  [
+                          {
+                              "id":  "tiposBotellon",
+                              "value":  [
+                                            {
+                                                "id":  "20l",
+                                                "stock":  0,
+                                                "litros":  20,
+                                                "moneda":  "USD",
+                                                "nombre":  "Recarga 20 Lts",
+                                                "precio":  2,
+                                                "categoria":  "relleno"
+                                            },
+                                            {
+                                                "id":  "mtkeqw86ufe3q9yht",
+                                                "stock":  0,
+                                                "litros":  20,
+                                                "moneda":  "USD",
+                                                "nombre":  "Recarga 20 Lts + Delvery",
+                                                "precio":  2.5,
+                                                "categoria":  "relleno"
+                                            },
+                                            {
+                                                "id":  "mu728pfceqhaeotl1",
+                                                "stock":  0,
+                                                "litros":  15,
+                                                "moneda":  "USD",
+                                                "nombre":  "Recarga 15 Lts",
+                                                "precio":  1.8,
+                                                "categoria":  "relleno"
+                                            },
+                                            {
+                                                "id":  "10l",
+                                                "stock":  0,
+                                                "litros":  12,
+                                                "moneda":  "USD",
+                                                "nombre":  "Recarga 12 Lts",
+                                                "precio":  1.5,
+                                                "categoria":  "relleno"
+                                            },
+                                            {
+                                                "id":  "item_1788276756624_am00",
+                                                "stock":  0,
+                                                "litros":  5,
+                                                "moneda":  "USD",
+                                                "nombre":  "Recarga 5 Lts",
+                                                "precio":  1,
+                                                "categoria":  "relleno"
+                                            },
+                                            {
+                                                "id":  "mun3xfsm9ic08npww",
+                                                "stock":  0,
+                                                "litros":  5,
+                                                "moneda":  "USD",
+                                                "nombre":  "Recarga Botellón + Delivery",
+                                                "precio":  1.5,
+                                                "categoria":  "relleno"
+                                            },
+                                            {
+                                                "id":  "item_1788277519440_h7z1",
+                                                "stock":  4,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Aquatabs Blister",
+                                                "precio":  3,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277518767_l2t7",
+                                                "stock":  8,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Aquatabs x 5",
+                                                "precio":  6,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6ua228aonw9jgr",
+                                                "stock":  1,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Balancín C/Casillero SA",
+                                                "precio":  0,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277264678_x6sl",
+                                                "stock":  2,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Base Invertida",
+                                                "precio":  18,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788276783554_1orm",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón 5 Lts",
+                                                "precio":  3,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277122537_tyki",
+                                                "stock":  1,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Asa 12 Lts",
+                                                "precio":  10,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277093821_7kxh",
+                                                "stock":  23,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Asa 18 Lts",
+                                                "precio":  12,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277257697_9qbg",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Boca ancha 20 Lts",
+                                                "precio":  35,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277021574_tqx3",
+                                                "stock":  5,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Liso 12 Lts",
+                                                "precio":  9,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788276951325_m6ag",
+                                                "stock":  16,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Liso 19 Lts",
+                                                "precio":  10,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277231519_ifno",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Prolipopileno 12 Lts",
+                                                "precio":  14,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277145307_3cfc",
+                                                "stock":  13,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Botellón Prolipopileno 19 Lts",
+                                                "precio":  16,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6vhz4mdukk2q23",
+                                                "stock":  1,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Casillero 5/P SA",
+                                                "precio":  0,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277519942_awlm",
+                                                "stock":  2,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Cepillo",
+                                                "precio":  10,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277262189_28b1",
+                                                "stock":  18,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Dispensador Electrónico",
+                                                "precio":  10,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277264000_ageh",
+                                                "stock":  5,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Dispensador Electrónico Plus",
+                                                "precio":  12,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6rtwswktni4w83",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Dispensador Grande SA",
+                                                "precio":  10,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277264148_gvp7",
+                                                "stock":  3,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Dispensador Manual",
+                                                "precio":  8,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6sw7ren63bp0vt",
+                                                "stock":  3,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Dispensador Mesa SA",
+                                                "precio":  20,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6gyq4p47pl1ocd",
+                                                "stock":  3,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Filtro Mini Grifo",
+                                                "precio":  3,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mur6a7u7puanbq02y",
+                                                "stock":  7,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Forro Botellón Importado",
+                                                "precio":  13,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mv1a5chf9h8frnolh",
+                                                "stock":  8,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Forro Botellón protección solar",
+                                                "precio":  8,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277520252_dph2",
+                                                "stock":  4,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Grifo",
+                                                "precio":  6,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277519784_lhn5",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Hielo",
+                                                "precio":  3,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277264366_8aor",
+                                                "stock":  15,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Porta Botellón Grande",
+                                                "precio":  5,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk66xqgehcgys291",
+                                                "stock":  2,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Porta Botellón Pqe.",
+                                                "precio":  2.5,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277520561_eg41",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Regilla",
+                                                "precio":  10,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277844320_zfni",
+                                                "stock":  0,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Silicón",
+                                                "precio":  5,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277521207_nkh5",
+                                                "stock":  14,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Tapa Reusable",
+                                                "precio":  0.25,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6khnoshuer56ld",
+                                                "stock":  9,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Tapa Rosca Alpes",
+                                                "precio":  0.5,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "mtk6nyfefnjqx0qwf",
+                                                "stock":  12,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Tapa Rosca Grande",
+                                                "precio":  0.5,
+                                                "categoria":  "producto"
+                                            },
+                                            {
+                                                "id":  "item_1788277520766_nc2y",
+                                                "stock":  1,
+                                                "litros":  0,
+                                                "moneda":  "USD",
+                                                "nombre":  "Tobito SA",
+                                                "precio":  14,
+                                                "categoria":  "producto"
+                                            }
+                                        ]
+                          }
+                      ]
+}
