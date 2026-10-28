@@ -1641,6 +1641,37 @@
           g.items.push(m);
         });
 
+        const backupVentas = storeData.respaldo_completo?.ventas || [];
+        const rawCfg = storeData.respaldo_completo?.configuracion;
+        const backupTipos = Array.isArray(rawCfg)
+          ? ((rawCfg.find(c => c && c.id === 'tiposBotellon') || {}).value || [])
+          : (rawCfg?.tiposBotellon || []);
+        const ventasByFecha = {};
+        backupVentas.forEach(v => {
+          if (v && v.fecha) ventasByFecha[v.fecha] = v;
+        });
+
+        const getMovimientoTitle = (m) => {
+          if (m.tipo === 'Merma') return m.descripcion || 'Lavado de botellones';
+          const vMatch = (m.detalles && m.detalles.length > 0) ? m : (m.fecha ? ventasByFecha[m.fecha] : null);
+          const detalles = vMatch && Array.isArray(vMatch.detalles) ? vMatch.detalles : null;
+          if (detalles && detalles.length > 0) {
+            return detalles.map(d => {
+              if (d.categoria === 'servicio') return `🛵 ${d.nombre || 'Delivery'}`;
+              const prod = backupTipos.find(t => t.id === d.tipoBotellonId);
+              let prodName = prod ? prod.nombre : (d.nombre || 'Recarga');
+              if ((d.categoria === 'relleno' || (prod && prod.categoria === 'relleno') || (!d.categoria && (!prod || prod.categoria !== 'producto'))) && /botell[oó]n/i.test(prodName) && !/nuevo/i.test(prodName)) {
+                prodName = prodName.replace(/botell[oó]nes?/gi, 'Recarga');
+              }
+              return `${d.cantidad || 1} ${prodName}`;
+            }).join(' + ');
+          }
+          if (m.descripcion && /botell[oó]n\(es\)/i.test(m.descripcion)) {
+            return m.descripcion.replace(/botell[oó]n\(es\)/gi, 'Recarga(s)');
+          }
+          return m.descripcion || m.tipo || 'Recarga';
+        };
+
         const htmlPieces = dayGroups.map(group => {
           const isCollapsed = collapsedFeedDays.has(group.dayKey);
 
@@ -1649,12 +1680,14 @@
               ? new Date(m.fecha).toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
               : `${m.hora} · ${m.cliente || ''}`;
 
+            const descTitle = getMovimientoTitle(m);
+
             return `
               <div class="feed-item" title="${escapeHtml(fullDateTitle)}">
                 <div class="feed-left">
                   <div class="feed-icon">${m.icono || '💧'}</div>
                   <div>
-                    <div class="feed-title">${escapeHtml(m.descripcion || m.tipo)}</div>
+                    <div class="feed-title">${escapeHtml(descTitle)}</div>
                     <div class="feed-meta">${m.hora} · ${escapeHtml(m.cliente || 'Cliente')}</div>
                   </div>
                 </div>

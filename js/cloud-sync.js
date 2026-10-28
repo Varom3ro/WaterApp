@@ -254,12 +254,32 @@ export async function syncToCloud(isManual = false) {
         ? Utils.formatTime(v.fecha)
         : (v.fecha ? new Date(v.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : '');
 
+      let descMov = '';
+      if (v.detalles && Array.isArray(v.detalles) && v.detalles.length > 0) {
+        descMov = v.detalles.map(d => {
+          if (d.categoria === 'servicio') {
+            return `🛵 ${d.nombre || 'Delivery'}`;
+          }
+          const prod = tipos.find(t => t.id === d.tipoBotellonId);
+          let prodName = prod ? prod.nombre : (d.nombre || 'Recarga');
+          if ((d.categoria === 'relleno' || (prod && prod.categoria === 'relleno') || (!d.categoria && (!prod || prod.categoria !== 'producto'))) && /botell[oó]n/i.test(prodName) && !/nuevo/i.test(prodName)) {
+            prodName = prodName.replace(/botell[oó]nes?/gi, 'Recarga');
+          }
+          return `${d.cantidad || 1} ${prodName}`;
+        }).join(' + ');
+      } else if (v.delivery > 0 && (!v.botellones || v.botellones === 0)) {
+        descMov = `🛵 ${v.deliveryTipoNombre || 'Servicio de Delivery'}`;
+      } else {
+        descMov = `${v.botellones || 1} Recarga(s)`;
+      }
+
       ultimosMovs.push({
         hora: horaStr,
         fecha: v.fecha,
         tipo: 'Venta',
         icono: '💧',
-        descripcion: `${v.botellones || 1} Botellón(es)`,
+        descripcion: descMov,
+        detalles: v.detalles || [],
         monto: Utils.formatCurrency(v.total),
         metodo: metodoLabel,
         cliente: v.clienteNombre || 'Cliente Mostrador'
