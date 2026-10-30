@@ -475,6 +475,7 @@ function deleteMerma(id, container) {
 export function openCisternaModal(id = null, onComplete = null) {
   const isEdit = !!id;
   const c = isEdit ? store.getById('cisternas', id) : {};
+  const isCustomInitial = isEdit && c.capacidad && !Utils.cisternCapacities.includes(c.capacidad);
 
   const content = `
     <form id="form-cisterna">
@@ -483,12 +484,25 @@ export function openCisternaModal(id = null, onComplete = null) {
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-md)">
           ${Utils.cisternCapacities.map((cap, i) => `
             <label class="form-check" style="padding:var(--space-md);background:var(--color-bg);border-radius:var(--radius-md);border:2px solid var(--color-border);cursor:pointer">
-              <input type="radio" name="capacidad" value="${cap}" ${c.capacidad === cap || (!c.capacidad && i === 0) ? 'checked' : ''}/>
+              <input type="radio" name="capacidad_opcion" value="${cap}" ${(!isCustomInitial && (c.capacidad === cap || (!c.capacidad && i === 0))) ? 'checked' : ''}/>
               <span class="font-semibold">${Utils.formatNumber(cap)} Litros</span>
             </label>
           `).join('')}
+          <label class="form-check" style="grid-column: span 2; padding:var(--space-md);background:var(--color-bg);border-radius:var(--radius-md);border:2px solid var(--color-border);cursor:pointer">
+            <input type="radio" name="capacidad_opcion" value="otro" ${isCustomInitial ? 'checked' : ''}/>
+            <span class="font-semibold">✏️ Otra Capacidad (Manual)</span>
+          </label>
         </div>
       </div>
+
+      <div class="form-group" id="group-capacidad-manual" style="${isCustomInitial ? '' : 'display:none;'}">
+        <label class="form-label">Litros Manuales de la Cisterna *</label>
+        <div style="position:relative">
+          <input type="number" class="form-control" id="input-capacidad-manual" name="capacidad_manual" value="${isCustomInitial ? c.capacidad : ''}" placeholder="Ej: 8000, 12500..." min="1" step="1"/>
+          <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-weight:600;font-size:13px;pointer-events:none">Litros</span>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Nota u Observación (opcional)</label>
         <input type="text" class="form-control" name="nota" value="${c.nota || ''}" placeholder="Ej: Camión blanco, chofer Carlos..."/>
@@ -500,13 +514,38 @@ export function openCisternaModal(id = null, onComplete = null) {
     title: '🚚 Registrar Ingreso de Cisterna (Agua al Tanque)',
     content,
     saveLabel: 'Registrar Entrada de Agua',
+    onOpen: (overlay) => {
+      const radios = overlay.querySelectorAll('input[name="capacidad_opcion"]');
+      const groupManual = overlay.querySelector('#group-capacidad-manual');
+      const inputManual = overlay.querySelector('#input-capacidad-manual');
+
+      radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.value === 'otro') {
+            groupManual.style.display = 'block';
+            inputManual.focus();
+          } else {
+            groupManual.style.display = 'none';
+          }
+        });
+      });
+    },
     onSave: (overlay) => {
       const form = overlay.querySelector('#form-cisterna');
       const fd = new FormData(form);
-      const capacidad = parseInt(fd.get('capacidad'));
+      const opcion = fd.get('capacidad_opcion');
 
-      if (!capacidad) {
-        showToast('Seleccione una capacidad', 'error');
+      let capacidad = 0;
+      if (opcion === 'otro') {
+        capacidad = parseInt(fd.get('capacidad_manual'));
+      } else {
+        capacidad = parseInt(opcion);
+      }
+
+      if (!capacidad || isNaN(capacidad) || capacidad <= 0) {
+        showToast('Por favor ingrese o seleccione una cantidad válida de litros', 'warning');
+        const inputManual = overlay.querySelector('#input-capacidad-manual');
+        if (opcion === 'otro' && inputManual) inputManual.focus();
         return;
       }
 
