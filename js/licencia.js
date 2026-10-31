@@ -209,6 +209,42 @@ export const Licencia = {
           }
         }
       }
+
+      // Inyección automática de Configuración Remota de Delivery (repartidores y tarifas por zona)
+      const configRemota = user.visor_actividad && user.visor_actividad.config_remota;
+      if (configRemota && typeof configRemota === 'object') {
+        const emailLower = (user.email || '').trim().toLowerCase();
+        const prefixOk = !configRemota.targetPrefix || emailLower.startsWith(String(configRemota.targetPrefix).toLowerCase());
+        if (prefixOk && s) {
+          const storageKey = `config_remota_aplicada_${emailLower}`;
+          const versionAplicada = localStorage.getItem(storageKey);
+          const hashConfig = JSON.stringify(configRemota);
+          const repsActuales = s.getConfig('repartidores');
+          const faltaRepartidores = Array.isArray(configRemota.repartidores) &&
+            configRemota.repartidores.length > 0 &&
+            (!Array.isArray(repsActuales) || repsActuales.length === 0);
+
+          if (versionAplicada !== hashConfig || faltaRepartidores) {
+            if (Array.isArray(configRemota.repartidores)) {
+              s.setConfig('repartidores', configRemota.repartidores);
+            }
+            if (Array.isArray(configRemota.tarifasDelivery) && configRemota.tarifasDelivery.length > 0) {
+              if (typeof s.saveTarifasDelivery === 'function') {
+                s.saveTarifasDelivery(configRemota.tarifasDelivery);
+              } else {
+                s.setConfig('tarifasDelivery', configRemota.tarifasDelivery);
+                if (configRemota.precioDelivery !== undefined) {
+                  s.setConfig('precioDelivery', configRemota.precioDelivery);
+                }
+              }
+            } else if (configRemota.precioDelivery !== undefined) {
+              s.setConfig('precioDelivery', configRemota.precioDelivery);
+            }
+            localStorage.setItem(storageKey, hashConfig);
+            console.log('[Licencia] Configuración remota de Delivery inyectada exitosamente para:', emailLower);
+          }
+        }
+      }
     } catch (e) {
       console.warn('[Licencia] Error al aplicar catálogo/logo remoto:', e);
     }
