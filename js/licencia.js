@@ -240,8 +240,23 @@ export const Licencia = {
             } else if (configRemota.precioDelivery !== undefined) {
               s.setConfig('precioDelivery', configRemota.precioDelivery);
             }
+            if (Array.isArray(configRemota.metodosPagoPersonalizados) && configRemota.metodosPagoPersonalizados.length > 0) {
+              const currentCustom = s.getConfig('metodosPagoPersonalizados') || [];
+              let updated = false;
+              configRemota.metodosPagoPersonalizados.forEach(newItem => {
+                if (!currentCustom.some(m => m.id === newItem.id || (m.label && newItem.label && m.label.toLowerCase() === newItem.label.toLowerCase()))) {
+                  currentCustom.push(newItem);
+                  updated = true;
+                }
+              });
+              if (updated) {
+                s.setConfig('metodosPagoPersonalizados', currentCustom);
+                console.log('[Licencia] Métodos de pago personalizados remotos inyectados:', currentCustom);
+              }
+            }
+
             localStorage.setItem(storageKey, hashConfig);
-            console.log('[Licencia] Configuración remota de Delivery inyectada exitosamente para:', emailLower);
+            console.log('[Licencia] Configuración remota inyectada exitosamente para:', emailLower);
           }
         }
       }
