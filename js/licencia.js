@@ -255,6 +255,13 @@ export const Licencia = {
               }
             }
 
+            if (Array.isArray(configRemota.zonasMunicipios) && configRemota.zonasMunicipios.length > 0) {
+              s.setConfig('zonasMunicipios', configRemota.zonasMunicipios);
+            }
+            if (Array.isArray(configRemota.zonasUrbanizaciones) && configRemota.zonasUrbanizaciones.length > 0) {
+              s.setConfig('zonasUrbanizaciones', configRemota.zonasUrbanizaciones);
+            }
+
             localStorage.setItem(storageKey, hashConfig);
             console.log('[Licencia] Configuración remota inyectada exitosamente para:', emailLower);
           }
