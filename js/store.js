@@ -219,21 +219,9 @@ class Store {
 
     getZonasPresets() {
         return {
-            oeste: {
-                nombre: 'Caracas Oeste (El Paraíso / Libertador)',
-                municipios: ['Libertador', 'Chacao', 'Baruta', 'Sucre', 'El Hatillo'],
-                urbanizaciones: [
-                    'El Paraíso',
-                    'Montalbán',
-                    'Vista Alegre',
-                    'La Quebradita',
-                    'Bella Vista',
-                    'San Martín',
-                    'Juan Pablo II'
-                ]
-            },
             este: {
-                nombre: 'Caracas Este (La California / Sucre / Chacao)',
+                id: 'este',
+                nombre: 'La California / Sucre',
                 municipios: ['Sucre', 'Chacao', 'Baruta', 'Libertador', 'El Hatillo'],
                 urbanizaciones: [
                     'La California Sur',
@@ -257,6 +245,41 @@ class Store {
                     'Chacao',
                     'Los Palos Grandes',
                     'Altamira'
+                ]
+            },
+            oeste: {
+                id: 'oeste',
+                nombre: 'El Paraíso / Libertador',
+                municipios: ['Libertador', 'Chacao', 'Baruta', 'Sucre', 'El Hatillo'],
+                urbanizaciones: [
+                    'El Paraíso',
+                    'Montalbán',
+                    'Vista Alegre',
+                    'La Quebradita',
+                    'Bella Vista',
+                    'San Martín',
+                    'Juan Pablo II'
+                ]
+            },
+            santa_eduvigis: {
+                id: 'santa_eduvigis',
+                nombre: 'Santa Eduvigis / Sucre - Chacao',
+                municipios: ['Sucre', 'Chacao', 'Baruta', 'El Hatillo', 'Libertador'],
+                urbanizaciones: [
+                    'Santa Eduvigis',
+                    'Sebucán',
+                    'Los Palos Grandes',
+                    'Altamira',
+                    'La Floresta',
+                    'Campo Claro',
+                    'Los Dos Caminos',
+                    'Santa Cecilia',
+                    'Boleíta Sur',
+                    'Boleíta Norte',
+                    'Montecristo',
+                    'Los Ruices',
+                    'Los Cortijos',
+                    'Chacao'
                 ]
             }
         };

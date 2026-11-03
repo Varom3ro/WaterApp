@@ -357,13 +357,16 @@ export function renderConfiguracion(container) {
               Personaliza los municipios y sectores frecuentes de tu tienda para autocompletar rápidamente al registrar clientes.
             </p>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" id="btn-preset-zonas-este" class="btn btn-xs btn-secondary" style="font-size: 11px; font-weight: 600;" title="Cargar zonas de La California, Sucre y Caracas Este">
-              📍 Plantilla: La California / Sucre
-            </button>
-            <button type="button" id="btn-preset-zonas-oeste" class="btn btn-xs btn-secondary" style="font-size: 11px; font-weight: 600;" title="Cargar zonas de El Paraíso y Caracas Oeste">
-              📍 Plantilla: El Paraíso / Libertador
-            </button>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <label for="select-preset-zonas" style="font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin: 0;">
+              📍 Cargar Plantilla:
+            </label>
+            <select id="select-preset-zonas" class="form-control" style="font-size: 12px; padding: 4px 10px; height: 32px; min-width: 210px; cursor: pointer; border-radius: 6px; font-weight: 500;">
+              <option value="">-- Seleccionar plantilla --</option>
+              <option value="este">📍 La California / Sucre</option>
+              <option value="oeste">📍 El Paraíso / Libertador</option>
+              <option value="santa_eduvigis">📍 Santa Eduvigis / Sucre - Chacao</option>
+            </select>
           </div>
         </div>
 
@@ -895,25 +898,19 @@ export function renderConfiguracion(container) {
     inputUrb.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrb(); } });
   }
 
-  const btnPresetEste = container.querySelector('#btn-preset-zonas-este');
-  if (btnPresetEste) {
-    btnPresetEste.addEventListener('click', () => {
+  const selectPresetZonas = container.querySelector('#select-preset-zonas');
+  if (selectPresetZonas) {
+    selectPresetZonas.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (!val) return;
       const presets = store.getZonasPresets();
-      currentMunicipios = [...presets.este.municipios];
-      currentUrbanizaciones = [...presets.este.urbanizaciones];
-      renderZonasTags();
-      showToast('Cargada plantilla de La California / Sucre. Haz clic en "Guardar Zonas" para confirmar.', 'info');
-    });
-  }
-
-  const btnPresetOeste = container.querySelector('#btn-preset-zonas-oeste');
-  if (btnPresetOeste) {
-    btnPresetOeste.addEventListener('click', () => {
-      const presets = store.getZonasPresets();
-      currentMunicipios = [...presets.oeste.municipios];
-      currentUrbanizaciones = [...presets.oeste.urbanizaciones];
-      renderZonasTags();
-      showToast('Cargada plantilla de El Paraíso / Libertador. Haz clic en "Guardar Zonas" para confirmar.', 'info');
+      if (presets[val]) {
+        currentMunicipios = [...presets[val].municipios];
+        currentUrbanizaciones = [...presets[val].urbanizaciones];
+        renderZonasTags();
+        showToast(`Cargada plantilla: ${presets[val].nombre}. Haz clic en "Guardar Zonas" para confirmar.`, 'info');
+      }
+      selectPresetZonas.value = '';
     });
   }
 
