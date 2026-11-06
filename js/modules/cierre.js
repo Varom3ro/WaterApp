@@ -16,6 +16,31 @@ function formatHora(isoStr) {
   }
 }
 
+function getNombreTiendaCompleto() {
+  let userEmail = '';
+  try {
+    const lic = JSON.parse(localStorage.getItem('licencia_usuario') || '{}');
+    userEmail = (lic.email || '').trim().toLowerCase();
+    if (lic.nombre_empresa && lic.nombre_empresa !== 'None' && lic.nombre_empresa.trim()) {
+      return lic.nombre_empresa.trim();
+    }
+  } catch (e) {}
+
+  if (userEmail.startsWith('refillh2o.')) {
+    const sedesMap = {
+      'refillh2o.lcf@gmail.com': 'Refill H2O - La California Sur',
+      'refillh2o.se@gmail.com': 'Refill H2O - Santa Eduvigis',
+      'refillh2o.ldc@gmail.com': 'Refill H2O - Los Dos Caminos',
+      'refillh2o.sr@gmail.com': 'Refill H2O - Santa Rosa',
+      'refillh2o.sp@gmail.com': 'Refill H2O - Santa Paula'
+    };
+    if (sedesMap[userEmail]) return sedesMap[userEmail];
+  }
+
+  const nombreCfg = (store.getConfig('empresaNombre') || '').trim();
+  return nombreCfg || 'Tu Empresa';
+}
+
 function getMethodsList() {
   const allMetodos = store.getMetodosPago(false);
   return [
@@ -525,7 +550,7 @@ function renderConsolidadoZ(turnos, fecha, methods) {
       <div>
         <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; font-weight: 600;">Reporte Z Consolidado</div>
         <h2 style="margin: 4px 0 0 0; color: white; font-size: 22px; font-weight: 800;">
-          ${Utils.escapeHtml(store.getConfig('empresaNombre') || 'Tu Empresa')} - Cierre del Día
+          ${Utils.escapeHtml(getNombreTiendaCompleto())} - Cierre del Día
         </h2>
         <div style="margin-top: 4px; font-size: 13.5px; opacity: 0.85;">
           📅 Fecha: ${Utils.formatDate(fecha)} | ${turnos.length} ${turnos.length === 1 ? 'Turno Registrado' : 'Turnos Registrados'}
@@ -856,7 +881,7 @@ function imprimirTicketTurno(turno) {
   const html = `
     <div style="font-family: 'Courier New', Courier, monospace; color: #000; background: #fff; padding: 20px; line-height: 1.4; font-size: 13px; max-width: 500px; margin: 0 auto;">
       <div style="text-align: center; margin-bottom: 15px;">
-        <div style="font-size: 18px; font-weight: bold; letter-spacing: 1px;">*** ${Utils.escapeHtml(store.getConfig('empresaNombre') || 'TU EMPRESA')} ***</div>
+        <div style="font-size: 18px; font-weight: bold; letter-spacing: 1px;">*** ${Utils.escapeHtml(getNombreTiendaCompleto())} ***</div>
         <div style="font-size: 15px; font-weight: bold; margin-top: 4px;">COMPROBANTE DE CIERRE - TURNO ${turno.numeroTurno}</div>
         <div style="font-size: 12px; margin-top: 4px;">FECHA: ${turno.fecha} | HORARIO: ${horaIni} - ${horaFin}</div>
         <div style="font-size: 12px;">CAJERO / ROL: ${(turno.cerradoPor || 'OPERARIO').toUpperCase()}</div>
@@ -1309,7 +1334,7 @@ export function getMatricialReportHTML(fecha) {
       
       <!-- Encabezado de Ticket Matricial -->
       <div style="text-align: center; margin-bottom: 25px;">
-        <div style="font-size: 20px; font-weight: bold; letter-spacing: 2px;">*** ${Utils.escapeHtml(store.getConfig('empresaNombre') || 'TU EMPRESA')} ***</div>
+        <div style="font-size: 20px; font-weight: bold; letter-spacing: 2px;">*** ${Utils.escapeHtml(getNombreTiendaCompleto())} ***</div>
         <div style="font-size: 14px; font-weight: bold; margin-top: 5px; letter-spacing: 1px;">REPORTE Z - CIERRE CONSOLIDADO DEL DÍA</div>
         <div style="font-size: 13px; margin-top: 5px;">FECHA DEL REPORTE: ${fecha}</div>
         <div style="border-top: 2px double #000; margin-top: 15px; margin-bottom: 5px;"></div>
