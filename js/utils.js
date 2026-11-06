@@ -142,7 +142,7 @@ export const Utils = {
   months: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
 
   // Capacidades de cisterna disponibles
-  cisternCapacities: [4500, 7500, 10000, 15000],
+  cisternCapacities: [4200, 7500, 10000, 15000],
 
   // Métodos de pago base
   paymentMethods: [

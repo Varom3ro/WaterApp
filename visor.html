@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="img/icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0B131E;
@@ -257,7 +257,7 @@
       font-size: 0.68rem;
       font-weight: 800;
       letter-spacing: 1px;
-      color: #67E8F9;
+      color: #475569;
       text-transform: uppercase;
       display: flex;
       align-items: center;
@@ -921,7 +921,754 @@
       text-align: center;
       box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
     }
+  
+/* ========================================================================== */
+/* NUEVO SISTEMA VISUAL NEUMÓRFICO CERÁMICO CLARO (CLAY & SOFT UI)            */
+/* ========================================================================== */
+:root {
+  --neu-bg: #EAECEF;
+  --neu-surface: #EFF1F5;
+  --neu-pill-dark: #121417;
+  --neu-pill-hover: #1F2228;
+  --neu-card-dark: #1A1D22;
+  --neu-coral: #FF3B30;
+  --neu-coral-glow: rgba(255, 59, 48, 0.35);
+  --neu-green: #10B981;
+  --neu-green-glow: rgba(16, 185, 129, 0.3);
+  --neu-blue: #007AFF;
+  --neu-text-main: #181A1F;
+  --neu-text-muted: #848B98;
+  --neu-text-subtle: #A6ADB9;
+  
+  --neu-shadow-out: 8px 8px 18px #cbcfd8, -8px -8px 18px #ffffff;
+  --neu-shadow-sm: 4px 4px 10px #d0d4de, -4px -4px 10px #ffffff;
+  --neu-shadow-inset: inset 3px 3px 6px #cbcfd8, inset -3px -3px 6px #ffffff;
+  --neu-shadow-dark: 6px 6px 14px rgba(0, 0, 0, 0.25), -2px -2px 6px rgba(255, 255, 255, 0.08);
+}
+
+body {
+  background: var(--neu-bg) !important;
+  color: var(--neu-text-main) !important;
+}
+
+.app-container {
+  max-width: 440px !important;
+  background: var(--neu-bg) !important;
+  padding-bottom: 95px !important;
+}
+
+/* Header Neumórfico */
+.top-header {
+  background: rgba(234, 236, 239, 0.92) !important;
+  backdrop-filter: blur(14px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 4px 12px rgba(180, 185, 195, 0.25) !important;
+}
+
+.store-name {
+  color: var(--neu-text-main) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+}
+
+.btn-icon {
+  background: var(--neu-surface) !important;
+  color: var(--neu-text-main) !important;
+  border: 1px solid #ffffff !important;
+  box-shadow: var(--neu-shadow-sm) !important;
+}
+.btn-icon:active {
+  box-shadow: var(--neu-shadow-inset) !important;
+}
+
+/* Selector de Periodos (Hoy | Semana | Mes) */
+.period-selector-pill {
+  display: flex;
+  background: var(--neu-bg);
+  padding: 4px;
+  border-radius: 30px;
+  box-shadow: var(--neu-shadow-inset);
+  margin-bottom: 16px;
+  gap: 4px;
+}
+.period-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 24px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--neu-text-muted);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.period-btn.active {
+  background: var(--neu-pill-dark);
+  color: #ffffff;
+  box-shadow: var(--neu-shadow-dark);
+}
+
+/* Tarjeta Hero Neumórfica Cerámica */
+.card-hero {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 28px !important;
+  box-shadow: var(--neu-shadow-out) !important;
+  color: var(--neu-text-main) !important;
+  padding: 1.5rem !important;
+}
+.hero-label {
+  color: var(--neu-text-muted) !important;
+  font-weight: 800 !important;
+  font-size: 0.76rem !important;
+  letter-spacing: 0.8px !important;
+}
+.hero-amount {
+  font-family: 'Space Grotesk', sans-serif !important;
+  color: var(--neu-text-main) !important;
+  font-size: 2.6rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -1px !important;
+}
+.hero-bs {
+  color: #2E7D32 !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+.hero-stats-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  margin-top: 1rem !important;
+  padding-top: 0.85rem !important;
+}
+.hero-stat-val {
+  color: var(--neu-text-main) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-size: 1.25rem !important;
+}
+.hero-stat-label {
+  color: var(--neu-text-muted) !important;
+  font-weight: 600 !important;
+}
+
+/* Desglose de Caja */
+.section-title {
+  color: var(--neu-text-main) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.3px !important;
+}
+.caja-card {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 20px !important;
+  box-shadow: var(--neu-shadow-sm) !important;
+}
+.caja-card:hover {
+  box-shadow: var(--neu-shadow-out) !important;
+}
+.caja-label {
+  color: var(--neu-text-muted) !important;
+  font-weight: 700 !important;
+}
+.caja-value {
+  color: var(--neu-text-main) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 800 !important;
+}
+.caja-sub {
+  color: #2E7D32 !important;
+  font-weight: 600 !important;
+}
+
+/* Dial Físico del Tanque */
+.tank-card {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 28px !important;
+  box-shadow: var(--neu-shadow-out) !important;
+  padding: 1.35rem !important;
+}
+.physical-tank-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.physical-dial {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.dial-outer-track {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: conic-gradient(#007AFF 0deg 245deg, #d8dce6 245deg 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--neu-shadow-inset);
+  transition: background 0.4s ease;
+}
+.dial-center-knob {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--neu-pill-dark);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.dial-pct {
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Space Grotesk', monospace;
+  color: #fff;
+}
+.dial-unit {
+  font-size: 8px;
+  color: #60A5FA;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Feed en Vivo */
+.feed-item {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 18px !important;
+  box-shadow: var(--neu-shadow-sm) !important;
+}
+.feed-icon {
+  background: var(--neu-bg) !important;
+  box-shadow: var(--neu-shadow-inset) !important;
+}
+.feed-title {
+  color: var(--neu-text-main) !important;
+  font-weight: 700 !important;
+}
+.feed-meta {
+  color: var(--neu-text-muted) !important;
+}
+.feed-amount {
+  color: var(--neu-text-main) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 800 !important;
+}
+.feed-day-badge {
+  background: var(--neu-bg) !important;
+  border: 1px solid #ffffff !important;
+  box-shadow: var(--neu-shadow-sm) !important;
+  color: var(--neu-text-main) !important;
+}
+
+/* Barra Selector de Sedes */
+.refill-sede-bar {
+  background: rgba(234, 236, 239, 0.95) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 4px 10px rgba(180, 185, 195, 0.2) !important;
+}
+.sede-bar-title {
+  color: var(--neu-text-main) !important;
+}
+.sede-pill-btn {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  color: var(--neu-text-main) !important;
+  box-shadow: var(--neu-shadow-sm) !important;
+  border-radius: 30px !important;
+}
+.sede-pill-btn.active {
+  background: var(--neu-pill-dark) !important;
+  color: #ffffff !important;
+  box-shadow: var(--neu-shadow-dark) !important;
+}
+.sede-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 2px;
+}
+.sede-status-dot.online {
+  background: #10B981;
+  box-shadow: 0 0 6px #10B981;
+}
+.sede-status-dot.offline {
+  background: #94A3B8;
+}
+
+/* CHECKLIST DE CIERRE Y CONSOLIDADO MULTISEDE */
+.cierres-checklist-card {
+  background: var(--neu-surface);
+  border: 1px solid #ffffff;
+  border-radius: 28px;
+  box-shadow: var(--neu-shadow-out);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.sede-cierre-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--neu-bg);
+  border-radius: 16px;
+  box-shadow: var(--neu-shadow-inset);
+  margin-bottom: 10px;
+}
+.sede-cierre-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cierre-check-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+.cierre-check-icon.done {
+  background: #10B981;
+  color: #ffffff;
+  box-shadow: 0 2px 6px var(--neu-green-glow);
+}
+.cierre-check-icon.pending {
+  background: #E2E8F0;
+  color: #64748B;
+}
+.consolidado-total-card {
+  background: linear-gradient(135deg, #121417 0%, #1E2229 100%);
+  color: #ffffff;
+  border-radius: 28px;
+  padding: 24px;
+  box-shadow: var(--neu-shadow-dark);
+  margin-bottom: 20px;
+}
+
+/* Barra de Navegación Inferior Flotante */
+.bottom-nav {
+  position: fixed !important;
+  bottom: 16px !important;
+  left: 20px !important;
+  right: 20px !important;
+  max-width: 400px !important;
+  margin: 0 auto !important;
+  height: 64px !important;
+  background: var(--neu-pill-dark) !important;
+  border-radius: 36px !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.nav-btn {
+  color: #717682 !important;
+  border-radius: 24px !important;
+  padding: 6px 12px !important;
+  font-weight: 700 !important;
+  transition: all 0.2s ease !important;
+}
+.nav-btn.active {
+  background: #23272F !important;
+  color: #ffffff !important;
+  box-shadow: inset 1px 1px 3px rgba(255, 255, 255, 0.12) !important;
+}
+.nav-btn.active .nav-icon {
+  transform: scale(1.1);
+}
+
+.card-login {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  box-shadow: var(--neu-shadow-out) !important;
+  border-radius: 28px !important;
+}
+.stock-row {
+  background: var(--neu-surface) !important;
+  border: 1px solid #ffffff !important;
+  box-shadow: var(--neu-shadow-sm) !important;
+  border-radius: 16px !important;
+}
+.stock-row strong, .stock-row div {
+  color: var(--neu-text-main) !important;
+}
+
+/* ========================================================================== */
+/* REFINAMIENTO DE SOBRIEDAD, TIPOGRAFÍA Y CONTRASTE                          */
+/* ========================================================================== */
+.top-header {
+  background: #EAECEF !important;
+  border-bottom: 1.5px solid #D6DAE2 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04) !important;
+  padding: 14px 18px !important;
+}
+
+.store-name {
+  color: #111418 !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.4px !important;
+}
+
+/* Badge de Sede Sobrio Minimalista (Negro Mate con borde) */
+.badge-sede {
+  background: #111418 !important;
+  color: #FFFFFF !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  padding: 3px 10px !important;
+  border-radius: 8px !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: none !important;
+  border: 1px solid #23272F !important;
+}
+
+/* Estado de Sincronización Sobrio */
+.live-status {
+  color: #4A5568 !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+}
+.live-dot {
+  background: #10B981 !important;
+  box-shadow: 0 0 6px #10B981 !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+/* Botones de Cabecera Monocromáticos Sobrios */
+.btn-icon {
+  background: #FFFFFF !important;
+  border: 1px solid #D8DCE4 !important;
+  color: #2D3748 !important;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.04), -2px -2px 6px #ffffff !important;
+  transition: all 0.2s ease !important;
+}
+.btn-icon:hover {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Píldoras de Sedes Sobrias y Elegantes */
+.refill-sede-bar {
+  background: #E4E7ED !important;
+  border-bottom: 1px solid #D1D5DB !important;
+  padding: 8px 16px !important;
+}
+.sede-bar-title {
+  color: #475569 !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+}
+.sede-pill-btn {
+  background: #FFFFFF !important;
+  border: 1px solid #D6DAE2 !important;
+  color: #334155 !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.03) !important;
+}
+.sede-pill-btn.active {
+  background: #111418 !important;
+  color: #FFFFFF !important;
+  border-color: #111418 !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
+}
+.sede-pill-btn .pill-code {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: inherit !important;
+  font-size: 0.64rem !important;
+}
+.sede-pill-btn.active .pill-code {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Encabezado de Días Colapsables en Feed (Sobrio, Elegante y con Total) */
+.feed-day-divider {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  margin: 14px 0 8px 0 !important;
+  cursor: pointer !important;
+}
+.feed-day-divider::before, .feed-day-divider::after {
+  display: none !important;
+}
+
+.feed-day-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  background: #FFFFFF !important;
+  border: 1px solid #D8DCE4 !important;
+  border-radius: 14px !important;
+  padding: 10px 14px !important;
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.2s ease !important;
+}
+.feed-day-bar:hover {
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+}
+.feed-day-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.feed-day-chevron {
+  font-size: 0.72rem !important;
+  color: #64748B !important;
+  transition: transform 0.25s ease !important;
+  display: inline-block !important;
+}
+.feed-day-chevron.collapsed {
+  transform: rotate(-90deg) !important;
+}
+.feed-day-title {
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+  color: #1E293B !important;
+}
+.feed-day-count-badge {
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  background: #F1F5F9 !important;
+  color: #64748B !important;
+  padding: 2px 8px !important;
+  border-radius: 10px !important;
+  border: 1px solid #E2E8F0 !important;
+}
+.feed-day-total {
+  font-size: 0.88rem !important;
+  font-weight: 800 !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  color: #0F172A !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.feed-day-total-bs {
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  color: #2E7D32 !important;
+}
+
+/* Items del Feed Sobrios */
+.feed-item {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.02) !important;
+}
+.feed-icon {
+  background: #F1F5F9 !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+  border: 1px solid #E2E8F0 !important;
+}
+.feed-title {
+  color: #0F172A !important;
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+}
+.feed-meta {
+  color: #64748B !important;
+  font-size: 0.74rem !important;
+}
+.feed-amount {
+  color: #0F172A !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-size: 0.95rem !important;
+  font-weight: 800 !important;
+}
+.feed-method {
+  color: #64748B !important;
+  font-size: 0.72rem !important;
+}
+
+
+/* ========================================================================== */
+/* PALETA SOBRIA Y ELEGANTE (ARQUITECTURAL / MINIMALISTA MATTE)               */
+/* ========================================================================== */
+.top-header {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+.badge-sede {
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  letter-spacing: 0.6px !important;
+  box-shadow: none !important;
+  border: none !important;
+  text-transform: uppercase !important;
+}
+
+.refill-sede-bar {
+  background: #F8FAFC !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  padding: 8px 16px !important;
+}
+.sede-bar-title {
+  color: #64748B !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.8px !important;
+  text-transform: uppercase !important;
+}
+
+.sede-pill-btn {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #334155 !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  padding: 6px 14px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s ease !important;
+}
+.sede-pill-btn:hover {
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
+  border-color: #94A3B8 !important;
+}
+.sede-pill-btn.active {
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  border-color: #0F172A !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25) !important;
+  font-weight: 700 !important;
+}
+.sede-pill-btn .pill-code {
+  background: #F1F5F9 !important;
+  color: #64748B !important;
+  border-radius: 4px !important;
+}
+.sede-pill-btn.active .pill-code {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+}
+
+/* Feed Day Header & Chevron */
+.feed-day-divider {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  margin: 10px 0 6px 0 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+.feed-day-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 12px !important;
+  padding: 11px 15px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.2s ease !important;
+}
+.feed-day-bar:hover {
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+}
+.feed-day-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.feed-day-chevron {
+  width: 16px !important;
+  height: 16px !important;
+  color: #64748B !important;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+}
+.feed-day-chevron.collapsed {
+  transform: rotate(-90deg) !important;
+}
+.feed-day-title {
+  font-size: 0.86rem !important;
+  font-weight: 700 !important;
+  color: #0F172A !important;
+}
+.feed-day-count-badge {
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  background: #F1F5F9 !important;
+  color: #475569 !important;
+  padding: 2px 8px !important;
+  border-radius: 8px !important;
+  border: 1px solid #E2E8F0 !important;
+}
+.feed-day-total {
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  color: #0F172A !important;
+  letter-spacing: -0.3px !important;
+}
+
+  
+.pill-conn-text {
+  font-size: 0.64rem !important;
+  font-weight: 700 !important;
+  padding: 1px 6px !important;
+  border-radius: 6px !important;
+  letter-spacing: 0.2px !important;
+  display: inline-block !important;
+}
+.pill-conn-text.online {
+  background: rgba(16, 185, 129, 0.14) !important;
+  color: #059669 !important;
+}
+.pill-conn-text.offline {
+  background: rgba(100, 116, 139, 0.12) !important;
+  color: #64748B !important;
+}
+.sede-pill-btn.active .pill-conn-text.online {
+  background: rgba(16, 185, 129, 0.3) !important;
+  color: #A7F3D0 !important;
+}
+.sede-pill-btn.active .pill-conn-text.offline {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #E2E8F0 !important;
+}
+
   </style>
+
 </head>
 <body>
 
@@ -973,10 +1720,9 @@
       <div class="header-store-info">
         <div class="store-name" style="flex-wrap: wrap; gap: 6px;">
           <span id="txt-store-name">Planta Piloto Principal</span>
-          <span id="badge-sede" class="badge-sede" style="display: none;">📍 La California Sur</span>
+          <span id="badge-sede" class="badge-sede" style="display: none;">La California Sur</span>
         </div>
-        <div style="font-size: 0.75rem; color: #67E8F9; margin-top: 2px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-          <span>👤</span>
+        <div style="font-size: 0.75rem; color: #475569; margin-top: 2px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
           <span id="txt-owner-email">correo@tienda.com</span>
         </div>
         <div class="live-status" style="margin-top: 3px;">
@@ -985,16 +1731,22 @@
         </div>
       </div>
       <div style="display: flex; gap: 8px;">
-        <button class="btn-icon" id="btn-pwa-header" style="display: none;" title="Instalar App en el Móvil">📲</button>
-        <button class="btn-icon" id="btn-sync-now" title="Actualizar datos">🔄</button>
-        <button class="btn-icon" id="btn-logout" title="Cerrar sesión">🚪</button>
+        <button class="btn-icon" id="btn-pwa-header" style="display: none;" title="Instalar App en el Móvil">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+        </button>
+        <button class="btn-icon" id="btn-sync-now" title="Actualizar datos">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+        <button class="btn-icon" id="btn-logout" title="Cerrar sesión">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
       </div>
     </header>
 
     <!-- BARRA SELECTORA DE SEDES (Exclusiva para supervisión Refill H2O) -->
     <div id="refill-sede-bar" class="refill-sede-bar" style="display: none;">
       <div class="sede-bar-header">
-        <span class="sede-bar-title">🏢 Supervisión de Sedes Refill H2O:</span>
+        <span class="sede-bar-title">Supervisión de Sedes Refill H2O:</span>
         <span id="sede-syncing-indicator" class="sede-syncing-indicator" style="display: none;">🔄 Cambiando sede...</span>
       </div>
       <div class="sede-pills-scroll" id="refill-sede-pills">
@@ -1006,7 +1758,21 @@
     <div id="tab-hoy" class="view-section active">
       
       <!-- Hero Card de Ventas -->
-      <div class="card-hero">
+      <!-- Selector de Periodo Táctil Neumórfico -->
+    <div class="period-selector-pill">
+      <button class="period-btn active" id="btn-period-hoy" onclick="cambiarPeriodoVentas('hoy')">
+        <span>⚡ Hoy</span>
+      </button>
+      <button class="period-btn" id="btn-period-semana" onclick="cambiarPeriodoVentas('semana')">
+        <span>📅 Semana</span>
+      </button>
+      <button class="period-btn" id="btn-period-mes" onclick="cambiarPeriodoVentas('mes')">
+        <span>🗓️ Mes</span>
+      </button>
+    </div>
+
+    <!-- Hero Card de Ventas -->
+    <div class="card-hero">
         <div class="hero-label">Total Facturado Hoy</div>
         <div class="hero-amount" id="txt-total-usd">$ 0.00</div>
         <div class="hero-bs" id="txt-total-bs">≈ Bs 0.00</div>
@@ -1062,19 +1828,28 @@
         </div>
       </div>
 
-      <!-- Tanque Widget -->
+      <!-- Tanque Widget Físico Neumórfico -->
       <h3 class="section-title">🌊 Nivel del Tanque de Agua</h3>
       <div class="tank-card">
-        <div class="tank-header">
-          <span style="font-weight: 700; color: #fff; font-size: 0.95rem;">Capacidad Actual</span>
-          <span style="font-weight: 800; color: var(--primary); font-size: 1.1rem;" id="tank-pct">0%</span>
+        <div class="physical-tank-wrapper">
+          <div style="flex: 1;">
+            <div style="font-size: 0.78rem; font-weight: 800; color: var(--neu-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Tanque Principal</div>
+            <div style="font-size: 1.45rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);" id="tank-litros">0 Litros</div>
+            <div style="font-size: 0.78rem; font-weight: 600; color: var(--neu-text-muted); margin-top: 2px;" id="tank-capacidad">Tanque de 0 L</div>
+          </div>
+          
+          <div class="physical-dial">
+            <div class="dial-outer-track" id="tank-dial-track">
+              <div class="dial-center-knob">
+                <span class="dial-pct" id="tank-pct">0%</span>
+                <span class="dial-unit">AGUA</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="tank-progress-bg">
+        
+        <div class="tank-progress-bg" style="display: none;">
           <div class="tank-progress-fill" id="tank-bar" style="width: 0%;"></div>
-        </div>
-        <div class="tank-footer">
-          <span id="tank-litros">0 Litros restantes</span>
-          <span id="tank-capacidad">Tanque de 0 L</span>
         </div>
       </div>
 
@@ -1091,7 +1866,7 @@
     <!-- PESTAÑA 2: ESTADÍSTICAS Y ANÁLISIS -->
     <div id="tab-stats" class="view-section">
       <div class="card-hero" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-color: rgba(6, 182, 212, 0.3);">
-        <div class="hero-label" style="color: #67E8F9;">Facturado este Mes</div>
+        <div class="hero-label" style="color: #475569;">Facturado este Mes</div>
         <div class="hero-amount" id="stat-mes-usd">$ 0.00</div>
         <div class="hero-bs" style="color: #A5F3FC;" id="stat-mes-bs">≈ Bs 0.00</div>
         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;" id="stat-mes-botellones">
@@ -1147,8 +1922,61 @@
 
     <!-- PESTAÑA 4: AUDITORÍA Y CIERRE -->
     <div id="tab-cierre" class="view-section">
-      <div class="card-hero" style="background: linear-gradient(135deg, #1E1B4B 0%, #0F172A 100%); border-color: rgba(99, 102, 241, 0.3);">
-        <div class="hero-label" style="color: #A5B4FC;">💵 Efectivo a Rendir Hoy</div>
+
+      <!-- Checklist de Cierre de Todas las Tiendas (Para Supervisor y Dueños) -->
+      <div class="cierres-checklist-card" id="multisede-cierres-checklist">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <div>
+            <h3 style="font-size: 1rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
+              📋 Estado de Cierres de Tiendas
+            </h3>
+            <p style="font-size: 0.76rem; color: var(--neu-text-muted); margin-top: 2px;">
+              Seguimiento en vivo del arqueo y cierre de caja de hoy
+            </p>
+          </div>
+          <span id="badge-cierres-count" style="background: var(--neu-bg); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; box-shadow: var(--neu-shadow-inset);">
+            0/0 Cerradas
+          </span>
+        </div>
+
+        <div id="container-sedes-cierre-list">
+          <div style="text-align: center; padding: 1.5rem; color: var(--neu-text-muted); font-size: 0.85rem;">
+            ⏳ Verificando cierres de sucursales...
+          </div>
+        </div>
+      </div>
+
+      <!-- Consolidado Total de Cierre de Todas las Tiendas -->
+      <div class="consolidado-total-card" id="multisede-consolidado-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8;">
+            TOTAL CONSOLIDADO MULTISEDE
+          </div>
+          <span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 12px; font-weight: 700;">HOY</span>
+        </div>
+        <div style="font-size: 2.2rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; margin: 6px 0;" id="txt-consolidado-usd">
+          $ 0.00
+        </div>
+        <div style="font-size: 0.9rem; color: #34D399; font-weight: 700;" id="txt-consolidado-bs">
+          ≈ Bs 0,00 total facturado
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div>
+            <div style="font-size: 0.72rem; color: #94A3B8; font-weight: 600;">Efectivo Total Físico</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #38BDF8;" id="txt-consolidado-efectivo-usd">$ 0.00</div>
+            <div style="font-size: 0.72rem; color: #A7F3D0;" id="txt-consolidado-efectivo-bs">+ Bs 0,00</div>
+          </div>
+          <div>
+            <div style="font-size: 0.72rem; color: #94A3B8; font-weight: 600;">Bancos / Digital</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #A78BFA;" id="txt-consolidado-bancos-usd">$ 0.00</div>
+            <div style="font-size: 0.72rem; color: #94A3B8;" id="txt-consolidado-ventas-count">0 ventas totales</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-hero" style="background: var(--neu-surface) !important; border: 1px solid #fff !important; color: var(--neu-text-main) !important;">
+        <div class="hero-label" style="color: var(--neu-text-muted) !important;">💵 Efectivo a Rendir (Esta Tienda)</div>
         <div class="hero-amount" id="cierre-efectivo-usd">$ 0.00</div>
         <div class="hero-bs" id="cierre-efectivo-bs-hero" style="color: #6EE7B7; font-size: 1.15rem; font-weight: 700; margin-top: 4px;">+ Bs 0.00 en efectivo</div>
         <div style="font-size: 0.8rem; color: #C7D2FE; margin-top: 6px;">
@@ -1190,19 +2018,27 @@
     <!-- Navegación Inferior -->
     <nav class="bottom-nav">
       <button class="nav-btn active" onclick="cambiarTab('hoy')">
-        <span class="nav-icon">⚡</span>
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        </span>
         <span>En Vivo</span>
       </button>
       <button class="nav-btn" onclick="cambiarTab('stats')">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </span>
         <span>Análisis</span>
       </button>
       <button class="nav-btn" onclick="cambiarTab('inv')">
-        <span class="nav-icon">📦</span>
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        </span>
         <span>Inventario</span>
       </button>
       <button class="nav-btn" onclick="cambiarTab('cierre')">
-        <span class="nav-icon">📋</span>
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </span>
         <span>Cierre</span>
       </button>
     </nav>
@@ -1230,7 +2066,7 @@
       sede: 'La California Sur',
       alias: 'La California Sur',
       codigo: 'LCF',
-      icono: '📍'
+      icono: ''
     },
     'refillh2o.se@gmail.com': {
       id: 'se',
@@ -1238,7 +2074,7 @@
       sede: 'Santa Eduvigis',
       alias: 'Santa Eduvigis',
       codigo: 'SE',
-      icono: '📍'
+      icono: ''
     },
     'refillh2o.ldc@gmail.com': {
       id: 'ldc',
@@ -1246,7 +2082,7 @@
       sede: 'Los Dos Caminos',
       alias: 'Los Dos Caminos',
       codigo: 'LDC',
-      icono: '📍'
+      icono: ''
     },
     'refillh2o.sr@gmail.com': {
       id: 'sr',
@@ -1254,7 +2090,7 @@
       sede: 'Santa Rosa',
       alias: 'Santa Rosa',
       codigo: 'SR',
-      icono: '📍'
+      icono: ''
     },
     'refillh2o.sp@gmail.com': {
       id: 'sp',
@@ -1262,7 +2098,7 @@
       sede: 'Santa Paula',
       alias: 'Santa Paula',
       codigo: 'SP',
-      icono: '📍'
+      icono: ''
     }
   };
 
@@ -1294,7 +2130,7 @@
       sede: `Sede ${code}`,
       alias: `Sede ${code}`,
       codigo: code,
-      icono: '📍'
+      icono: ''
     };
   }
 
@@ -1320,11 +2156,13 @@
     container.innerHTML = sedesArray.map(s => {
       const isActive = s.email.toLowerCase() === activeEmail.toLowerCase();
       const activeClass = isActive ? 'active' : '';
+      const cached = cacheGlobalTiendas[s.email];
+      const conn = calcularTiempoDesconexion(cached?.ultima_actualizacion);
       return `
-        <button type="button" class="sede-pill-btn ${activeClass}" onclick="cambiarSedeRefillH2O('${s.email}')" title="Ver métricas de ${escapeHtml(s.sede)}">
-          <span>${s.icono || '📍'}</span>
+        <button type="button" class="sede-pill-btn ${activeClass}" onclick="cambiarSedeRefillH2O('${s.email}')" title="${escapeHtml(s.sede)} · ${conn.online ? 'En línea' : conn.texto}">
+          <span class="sede-status-dot ${conn.online ? 'online' : 'offline'}"></span>
           <span>${escapeHtml(s.sede)}</span>
-          <span class="pill-code">${s.codigo}</span>
+          <span class="pill-conn-text ${conn.online ? 'online' : 'offline'}">${conn.online ? 'En línea' : conn.texto}</span>
         </button>
       `;
     }).join('');
@@ -1351,13 +2189,13 @@
     if (info) {
       const badge = document.getElementById('badge-sede');
       if (badge) {
-        badge.textContent = `📍 ${info.sede}`;
+        badge.textContent = info.sede;
         badge.style.display = 'inline-flex';
       }
       const txtOwner = document.getElementById('txt-owner-email');
       if (txtOwner) {
         if (esSupervisorRefill()) {
-          txtOwner.innerHTML = `<span>👑 Supervisión: refillh2o@gmail.com · <strong style="color:#FFF;">${info.sede}</strong></span>`;
+          txtOwner.innerHTML = `<span style="color: #475569;">Supervisión: <span style="color: #334155; font-weight:600;">refillh2o@gmail.com</span> · <strong style="color:#0F172A; font-weight:700;">${info.sede}</strong></span>`;
         } else {
           txtOwner.textContent = nuevoEmail;
         }
@@ -1641,7 +2479,258 @@
   });
 
   // Cambiar Pestañas
-  function cambiarTab(tabName) {
+  
+// =========================================================================
+// SISTEMA DE PERIODOS (HOY | SEMANA | MES), ESTADO EN LÍNEA Y CONSOLIDADO
+// =========================================================================
+let periodoActivo = 'hoy'; // 'hoy', 'semana', 'mes'
+let cacheGlobalTiendas = {}; // Cache de datos de todas las sucursales
+
+window.cambiarPeriodoVentas = function(periodo) {
+  periodoActivo = periodo;
+  document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
+  const btn = document.getElementById(`btn-period-${periodo}`);
+  if (btn) btn.classList.add('active');
+
+  const currentData = cacheGlobalTiendas[currentStoreEmail];
+  if (currentData) {
+    aplicarPeriodoVentas(currentData, periodo);
+  }
+};
+
+function calcularTiempoDesconexion(fechaIso) {
+  if (!fechaIso) return { online: false, texto: 'Sin datos', horaExacta: '' };
+  const d = new Date(fechaIso);
+  if (isNaN(d.getTime())) return { online: false, texto: 'Sin datos', horaExacta: '' };
+  
+  const diffMs = Date.now() - d.getTime();
+  const diffMin = Math.floor(diffMs / (1000 * 60));
+  const horaExacta = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+  const fechaExacta = d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
+  
+  // En línea si hubo actividad en los últimos 7 minutos
+  if (diffMin <= 7) {
+    return { online: true, texto: 'En línea', horaExacta, detalle: `Hoy ${horaExacta}` };
+  }
+  if (diffMin < 60) {
+    return { online: false, texto: `Hace ${diffMin} min`, horaExacta, detalle: `Hoy ${horaExacta}` };
+  }
+  const diffHoras = Math.floor(diffMin / 60);
+  if (diffHoras < 24) {
+    return { online: false, texto: `Hace ${diffHoras} h`, horaExacta, detalle: `Hoy ${horaExacta}` };
+  }
+  const diffDias = Math.floor(diffHoras / 24);
+  return { online: false, texto: `Hace ${diffDias} d`, horaExacta, detalle: `${fechaExacta} ${horaExacta}` };
+}
+
+function aplicarPeriodoVentas(storeData, periodo) {
+  const r = storeData.resumen_hoy || {};
+  const stats = storeData.analisis_mes || {};
+
+    // Actualizar indicador de conexión directa en la cabecera
+    const connInfo = calcularTiempoDesconexion(storeData.ultima_actualizacion);
+    const liveStatusEl = document.querySelector('.live-status');
+    if (liveStatusEl) {
+      if (connInfo.online) {
+        liveStatusEl.innerHTML = `
+          <span class="live-dot" style="background:#10B981;"></span>
+          <span style="color:#059669; font-weight:700;">EN LÍNEA</span> · <span style="color:#475569;">Activa ahora (${connInfo.horaExacta || 'Hoy'})</span>
+        `;
+      } else {
+        liveStatusEl.innerHTML = `
+          <span class="live-dot" style="background:#94A3B8; box-shadow:none;"></span>
+          <span style="color:#64748B; font-weight:700;">DESCONECTADA</span> · <span style="color:#475569;">Últ. conexión: <strong>${connInfo.texto}</strong> ${connInfo.horaExacta ? '(' + connInfo.horaExacta + ')' : ''}</span>
+        `;
+      }
+    }
+  const backup = storeData.respaldo_completo;
+  const ventas = (backup && Array.isArray(backup.ventas)) ? backup.ventas : [];
+
+  const heroLabel = document.querySelector('.hero-label');
+  let totalUSD = 0;
+  let totalBs = 0;
+  let botellones = 0;
+  let litros = 0;
+  let numVentas = 0;
+
+  const now = new Date();
+
+  if (periodo === 'hoy') {
+    if (heroLabel) heroLabel.textContent = 'Total Facturado Hoy';
+    totalUSD = r.totalUSD || 0;
+    totalBs = r.totalBs || 0;
+    botellones = r.botellones || 0;
+    litros = r.litros || 0;
+    numVentas = r.numVentas || 0;
+  } else if (periodo === 'semana') {
+    if (heroLabel) heroLabel.textContent = 'Total Facturado Esta Semana';
+    // Últimos 7 días
+    const sieteDiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const ventasSemana = ventas.filter(v => v.fecha && new Date(v.fecha) >= sieteDiasAtras);
+    
+    if (ventasSemana.length > 0) {
+      ventasSemana.forEach(v => {
+        totalUSD += parseFloat(v.total) || 0;
+        botellones += parseInt(v.botellones) || 0;
+        litros += parseFloat(v.litrosTotales) || ((parseInt(v.botellones) || 0) * 20);
+      });
+      numVentas = ventasSemana.length;
+      const tasa = (r.totalUSD > 0 && r.totalBs > 0) ? (r.totalBs / r.totalUSD) : 890;
+      totalBs = totalUSD * tasa;
+    } else {
+      // Fallback si no hay ventas detalladas en respaldo
+      totalUSD = r.totalUSD || 0;
+      totalBs = r.totalBs || 0;
+      botellones = r.botellones || 0;
+      litros = r.litros || 0;
+      numVentas = r.numVentas || 0;
+    }
+  } else if (periodo === 'mes') {
+    if (heroLabel) heroLabel.textContent = 'Total Facturado Este Mes';
+    totalUSD = stats.totalMesUSD || r.totalUSD || 0;
+    totalBs = stats.totalMesBs || r.totalBs || 0;
+    botellones = stats.totalBotellonesMes || r.botellones || 0;
+    litros = (stats.totalBotellonesMes ? stats.totalBotellonesMes * 20 : (r.litros || 0));
+    numVentas = ventas.filter(v => v.fecha && v.fecha.startsWith(now.toISOString().substring(0, 7))).length || (r.numVentas || 0);
+  }
+
+  document.getElementById('txt-total-usd').textContent = `$ ${totalUSD.toFixed(2)}`;
+  document.getElementById('txt-total-bs').textContent = `≈ Bs ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+  document.getElementById('txt-botellones').textContent = botellones;
+  document.getElementById('txt-litros').textContent = `${litros.toLocaleString()} L`;
+  document.getElementById('txt-ventas-count').textContent = numVentas;
+}
+
+// Cargar todas las tiendas para supervisión simultánea (Cierres + Consolidado)
+async function cargarTodasLasSedesRefill() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}?select=*`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    if (!res.ok) return;
+    const allData = await res.json();
+    
+    let sumTotalUSD = 0;
+    let sumTotalBs = 0;
+    let sumEfectivoUSD = 0;
+    let sumEfectivoBs = 0;
+    let sumBancosUSD = 0;
+    let sumVentasCount = 0;
+
+    let totalSedesCount = 0;
+    let sedesCerradasCount = 0;
+
+    const checklistContainer = document.getElementById('container-sedes-cierre-list');
+    const sedesListHtml = [];
+
+    const sedesKeys = Object.keys(REFILLH2O_SEDES);
+
+    sedesKeys.forEach(email => {
+      totalSedesCount++;
+      const info = REFILLH2O_SEDES[email];
+      const tienda = allData.find(t => (t.empresa_email || '').toLowerCase() === email.toLowerCase());
+      
+      const r = tienda?.resumen_hoy || {};
+      const statusConn = calcularTiempoDesconexion(tienda?.ultima_actualizacion);
+      
+      // Chequear si la tienda ya cerró caja hoy
+      // Se detecta si hay turnos/arqueos cerrados en su configuración o si ya no tiene movimientos pendientes
+      const backup = tienda?.respaldo_completo;
+      let cerradoHoy = false;
+      let horaCierre = '';
+      
+      const hoyStr = new Date().toISOString().substring(0, 10);
+      if (backup && Array.isArray(backup.configuracion)) {
+        const arqueosCfg = backup.configuracion.find(c => c.id === 'tuempresa_arqueos');
+        if (arqueosCfg && Array.isArray(arqueosCfg.value)) {
+          const arqHoy = arqueosCfg.value.find(a => a.fecha === hoyStr);
+          if (arqHoy) {
+            cerradoHoy = true;
+            horaCierre = arqHoy.hora || 'Cerrado';
+          }
+        }
+      }
+
+      // Si el supervisor tiene movimientos y la última actualización fue tarde
+      if (cerradoHoy) sedesCerradasCount++;
+
+      // Acumular consolidado
+      const tUSD = r.totalUSD || 0;
+      const tBs = r.totalBs || 0;
+      const efUSD = r.efectivoUSD || 0;
+      const efBs = r.efectivoBs || 0;
+      const tDigital = Math.max(0, tUSD - efUSD - (r.efectivoBsUSD || 0));
+
+      sumTotalUSD += tUSD;
+      sumTotalBs += tBs;
+      sumEfectivoUSD += efUSD;
+      sumEfectivoBs += efBs;
+      sumBancosUSD += tDigital;
+      sumVentasCount += (r.numVentas || 0);
+
+      // Guardar en cache global
+      if (tienda) cacheGlobalTiendas[email] = tienda;
+
+      // Item del checklist
+      sedesListHtml.push(`
+        <div class="sede-cierre-row">
+          <div class="sede-cierre-info">
+            <div class="cierre-check-icon ${cerradoHoy ? 'done' : 'pending'}">
+              ${cerradoHoy ? '✓' : '⏳'}
+            </div>
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--neu-text-main);">
+                ${info.sede}
+              </div>
+              <div style="font-size: 0.72rem; color: var(--neu-text-muted);">
+                ${statusConn.texto} · ${r.numVentas || 0} ventas hoy
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.9rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
+              $ ${tUSD.toFixed(2)}
+            </div>
+            <div style="font-size: 0.72rem; font-weight: 700; color: ${cerradoHoy ? '#10B981' : '#F59E0B'};">
+              ${cerradoHoy ? (horaCierre || 'Cerrada') : 'En Operación'}
+            </div>
+          </div>
+        </div>
+      `);
+    });
+
+    // Renderizar Checklist
+    if (checklistContainer) {
+      checklistContainer.innerHTML = sedesListHtml.join('');
+    }
+    const badgeCount = document.getElementById('badge-cierres-count');
+    if (badgeCount) {
+      badgeCount.textContent = `${sedesCerradasCount}/${totalSedesCount} Cerradas`;
+    }
+
+    // Renderizar Consolidado Multisede
+    const txtConsUSD = document.getElementById('txt-consolidado-usd');
+    if (txtConsUSD) txtConsUSD.textContent = `$ ${sumTotalUSD.toFixed(2)}`;
+    const txtConsBs = document.getElementById('txt-consolidado-bs');
+    if (txtConsBs) txtConsBs.textContent = `≈ Bs ${sumTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} total facturado`;
+    const txtConsEfUSD = document.getElementById('txt-consolidado-efectivo-usd');
+    if (txtConsEfUSD) txtConsEfUSD.textContent = `$ ${sumEfectivoUSD.toFixed(2)}`;
+    const txtConsEfBs = document.getElementById('txt-consolidado-efectivo-bs');
+    if (txtConsEfBs) txtConsEfBs.textContent = `+ Bs ${sumEfectivoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+    const txtConsBancos = document.getElementById('txt-consolidado-bancos-usd');
+    if (txtConsBancos) txtConsBancos.textContent = `$ ${sumBancosUSD.toFixed(2)}`;
+    const txtConsCount = document.getElementById('txt-consolidado-ventas-count');
+    if (txtConsCount) txtConsCount.textContent = `${sumVentasCount} ventas totales`;
+
+  } catch(e) {
+    console.warn('[Visor] Error al cargar todas las sedes:', e);
+  }
+}
+
+function cambiarTab(tabName) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
 
@@ -1866,6 +2955,9 @@
   }
 
   function renderDashboard(storeData) {
+    if (storeData.empresa_email) {
+      cacheGlobalTiendas[storeData.empresa_email.toLowerCase()] = storeData;
+    }
     const r = storeData.resumen_hoy || {};
     const t = storeData.nivel_tanque || {};
     const prods = storeData.stock_productos || [];
@@ -1883,12 +2975,12 @@
     if (esRefill && sedeInfo) {
       if (txtStoreName) txtStoreName.textContent = 'Refill H2O';
       if (badgeSede) {
-        badgeSede.textContent = `📍 ${sedeInfo.sede}`;
+        badgeSede.textContent = sedeInfo.sede;
         badgeSede.style.display = 'inline-flex';
       }
       if (txtOwner) {
         if (esSupervisorRefill()) {
-          txtOwner.innerHTML = `<span>👑 Supervisión: refillh2o@gmail.com · <strong style="color:#FFF;">${sedeInfo.sede}</strong></span>`;
+          txtOwner.innerHTML = `<span style="color: #475569;">Supervisión: <span style="color: #334155; font-weight:600;">refillh2o@gmail.com</span> · <strong style="color:#0F172A; font-weight:700;">${sedeInfo.sede}</strong></span>`;
         } else {
           txtOwner.textContent = activeEmail;
         }
@@ -1938,51 +3030,152 @@
       }).join('');
     }
 
-    // Tanque
-    const pct = t.nivelPct || 68;
-    document.getElementById('tank-pct').textContent = `${pct}%`;
-    document.getElementById('tank-bar').style.width = `${pct}%`;
-    document.getElementById('tank-litros').textContent = `${(t.litros || 0).toLocaleString()} Litros restantes`;
-    document.getElementById('tank-capacidad').textContent = `Tanque de ${(t.capacidadTanque || 30000).toLocaleString()} L`;
+    // Tanque y Dial Físico Neumórfico
+    const pct = t.nivelPct !== undefined ? t.nivelPct : 68;
+    const tankPctEl = document.getElementById('tank-pct');
+    if (tankPctEl) tankPctEl.textContent = `${pct}%`;
+    const tankBarEl = document.getElementById('tank-bar');
+    if (tankBarEl) tankBarEl.style.width = `${pct}%`;
+    const tankLitrosEl = document.getElementById('tank-litros');
+    if (tankLitrosEl) tankLitrosEl.textContent = `${(t.litros || 0).toLocaleString()} L`;
+    const tankCapEl = document.getElementById('tank-capacidad');
+    if (tankCapEl) tankCapEl.textContent = `Capacidad: ${(t.capacidadTanque || 30000).toLocaleString()} L`;
+    
+    // Actualizar gradiente del dial cónico
+    const dialTrack = document.getElementById('tank-dial-track');
+    if (dialTrack) {
+      const deg = Math.round((pct / 100) * 360);
+      dialTrack.style.background = `conic-gradient(#007AFF 0deg ${deg}deg, #d8dce6 ${deg}deg 360deg)`;
+    }
+
+    // Aplicar período activo (Hoy / Semana / Mes)
+    if (typeof aplicarPeriodoVentas === 'function') {
+      aplicarPeriodoVentas(storeData, periodoActivo);
+    }
 
     document.getElementById('inv-tank-litros').textContent = `${(t.litros || 0).toLocaleString()} L`;
     document.getElementById('inv-tank-bar').style.width = `${pct}%`;
 
-    // Feed de Movimientos con Separadores de Día y grupos colapsables
+    // Feed de Movimientos con Separadores de Día y grupos colapsables (Últimos 6 días con historial completo)
     const feedCont = document.getElementById('feed-container');
     if (feedCont) {
-      if (movs.length > 0) {
+      // 1. Extraer respaldo de ventas y catálogo para alimentar días anteriores si ultimos_movimientos es corto (35 items)
+      const backupVentas = storeData.respaldo_completo?.ventas || [];
+      const rawCfg = storeData.respaldo_completo?.configuracion;
+      const backupTipos = Array.isArray(rawCfg)
+        ? ((rawCfg.find(c => c && c.id === 'tiposBotellon') || {}).value || [])
+        : (rawCfg?.tiposBotellon || []);
+      const backupClientes = storeData.respaldo_completo?.clientes || [];
+      const clientesMap = {};
+      backupClientes.forEach(c => { if (c && c.id) clientesMap[c.id] = c.nombre; });
+
+      // Mapa para unificar movimientos sin duplicados
+      const movsMap = new Map();
+      const seenFechas = new Set();
+
+      // 1. Incorporar ventas del respaldo completo como fuente primaria autoritativa
+      if (backupVentas.length > 0) {
+        const sortedBackup = [...backupVentas]
+          .filter(v => v && v.fecha)
+          .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        sortedBackup.forEach(v => {
+          const vKey = v.fecha;
+          if (seenFechas.has(vKey)) return;
+          seenFechas.add(vKey);
+
+          let metodoLabel = 'Punto de Venta';
+          if (v.tipo === 'credito') {
+            metodoLabel = 'Crédito';
+          } else if (v.pagos && v.pagos[0]) {
+            const pm = (v.pagos[0].metodo || '').toLowerCase();
+            if (pm.includes('punto')) metodoLabel = 'Punto de Venta';
+            else if (pm.includes('pago_movil')) metodoLabel = 'Pago Móvil';
+            else if (pm.includes('efectivo') && pm.includes('usd')) metodoLabel = 'Efectivo USD';
+            else if (pm.includes('efectivo')) metodoLabel = 'Efectivo Bs';
+            else if (pm.includes('transferencia')) metodoLabel = 'Transferencia';
+            else metodoLabel = v.pagos[0].metodo || 'Pagado';
+          }
+
+          let horaStr = '';
+          if (v.fecha) {
+            try {
+              horaStr = new Date(v.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+            } catch(e) {
+              horaStr = '';
+            }
+          }
+
+          const clienteNombre = v.clienteNombre || (v.clienteId ? clientesMap[v.clienteId] : null) || 'Cliente Mostrador';
+
+          movsMap.set(vKey, {
+            id: v.id,
+            fecha: v.fecha,
+            hora: horaStr,
+            tipo: v.tipo === 'credito' ? 'Crédito' : 'Venta',
+            monto: `$ ${(v.total || 0).toFixed(2)}`,
+            metodo: metodoLabel,
+            cliente: clienteNombre,
+            detalles: v.detalles || [],
+            descripcion: ''
+          });
+        });
+      }
+
+      // 2. Incorporar cualquier movimiento de ultimos_movimientos (como mermas o ventas recientes no volcadas)
+      (storeData.ultimos_movimientos || []).forEach(m => {
+        if (!m || !m.fecha) return;
+        const key = m.fecha;
+        if (!seenFechas.has(key)) {
+          seenFechas.add(key);
+          movsMap.set(key, m);
+        }
+      });
+      const todosMovs = Array.from(movsMap.values());
+
+      if (todosMovs.length > 0) {
         // Ordenar cronológicamente descendente
-        const sortedMovs = [...movs].sort((a, b) => {
+        todosMovs.sort((a, b) => {
           const tA = a.fecha ? new Date(a.fecha).getTime() : 0;
           const tB = b.fecha ? new Date(b.fecha).getTime() : 0;
           return tB - tA;
         });
 
-        // Agrupar por fecha
+        // Agrupar por fecha y calcular total de ventas por día
         const dayGroups = [];
         const groupIndexMap = {};
 
-        sortedMovs.forEach(m => {
+        todosMovs.forEach(m => {
           const k = getDayKey(m.fecha);
+          if (k === 'unknown') return;
           let g = groupIndexMap[k];
           if (!g) {
             g = {
               dayKey: k,
-              label: k === 'unknown' ? 'Otros Movimientos' : formatDayHeader(m.fecha),
-              items: []
+              label: formatDayHeader(m.fecha),
+              items: [],
+              totalUSD: 0
             };
             groupIndexMap[k] = g;
             dayGroups.push(g);
           }
           g.items.push(m);
+          if (m.tipo !== 'Merma' && m.monto) {
+            const num = parseFloat(String(m.monto).replace(/[^0-9.-]/g, '')) || 0;
+            g.totalUSD += num;
+          }
         });
 
-        const backupVentas = storeData.respaldo_completo?.ventas || [];
-        const rawCfg = storeData.respaldo_completo?.configuracion;
-        const backupTipos = Array.isArray(rawCfg)
-          ? ((rawCfg.find(c => c && c.id === 'tiposBotellon') || {}).value || [])
-          : (rawCfg?.tiposBotellon || []);
+        // Limitar exactamente a los últimos 6 días con actividad
+        const ultimos6Dias = dayGroups.slice(0, 6);
+
+        // Por defecto, colapsar todos los días (salvo si el usuario ya interactuó con uno)
+        ultimos6Dias.forEach(group => {
+          if (!feedUserInteractedDays.has(group.dayKey)) {
+            collapsedFeedDays.add(group.dayKey);
+          }
+        });
+
         const ventasByFecha = {};
         backupVentas.forEach(v => {
           if (v && v.fecha) ventasByFecha[v.fecha] = v;
@@ -1994,7 +3187,7 @@
           const detalles = vMatch && Array.isArray(vMatch.detalles) ? vMatch.detalles : null;
           if (detalles && detalles.length > 0) {
             return detalles.map(d => {
-              if (d.categoria === 'servicio') return `🛵 ${d.nombre || 'Delivery'}`;
+              if (d.categoria === 'servicio') return `Delivery ${d.nombre || ''}`.trim();
               const prod = backupTipos.find(t => t.id === d.tipoBotellonId);
               let prodName = prod ? prod.nombre : (d.nombre || 'Recarga');
               if ((d.categoria === 'relleno' || (prod && prod.categoria === 'relleno') || (!d.categoria && (!prod || prod.categoria !== 'producto'))) && /botell[oó]n/i.test(prodName) && !/nuevo/i.test(prodName)) {
@@ -2009,7 +3202,7 @@
           return m.descripcion || m.tipo || 'Recarga';
         };
 
-        const htmlPieces = dayGroups.map(group => {
+        const htmlPieces = ultimos6Dias.map(group => {
           const isCollapsed = collapsedFeedDays.has(group.dayKey);
 
           const itemsHtml = group.items.map(m => {
@@ -2022,15 +3215,17 @@
             return `
               <div class="feed-item" title="${escapeHtml(fullDateTitle)}">
                 <div class="feed-left">
-                  <div class="feed-icon">${m.icono || '💧'}</div>
+                  <div class="feed-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                  </div>
                   <div>
                     <div class="feed-title">${escapeHtml(descTitle)}</div>
                     <div class="feed-meta">${m.hora} · ${escapeHtml(m.cliente || 'Cliente')}</div>
                   </div>
                 </div>
                 <div class="feed-right">
-                  <div class="feed-amount" style="color: ${m.tipo === 'Merma' ? 'var(--warning)' : 'var(--primary)'};">${m.monto}</div>
-                  <div class="feed-method">${m.metodo || ''}</div>
+                  <div class="feed-amount" style="color: ${m.tipo === 'Merma' ? '#D97706' : '#0F172A'};">${m.monto}</div>
+                  <div class="feed-method">${escapeHtml(m.metodo || '')}</div>
                 </div>
               </div>
             `;
@@ -2038,11 +3233,18 @@
 
           return `
             <div class="feed-day-group" data-day="${group.dayKey}">
-              <div class="feed-day-divider" onclick="toggleFeedDay('${group.dayKey}')" role="button" tabindex="0" title="Toca para recoger o desplegar">
-                <div class="feed-day-badge">
-                  <span id="feed-arrow-${group.dayKey}" class="feed-day-chevron ${isCollapsed ? 'collapsed' : ''}">▼</span>
-                  <span>${escapeHtml(group.label)}</span>
-                  <span class="feed-day-count">${group.items.length}</span>
+              <div class="feed-day-divider" onclick="toggleFeedDay('${group.dayKey}')" role="button" tabindex="0" title="Toca para desplegar o recoger este día">
+                <div class="feed-day-bar">
+                  <div class="feed-day-left">
+                    <svg id="feed-arrow-${group.dayKey}" class="feed-day-chevron ${isCollapsed ? 'collapsed' : ''}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                    <span class="feed-day-title">${escapeHtml(group.label)}</span>
+                    <span class="feed-day-count-badge">${group.items.length} movs</span>
+                  </div>
+                  <div class="feed-day-total">
+                    <span>$ ${group.totalUSD.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
               <div id="feed-items-${group.dayKey}" class="feed-day-items ${isCollapsed ? 'collapsed' : ''}">
@@ -2166,8 +3368,10 @@
 
   // Control de secciones colapsables en el feed de movimientos
   const collapsedFeedDays = new Set();
+  const feedUserInteractedDays = new Set();
 
   window.toggleFeedDay = function(dayKey) {
+    feedUserInteractedDays.add(dayKey);
     if (collapsedFeedDays.has(dayKey)) {
       collapsedFeedDays.delete(dayKey);
     } else {
