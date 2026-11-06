@@ -560,6 +560,9 @@ function renderConsolidadoZ(turnos, fecha, methods) {
         <button id="btn-imprimir-reporte-z" class="btn btn-primary" style="font-weight: 700; height: 40px; padding: 0 16px;">
           📄 Imprimir Reporte Z (PDF)
         </button>
+        <button id="btn-imprimir-reporte-txt" class="btn btn-secondary" style="font-weight: 700; height: 40px; padding: 0 16px; margin-left: 8px;">
+          📋 Descargar Reporte (.txt)
+        </button>
       </div>
     </div>
 
@@ -1025,6 +1028,12 @@ function renderCierreContent(fecha, activeTab = null) {
         document.getElementById('btn-generar-pdf-home')?.click();
       });
     }
+    const btnPrintTxt = pane.querySelector('#btn-imprimir-reporte-txt');
+    if (btnPrintTxt) {
+      btnPrintTxt.addEventListener('click', () => {
+        document.getElementById('btn-generar-txt-home')?.click();
+      });
+    }
 
     pane.querySelectorAll('.btn-ver-turno-tab').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1202,6 +1211,264 @@ function renderCierreContent(fecha, activeTab = null) {
 }
 
 // Función auxiliar para generar el HTML con estilo de impresora matricial para el PDF del Reporte Z
+
+export function getReporteTxtString(fecha) {
+  const nombreTienda = getNombreTiendaCompleto();
+  const cierre = store.getCierreCaja(fecha);
+  const arqueo = store.getArqueo(fecha);
+  const turnos = store.getTurnos(fecha);
+  const allMetodos = store.getMetodosPago(false);
+  const tipos = store.getConfig('tiposBotellon') || [];
+  const tasaActual = store.getConfig('tasaCambio') || 896.12;
+
+  // Ventas del día
+  const allVentas = store.getAll('ventas') || [];
+  const ventasDia = allVentas.filter(v => v && v.fecha && v.fecha.startsWith(fecha));
+
+  // Consolidado de productos
+  const productoResumen = {};
+  let totalUnidadesVendidas = 0;
+  let totalUnidadesSinCobro = 0;
+  let totalLitrosVendidos = 0;
+  let totalMontoProductos = 0;
+
+  ventasDia.forEach(v => {
+    const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+    if (v.detalles && Array.isArray(v.detalles) && v.detalles.length > 0) {
+      v.detalles.forEach(d => {
+        if (d.categoria === 'servicio') return;
+        const prod = tipos.find(t => t.id === d.tipoBotellonId);
+        const prodName = prod ? prod.nombre : (d.nombre || 'Producto');
+        const cap = prod ? (parseFloat(prod.litros) || 20) : (parseFloat(d.capacidad) || 20);
+        const cant = (d.cantidad || 1);
+        const itemSinCobro = isSinCobro || !!d.esCortesia || (d.subtotal === 0);
+        const ltsItem = d.litros !== undefined ? d.litros : (cant * cap);
+
+        if (!productoResumen[prodName]) {
+          productoResumen[prodName] = { facturado: 0, sinCobro: 0, litros: 0, monto: 0 };
+        }
+        productoResumen[prodName].litros += ltsItem;
+        totalLitrosVendidos += ltsItem;
+
+        if (itemSinCobro) {
+          productoResumen[prodName].sinCobro += cant;
+          totalUnidadesSinCobro += cant;
+        } else {
+          productoResumen[prodName].facturado += cant;
+          const sub = (d.subtotal || 0);
+          productoResumen[prodName].monto += sub;
+          totalUnidadesVendidas += cant;
+          totalMontoProductos += sub;
+        }
+      });
+    } else if (v.botellones) {
+      const prodName = 'Recarga 20 Lts';
+      const cant = parseInt(v.botellones) || 1;
+      const ltsItem = cant * 20;
+      if (!productoResumen[prodName]) {
+        productoResumen[prodName] = { facturado: 0, sinCobro: 0, litros: 0, monto: 0 };
+      }
+      productoResumen[prodName].facturado += cant;
+      productoResumen[prodName].litros += ltsItem;
+      productoResumen[prodName].monto += (v.total || 0);
+      totalUnidadesVendidas += cant;
+      totalLitrosVendidos += ltsItem;
+      totalMontoProductos += (v.total || 0);
+    }
+  });
+
+  const listProdResumen = Object.entries(productoResumen).sort((a, b) => b[1].facturado - a[1].facturado);
+
+  // Formateador con padding para columnas monoespacio
+  const padRight = (str, len) => String(str).padEnd(len).substring(0, len);
+  const padLeft = (str, len) => String(str).padStart(len).substring(0, len);
+
+  const w = 72;
+  const sepDouble = "=".repeat(w);
+  const sepSingle = "-".repeat(w);
+  const lines = [];
+
+  const ahoraStr = new Date().toLocaleString('es-VE', { 
+    day: '2-digit', month: '2-digit', year: 'numeric', 
+    hour: '2-digit', minute: '2-digit', hour12: true 
+  });
+
+  // ENCABEZADO
+  lines.push(sepDouble);
+  lines.push(`*** ${nombreTienda.toUpperCase()} ***`.padStart(Math.floor((w + nombreTienda.length + 8) / 2)).padEnd(w));
+  lines.push("REPORTE CONSOLIDADO DE CIERRE DE CAJA Y VENTAS".padStart(Math.floor((w + 46) / 2)).padEnd(w));
+  lines.push(sepDouble);
+  lines.push(`FECHA DEL REPORTE : ${fecha}`);
+  lines.push(`FECHA DE EMISIÓN  : ${ahoraStr}`);
+  lines.push(`TASA DE CAMBIO    : Bs ${Utils.formatNumber(tasaActual, true)} / USD`);
+  lines.push(`TOTAL OPERACIONES : ${ventasDia.length} ventas facturadas hoy`);
+  lines.push("");
+
+  // 1. RESUMEN DE VENTAS POR PRODUCTO
+  lines.push(sepDouble);
+  lines.push("1. RESUMEN DE VENTAS POR PRODUCTO");
+  lines.push(sepDouble);
+  lines.push(`${padRight('PRODUCTO / SERVICIO', 30)} ${padLeft('FACTURADO', 10)} ${padLeft('SIN COBRO', 10)} ${padLeft('LITROS', 9)} ${padLeft('MONTO ($)', 10)}`);
+  lines.push(sepSingle);
+
+  if (listProdResumen.length === 0) {
+    lines.push("No se registraron ventas en esta fecha.");
+  } else {
+    listProdResumen.forEach(([nombre, info]) => {
+      const factStr = info.facturado > 0 ? `${info.facturado} unid.` : '-';
+      const scStr = info.sinCobro > 0 ? `${info.sinCobro} unid.` : '-';
+      const ltsStr = `${Math.round(info.litros).toLocaleString('es-VE')} L`;
+      const montoStr = `$ ${info.monto.toFixed(2)}`;
+      lines.push(`${padRight(nombre, 30)} ${padLeft(factStr, 10)} ${padLeft(scStr, 10)} ${padLeft(ltsStr, 9)} ${padLeft(montoStr, 10)}`);
+    });
+    lines.push(sepSingle);
+    const totFactStr = `${totalUnidadesVendidas} unid.`;
+    const totScStr = totalUnidadesSinCobro > 0 ? `${totalUnidadesSinCobro} unid.` : '-';
+    const totLtsStr = `${Math.round(totalLitrosVendidos).toLocaleString('es-VE')} L`;
+    const totMontoStr = `$ ${totalMontoProductos.toFixed(2)}`;
+    lines.push(`${padRight('TOTALES GENERALES', 30)} ${padLeft(totFactStr, 10)} ${padLeft(totScStr, 10)} ${padLeft(totLtsStr, 9)} ${padLeft(totMontoStr, 10)}`);
+  }
+  lines.push("");
+
+  // 2. RESUMEN DE FLUJO DE CAJA
+  lines.push(sepDouble);
+  lines.push("2. RESUMEN DE FLUJO DE CAJA");
+  lines.push(sepDouble);
+  lines.push(`${padRight('Ingreso Real en Caja (Contado + Abonos):', 48)} ${padLeft('$ ' + (cierre.totalVentasUSD || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('Total Ventas Registradas (Valor):', 48)} ${padLeft('$ ' + (cierre.totalVentasUSD || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('(-) Crédito Otorgado Hoy (Deuda Nueva):', 48)} ${padLeft('- $ ' + (cierre.creditoUSD || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('(+) Crédito Cobrado Hoy (Abonos Recibidos):', 48)} ${padLeft('+ $ ' + (cierre.abonosUSD || 0).toFixed(2), 23)}`);
+  lines.push(sepSingle);
+  lines.push(`Total Botellones Despachados: ${totalUnidadesVendidas + totalUnidadesSinCobro} unidades`);
+  lines.push(`Total Agua Purificada Despachada: ${Math.round(totalLitrosVendidos).toLocaleString('es-VE')} Litros`);
+  lines.push(sepSingle);
+  lines.push("DESGLOSE DE INGRESOS POR MÉTODO DE PAGO:");
+  lines.push(sepSingle);
+  lines.push(`${padRight('MÉTODO', 32)} ${padLeft('MONTO ($)', 18)} ${padLeft('MONTO (Bs)', 20)}`);
+  lines.push(sepSingle);
+
+  allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.id)).forEach(m => {
+    const isUsd = m.moneda === 'USD' || m.id === 'efectivo_usd';
+    const usd = cierre[m.id] || 0;
+    const bs = cierre.bs ? (cierre.bs[m.id] || 0) : 0;
+    if (usd > 0 || bs > 0) {
+      const bsStr = bs > 0 ? `Bs ${Utils.formatNumber(bs, true)}` : (isUsd ? '-' : `Bs 0,00`);
+      lines.push(`${padRight(m.label, 32)} ${padLeft('$ ' + usd.toFixed(2), 18)} ${padLeft(bsStr, 20)}`);
+    }
+  });
+
+  lines.push(sepSingle);
+  lines.push(`${padRight('TOTAL RECAUDADO EN CAJA', 32)} ${padLeft('$ ' + (cierre.totalVentasUSD || 0).toFixed(2), 18)}`);
+  lines.push("");
+
+  // 3. DESGLOSE DE TURNOS DE CAJA
+  if (turnos && turnos.length > 0) {
+    lines.push(sepDouble);
+    lines.push(`3. DESGLOSE DE TURNOS DE CAJA (${turnos.length})`);
+    lines.push(sepDouble);
+    lines.push(`${padRight('TURNO / HORARIO', 36)} ${padLeft('OPERACIONES', 12)} ${padLeft('FÍSICO ($)', 11)} ${padLeft('FÍSICO (Bs)', 11)}`);
+    lines.push(sepSingle);
+
+    turnos.forEach(t => {
+      const sist = t.sistema || store.getCierreCaja(t.fecha, t.inicio, t.fin);
+      let usd = 0;
+      let bs = 0;
+      if (t.declaracion) {
+        allMetodos.forEach(m => {
+          const val = t.declaracion[m.id] || 0;
+          if (m.moneda === 'USD' || m.id === 'efectivo_usd') usd += val;
+          else bs += val;
+        });
+      }
+      const labelTurno = `Turno ${t.numeroTurno} (${formatHora(t.inicio)} - ${formatHora(t.fin)})`;
+      lines.push(`${padRight(labelTurno, 36)} ${padLeft((sist.cantidadVentas || 0) + ' vtas', 12)} ${padLeft('$ ' + usd.toFixed(2), 11)} ${padLeft('Bs ' + Utils.formatNumber(bs, true), 11)}`);
+    });
+    lines.push("");
+  }
+
+  // 4. CUADRE CONSOLIDADO DE CAJA (FÍSICO vs SISTEMA)
+  if (arqueo && arqueo.declaracion) {
+    lines.push(sepDouble);
+    lines.push("4. CUADRE CONSOLIDADO DE CAJA (ARQUEO vs SISTEMA)");
+    lines.push(sepDouble);
+    lines.push(`${padRight('MÉTODO', 26)} ${padLeft('DECLARADO', 15)} ${padLeft('SISTEMA', 15)} ${padLeft('DIFERENCIA', 14)}`);
+    lines.push(sepSingle);
+
+    let totDifUsd = 0;
+    let totDifBs = 0;
+    allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.id)).forEach(m => {
+      const isUsd = m.moneda === 'USD' || m.id === 'efectivo_usd';
+      const decl = arqueo.declaracion[m.id] || 0;
+      const sist = isUsd ? (cierre[m.id] || 0) : (cierre.bs ? (cierre.bs[m.id] || 0) : 0);
+      const dif = decl - sist;
+      if (isUsd) totDifUsd += dif;
+      else totDifBs += dif;
+
+      if (decl > 0 || sist > 0 || dif !== 0) {
+        const fmt = (v) => isUsd ? `$ ${v.toFixed(2)}` : `Bs ${Utils.formatNumber(v, true)}`;
+        const difStr = (dif > 0 ? '+' : '') + fmt(dif);
+        lines.push(`${padRight(m.label, 26)} ${padLeft(fmt(decl), 15)} ${padLeft(fmt(sist), 15)} ${padLeft(difStr, 14)}`);
+      }
+    });
+
+    lines.push(sepSingle);
+    lines.push(`${padRight('DIFERENCIA TOTAL USD:', 45)} ${padLeft((totDifUsd > 0 ? '+' : '') + '$ ' + totDifUsd.toFixed(2), 26)}`);
+    lines.push(`${padRight('DIFERENCIA TOTAL Bs:', 45)} ${padLeft((totDifBs > 0 ? '+' : '') + 'Bs ' + Utils.formatNumber(totDifBs, true), 26)}`);
+    lines.push("");
+  }
+
+  // 5. AUDITORÍA DE RELOJ MEDIDOR (CAUDALÍMETRO)
+  const moduloCaud = store.getConfig('moduloCaudalimetro');
+  const lecturaCaud = store.getLecturaCaudalimetro(fecha);
+  if (moduloCaud && lecturaCaud && (lecturaCaud.litrosReloj > 0 || lecturaCaud.final > 0)) {
+    lines.push(sepDouble);
+    lines.push("5. AUDITORÍA DE RELOJ MEDIDOR DE AGUA (CAUDALÍMETRO)");
+    lines.push(sepDouble);
+    lines.push(`Lectura Inicial (${lecturaCaud.horaInicial || '00:00'}): ${padLeft((lecturaCaud.inicial || 0).toLocaleString('es-VE') + ' L', 35)}`);
+    lines.push(`Lectura Final   (${lecturaCaud.horaFinal || '23:59'}): ${padLeft((lecturaCaud.final || 0).toLocaleString('es-VE') + ' L', 35)}`);
+    lines.push(sepSingle);
+    lines.push(`${padRight('Agua Total según Reloj Físico:', 42)} ${padLeft((lecturaCaud.litrosReloj || 0).toLocaleString('es-VE') + ' L', 29)}`);
+    lines.push(`${padRight('Agua en Ventas Despachadas:', 42)} ${padLeft(Math.round(totalLitrosVendidos).toLocaleString('es-VE') + ' L', 29)}`);
+
+    const mermasDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
+    const litrosMermas = mermasDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
+    const mermasLavado = Math.round(totalLitrosVendidos * 0.05);
+    lines.push(`${padRight('Mermas de Lavado / Higienización (estimadas):', 42)} ${padLeft(mermasLavado.toLocaleString('es-VE') + ' L', 29)}`);
+    if (litrosMermas > 0) {
+      lines.push(`${padRight('Otras Mermas Registradas:', 42)} ${padLeft(litrosMermas.toLocaleString('es-VE') + ' L', 29)}`);
+    }
+    const totalJustificado = totalLitrosVendidos + mermasLavado + litrosMermas;
+    const diffAgua = Math.round((lecturaCaud.litrosReloj - totalJustificado) * 10) / 10;
+    lines.push(sepSingle);
+    lines.push(`${padRight('Diferencia de Auditoría (Faltante / Desviación):', 42)} ${padLeft((diffAgua > 0 ? '+' : '') + diffAgua.toLocaleString('es-VE') + ' L', 29)}`);
+    lines.push("");
+  }
+
+  lines.push(sepDouble);
+  lines.push("*** FIN DEL REPORTE - IMPRESO DESDE SISTEMA WATERAPP ***".padStart(Math.floor((w + 56) / 2)).padEnd(w));
+  lines.push(sepDouble);
+
+  return lines.join("\r\n");
+}
+
+export function descargarReporteTxt(fecha) {
+  const contenido = getReporteTxtString(fecha);
+  const nombreTienda = getNombreTiendaCompleto().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `Reporte_${nombreTienda}_${fecha}.txt`;
+
+  // Usar UTF-8 BOM para apertura directa y limpia en Bloc de Notas de Windows y teléfonos móviles
+  const blob = new Blob(['\uFEFF' + contenido], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
 export function getMatricialReportHTML(fecha) {
   const cierre = store.getCierreCaja(fecha);
   const arqueo = store.getArqueo(fecha);
@@ -1555,6 +1822,7 @@ export function renderCierreCaja(container) {
           <input type="date" class="form-control" id="cierre-fecha-home" style="max-width:160px; height:36px; padding:4px 8px; font-size:14px;" value="${today}"/>
         </div>
         <button id="btn-generar-pdf-home" class="btn btn-primary" style="height:36px; padding:0 12px; font-size:13px;">📄 Generar Z (PDF)</button>
+        <button id="btn-generar-txt-home" class="btn btn-secondary" style="height:36px; padding:0 12px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">📋 Reporte (.txt)</button>
       </div>
     </div>
     <div id="cierre-caja-home-content"></div>
@@ -1563,6 +1831,7 @@ export function renderCierreCaja(container) {
   const contentDiv = container.querySelector('#cierre-caja-home-content');
   const fechaInput = container.querySelector('#cierre-fecha-home');
   const pdfBtn = container.querySelector('#btn-generar-pdf-home');
+  const txtBtn = container.querySelector('#btn-generar-txt-home');
 
   fechaInput.addEventListener('change', () => {
     currentActiveTab = null;
@@ -1589,6 +1858,12 @@ export function renderCierreCaja(container) {
         alert("La librería PDF no está lista o cargada.");
     }
   });
+
+  if (txtBtn) {
+    txtBtn.addEventListener('click', () => {
+      descargarReporteTxt(fechaInput.value);
+    });
+  }
 
   renderCierre(contentDiv, today);
 }
