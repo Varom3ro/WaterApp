@@ -17,7 +17,7 @@ import { renderVentas } from './modules/ventas.js';
 import { renderInventario } from './modules/inventario.js';
 import { renderReportes } from './modules/reportes.js';
 import { renderConfiguracion } from './modules/configuracion.js';
-import { renderCierreCaja } from './modules/cierre.js';
+import { renderCierreCaja } from './modules/cierre.js?v=2.8.54';
 
 // 🛡️ Blindaje global contra cierre de ventana en PWA de escritorio Windows al presionar F5 o Ctrl+R:
 // Se captura a nivel de captura global inmediatamente al iniciar el script.
