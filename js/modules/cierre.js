@@ -32,7 +32,8 @@ function getNombreTiendaCompleto() {
       'refillh2o.se@gmail.com': 'Refill H2O - Santa Eduvigis',
       'refillh2o.ldc@gmail.com': 'Refill H2O - Los Dos Caminos',
       'refillh2o.sr@gmail.com': 'Refill H2O - Santa Rosa',
-      'refillh2o.sp@gmail.com': 'Refill H2O - Santa Paula'
+      'refillh2o.sp@gmail.com': 'Refill H2O - Santa Paula',
+      'refillh2o.sf@gmail.com': 'Refill H2O - Santa Fe'
     };
     if (sedesMap[userEmail]) return sedesMap[userEmail];
   }

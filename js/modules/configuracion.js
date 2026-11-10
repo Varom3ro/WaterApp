@@ -366,6 +366,7 @@ export function renderConfiguracion(container) {
               <option value="este">📍 La California / Sucre</option>
               <option value="oeste">📍 El Paraíso / Libertador</option>
               <option value="santa_eduvigis">📍 Santa Eduvigis / Sucre - Chacao</option>
+              <option value="santa_fe">📍 Santa Fe / Baruta</option>
             </select>
           </div>
         </div>
