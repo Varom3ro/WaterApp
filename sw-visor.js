@@ -2,7 +2,7 @@
 // WaterApp - Service Worker Visor Ejecutivo Móvil
 // ============================================
 
-const CACHE_NAME = 'waterapp-visor-v1.0.6';
+const CACHE_NAME = 'waterapp-visor-v1.0.7';
 
 const ASSETS_TO_CACHE = [
   './visor.html',

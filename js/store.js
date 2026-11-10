@@ -281,6 +281,34 @@ class Store {
                     'Los Cortijos',
                     'Chacao'
                 ]
+            },
+            santa_fe: {
+                id: 'santa_fe',
+                nombre: 'Santa Fe / Baruta',
+                municipios: ['Baruta', 'El Hatillo', 'Chacao', 'Sucre', 'Libertador'],
+                urbanizaciones: [
+                    'Santa Fe Norte',
+                    'Santa Fe Sur',
+                    'Prados del Este',
+                    'Cumbres de Curumo',
+                    'Los Campitos',
+                    'Alto Prado',
+                    'Manzanares',
+                    'El Peñón',
+                    'Colinas de Bello Monte',
+                    'Valle Arriba',
+                    'Concresa',
+                    'Las Mercedes',
+                    'Santa Inés',
+                    'Terrazas del Club Hípico',
+                    'Lomas del Club Hípico',
+                    'La Alameda',
+                    'Lomas de Prados del Este',
+                    'Santa Mónica',
+                    'Chuao',
+                    'El Cafetal',
+                    'San Román'
+                ]
             }
         };
     }
