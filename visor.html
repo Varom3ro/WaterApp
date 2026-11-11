@@ -1575,7 +1575,7 @@ body {
   flex-shrink: 0 !important;
 }
 
-.header-sub-row {
+.header-mid-row {
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
@@ -1583,12 +1583,29 @@ body {
   width: 100% !important;
 }
 
-.header-sub-meta {
+.header-sede-wrap {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  flex-wrap: nowrap !important;
+  gap: 6px !important;
   min-width: 0 !important;
+}
+
+.header-status-row {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding-top: 1px !important;
+}
+
+.live-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 0.73rem !important;
+  color: #475569 !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  width: 100% !important;
 }
 
 .badge-sede {
@@ -1853,22 +1870,25 @@ body.hide-montos #cierre-digital-usd {
         </div>
       </div>
 
-      <!-- Fila 2: Segunda línea completa para la sede y estado, más el switch de modo supervisor -->
-      <div class="header-sub-row">
-        <div class="header-sub-meta">
+      <!-- Fila 2: Debajo de Refill H2O colocamos la Sede a la izquierda y el botón Modo Supervisor a la derecha -->
+      <div class="header-mid-row">
+        <div class="header-sede-wrap">
           <span id="badge-sede" class="badge-sede" style="display: none;">Santa Eduvigis</span>
           <span id="txt-owner-email" class="header-email" style="display: none;">correo@tienda.com</span>
-          <div class="live-status">
-            <span class="live-dot"></span>
-            <span>EN LÍNEA · <span id="txt-last-time">Ahora</span></span>
-          </div>
         </div>
-
         <button type="button" class="btn-role-switch" onclick="cambiarAModoSupervisor()" title="Cambiar a Modo Supervisor">
           <span>🛡️</span>
           <span>Modo Supervisor</span>
           <span style="font-size: 0.68rem; opacity: 0.7;">➔</span>
         </button>
+      </div>
+
+      <!-- Fila 3: Espacio de abajo dedicado completamente al estado de conexión -->
+      <div class="header-status-row">
+        <div class="live-status">
+          <span class="live-dot"></span>
+          <span>EN LÍNEA · <span id="txt-last-time">Ahora</span></span>
+        </div>
       </div>
     </header>
 
