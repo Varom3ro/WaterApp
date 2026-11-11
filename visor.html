@@ -2861,8 +2861,34 @@ function cambiarTab(tabName) {
       if (!res.ok) throw new Error('Error de conexión con la nube');
       const data = await res.json();
 
+      let storeData = (data && data.length > 0) ? data[0] : {};
+
+      // Sincronizar catálogo/stock más reciente de licencia_agua_clientes
+      try {
+        const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=catalogo_inicial`, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        if (resLic.ok) {
+          const licList = await resLic.json();
+          if (licList && licList.length > 0 && Array.isArray(licList[0].catalogo_inicial)) {
+            const prodsCat = licList[0].catalogo_inicial
+              .filter(item => item.categoria === 'producto')
+              .map(p => ({
+                nombre: p.nombre,
+                stock: parseInt(p.stock) || 0,
+                precio: parseFloat(p.precio) || 0
+              }));
+            if (prodsCat.length > 0) {
+              storeData.stock_productos = prodsCat;
+            }
+          }
+        }
+      } catch (errLic) {
+        console.warn('Error cargando catalogo_inicial:', errLic);
+      }
+
       if (data && data.length > 0) {
-        renderDashboard(data[0]);
+        renderDashboard(storeData);
       } else {
         // Datos de muestra si aún no ha sincronizado
         console.log('No data yet, using sample data');

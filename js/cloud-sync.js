@@ -235,7 +235,7 @@ export async function syncToCloud(isManual = false) {
       .filter(v => v && v.fecha)
       .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-    ventasCronologicas.slice(0, 35).forEach(v => {
+    ventasCronologicas.slice(0, 60).forEach(v => {
       let metodoLabel = '💵 Pagado';
       if (v.tipo === 'credito') metodoLabel = '📋 Crédito';
       else if (v.pagos && v.pagos[0]) {
@@ -388,22 +388,30 @@ export async function syncToCloud(isManual = false) {
       }
     });
 
-    // Generar respaldo completo para recuperación ante desastres (Plan Plus)
+    // 🛡️ Sincronización Inteligente de 2 Niveles:
+    // Nivel 1: Sincronización en vivo ultraligera (~15-30 KB) en cada venta para no saturar internet.
+    // Nivel 2: Respaldo histórico completo (Plan Plus) al cerrar caja (isManual=true) o cada 4 horas.
+    const lastFullBackupTime = parseInt(localStorage.getItem('waterapp_last_full_backup_time') || '0');
+    const fourHoursMs = 4 * 60 * 60 * 1000;
+    const shouldIncludeFullBackup = isManual || (Date.now() - lastFullBackupTime > fourHoursMs);
+
     let respaldoObj = null;
-    try {
-      const backupStr = store.exportData();
-      respaldoObj = JSON.parse(backupStr);
-      // 🛡️ Filtro de seguridad de tamaño: Evitar que imágenes gigantes bloqueen el respaldo o agoten el timeout en Supabase
-      if (respaldoObj && Array.isArray(respaldoObj.configuracion)) {
-        respaldoObj.configuracion = respaldoObj.configuracion.map(c => {
-          if (c.id === 'empresaLogo' && typeof c.value === 'string' && c.value.length > 70000) {
-            return { ...c, value: './img/logo.png' };
-          }
-          return c;
-        });
+    if (shouldIncludeFullBackup) {
+      try {
+        const backupStr = store.exportData();
+        respaldoObj = JSON.parse(backupStr);
+        // 🛡️ Filtro de seguridad de tamaño: Evitar que imágenes gigantes bloqueen el respaldo o agoten el timeout en Supabase
+        if (respaldoObj && Array.isArray(respaldoObj.configuracion)) {
+          respaldoObj.configuracion = respaldoObj.configuracion.map(c => {
+            if (c.id === 'empresaLogo' && typeof c.value === 'string' && c.value.length > 70000) {
+              return { ...c, value: './img/logo.png' };
+            }
+            return c;
+          });
+        }
+      } catch (bErr) {
+        console.warn('[CloudSync] Error generando snapshot de respaldo:', bErr);
       }
-    } catch (bErr) {
-      console.warn('[CloudSync] Error generando snapshot de respaldo:', bErr);
     }
 
     const payload = {
@@ -434,7 +442,7 @@ export async function syncToCloud(isManual = false) {
         nivelPct
       },
       stock_productos: prodsFisicos,
-      ultimos_movimientos: ultimosMovs.slice(0, 35),
+      ultimos_movimientos: ultimosMovs.slice(0, 60),
       analisis_mes: {
         totalMesUSD,
         totalMesBs,
@@ -443,31 +451,69 @@ export async function syncToCloud(isManual = false) {
         ventasPorDia,
         maxDia,
         maxMonto
-      },
-      respaldo_completo: respaldoObj
+      }
     };
 
-    // 🛡️ Nunca enviar un respaldo vacío sobre un respaldo existente en la nube
-    if ((!respaldoObj || ((!respaldoObj.ventas || respaldoObj.ventas.length === 0) && (!respaldoObj.clientes || respaldoObj.clientes.length === 0))) && !isManual) {
-      delete payload.respaldo_completo;
+    if (shouldIncludeFullBackup && respaldoObj) {
+      const hasContent = (respaldoObj.ventas && respaldoObj.ventas.length > 0) || (respaldoObj.clientes && respaldoObj.clientes.length > 0);
+      if (hasContent || isManual) {
+        payload.respaldo_completo = respaldoObj;
+      }
     }
 
-    const res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=minimal'
-      },
-      body: JSON.stringify(payload)
-    });
+    let res;
+    // Si incluye respaldo completo, hacemos POST con merge-duplicates (upsert)
+    if (payload.respaldo_completo) {
+      res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        localStorage.setItem('waterapp_last_full_backup_time', String(Date.now()));
+      }
+    } else {
+      // ⚡ Sincronización Ultraligera en Vivo: PATCH selectivo (15-30 KB)
+      // Mantiene intacto en Supabase el respaldo histórico anterior sin saturar la conexión
+      res = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      // Fallback a POST solo si la tienda es nueva y aún no existe fila previa en Supabase
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+    }
 
-    if (res.ok) {
-      console.log('[CloudSync] ✅ Datos y respaldo íntegro de la tienda sincronizados con Supabase:', payload);
+    if (res && res.ok) {
+      // ⏰ Blindaje de reloj: verificar desfase horario del computador contra el servidor
+      const serverDateHeader = res.headers.get('date');
+      if (serverDateHeader) {
+        verificarDesfaseRelojPC(serverDateHeader);
+      }
+      console.log(`[CloudSync] ✅ Sincronización exitosa (${payload.respaldo_completo ? 'Completa 📦' : 'Ultraligera ⚡'}):`, payload.ultima_actualizacion);
       return true;
     } else {
-      console.warn('[CloudSync] Error en respuesta de Supabase:', await res.text());
+      console.warn('[CloudSync] Error en respuesta de Supabase:', res ? await res.text() : 'No response');
       return false;
     }
   } catch (e) {
@@ -581,10 +627,47 @@ export async function backupToCloudNow() {
   };
 }
 
+/**
+ * ⏰ Blindaje de reloj de la PC contra hora del servidor Supabase tras cortes de luz.
+ */
+export function verificarDesfaseRelojPC(serverDateStr) {
+  try {
+    const serverTime = new Date(serverDateStr).getTime();
+    const localTime = Date.now();
+    const diffMin = Math.round((localTime - serverTime) / (1000 * 60));
+    const bannerId = 'banner-desfase-reloj';
+    let banner = document.getElementById(bannerId);
+
+    if (Math.abs(diffMin) >= 15) {
+      console.warn(`[CloudSync] ⏰ Reloj de la PC desfasado por ${diffMin} minutos.`);
+      if (!banner && typeof document !== 'undefined') {
+        banner = document.createElement('div');
+        banner.id = bannerId;
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#DC2626;color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+        banner.innerHTML = `
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:18px;">⏰</span>
+            <span>
+              <strong>Atención:</strong> La hora de este computador está desfasada por ${Math.abs(diffMin)} minutos respecto a la hora oficial de internet (posible corte de luz reciente). Por favor ajusta la hora de Windows para que las ventas no se registren con fecha u hora incorrecta.
+            </span>
+          </div>
+          <button style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;margin-left:10px;" onclick="this.parentElement.remove()">✕ Cerrar</button>
+        `;
+        document.body.prepend(banner);
+      }
+    } else if (banner) {
+      banner.remove();
+    }
+  } catch (e) {
+    console.warn('[CloudSync] Error verificando desfase horario:', e);
+  }
+}
+
 // Exponer globalmente
 if (typeof window !== 'undefined') {
   window.syncToCloud = syncToCloud;
   window.getCloudBackup = getCloudBackup;
   window.restoreFromCloud = restoreFromCloud;
   window.backupToCloudNow = backupToCloudNow;
+  window.verificarDesfaseRelojPC = verificarDesfaseRelojPC;
 }

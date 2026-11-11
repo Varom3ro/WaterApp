@@ -3,6 +3,7 @@ import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { openModalCaudalimetro, openModalPedidosPendientes } from './ventas.js';
+import { syncToCloud } from '../cloud-sync.js';
 
 let currentActiveTab = null;
 
@@ -269,6 +270,16 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
     const ejecutarCierreTurno = () => {
       const turnoGuardado = store.saveTurnoCierre(fecha, declaracion, observaciones, lectCaud);
       showToast(`✅ Turno ${turnoGuardado.numeroTurno} cerrado exitosamente`, 'success');
+
+      // ☁️ Sincronizar y forzar respaldo histórico completo a la nube con confirmación
+      if (typeof syncToCloud === 'function') {
+        syncToCloud(true).then(ok => {
+          if (ok) {
+            showToast('☁️ Cierre y respaldo histórico respaldados con éxito en la nube', 'info');
+          }
+        }).catch(() => {});
+      }
+
       currentActiveTab = 'turno_' + turnoGuardado.id;
       const contentDiv = document.getElementById('cierre-caja-home-content');
       if (contentDiv) {

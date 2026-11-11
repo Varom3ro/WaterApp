@@ -34,6 +34,29 @@ class Store {
         this._initDefaults();
         this.depurarAbonosInvalidos();
 
+        // 🛡️ Blindaje de recuperación post-apagón:
+        // Si IndexedDB devolvió menos ventas para hoy que las que teníamos en el espejo caliente de localStorage
+        // (por ejemplo, si un corte brusco impidió el volcado de LevelDB al disco), restaurar inmediatamente
+        try {
+            const todayISO = Utils.todayISO();
+            const mirror = JSON.parse(localStorage.getItem('waterapp_mirror_ventas_hoy') || '[]');
+            const ventasDb = this.cache['ventas'] || [];
+            const existingIds = new Set(ventasDb.map(v => v.id));
+            let recovered = 0;
+            mirror.forEach(v => {
+                if (v && v.id && v.fecha && v.fecha.startsWith(todayISO) && !existingIds.has(v.id)) {
+                    this.cache['ventas'].push(v);
+                    this._putDB('ventas', v);
+                    recovered++;
+                }
+            });
+            if (recovered > 0) {
+                console.warn(`[Store] 🛡️ Se recuperaron ${recovered} venta(s) del espejo caliente tras reinicio brusco.`);
+            }
+        } catch (eRec) {
+            console.warn('[Store] Error en recuperación de espejo de ventas:', eRec);
+        }
+
         // 🗜️ Auto-optimizar logotipo si es excesivamente pesado (> 60KB) para evitar bloqueos de red o base de datos
         try {
             const logo = this.getConfig('empresaLogo');
@@ -97,10 +120,22 @@ class Store {
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
+                tx.onerror = (err) => {
+                    console.error(`[Store] ❌ Error en transacción IndexedDB (${storeName}):`, err);
+                    resolve(false);
+                };
+                tx.onabort = (err) => {
+                    console.error(`[Store] ❌ Transacción IndexedDB abortada (${storeName}):`, err);
+                    resolve(false);
+                };
                 const req = tx.objectStore(storeName).put(item);
                 req.onsuccess = () => resolve(true);
-                req.onerror = () => resolve(false);
+                req.onerror = (err) => {
+                    console.error(`[Store] ❌ Error guardando en IndexedDB (${storeName}):`, err);
+                    resolve(false);
+                };
             } catch (e) {
+                console.error(`[Store] ❌ Excepción al escribir en IndexedDB (${storeName}):`, e);
                 resolve(false);
             }
         });
@@ -111,6 +146,8 @@ class Store {
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
+                tx.onerror = () => resolve(false);
+                tx.onabort = () => resolve(false);
                 const req = tx.objectStore(storeName).delete(id);
                 req.onsuccess = () => resolve(true);
                 req.onerror = () => resolve(false);
@@ -131,8 +168,34 @@ class Store {
         return arr.find(item => item.id === id) || null;
     }
 
+    // 🛡️ Espejo síncrono de seguridad para ventas del día en localStorage (inmune a cortes de energía en IndexedDB)
+    _mirrorVentasHoy(item = null, removeId = null) {
+        try {
+            const todayISO = Utils.todayISO();
+            let mirror = JSON.parse(localStorage.getItem('waterapp_mirror_ventas_hoy') || '[]');
+            mirror = mirror.filter(v => v && v.fecha && v.fecha.startsWith(todayISO));
+
+            if (removeId) {
+                mirror = mirror.filter(v => v.id !== removeId);
+            } else if (item && item.id) {
+                const idx = mirror.findIndex(v => v.id === item.id);
+                if (idx !== -1) {
+                    mirror[idx] = item;
+                } else {
+                    mirror.push(item);
+                }
+            }
+            localStorage.setItem('waterapp_mirror_ventas_hoy', JSON.stringify(mirror));
+        } catch (e) {
+            console.warn('[Store] Error en espejo de ventas de hoy:', e);
+        }
+    }
+
     save(collection, item) {
         this.cache[collection].push(item);
+        if (collection === 'ventas') {
+            this._mirrorVentasHoy(item);
+        }
         this._putDB(collection, item); // flush
         this._autoBackup();
         this._triggerCloudSync(collection);
@@ -144,6 +207,9 @@ class Store {
         const idx = arr.findIndex(item => item.id === id);
         if (idx === -1) return null;
         arr[idx] = { ...arr[idx], ...updates, updatedAt: new Date().toISOString() };
+        if (collection === 'ventas') {
+            this._mirrorVentasHoy(arr[idx]);
+        }
         this._putDB(collection, arr[idx]);
         this._autoBackup();
         this._triggerCloudSync(collection);
@@ -155,6 +221,9 @@ class Store {
         const initialLen = arr.length;
         this.cache[collection] = arr.filter(item => item.id !== id);
         if (this.cache[collection].length < initialLen) {
+            if (collection === 'ventas') {
+                this._mirrorVentasHoy(null, id);
+            }
             this._deleteDB(collection, id);
             this._autoBackup();
             this._triggerCloudSync(collection);
