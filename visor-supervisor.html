@@ -2026,7 +2026,16 @@
 
   async function guardarCatalogoEnSupabase(nuevoCatalogo, listaSedes) {
     try {
+      const prodsFisicos = nuevoCatalogo
+        .filter(item => item.categoria === 'producto')
+        .map(p => ({
+          nombre: p.nombre,
+          stock: parseInt(p.stock) || 0,
+          precio: parseFloat(p.precio) || 0
+        }));
+
       for (const sedeEmail of listaSedes) {
+        // 1. Guardar en licencia_agua_clientes (para inyección al POS de planta)
         await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}`, {
           method: 'PATCH',
           headers: {
@@ -2036,6 +2045,20 @@
           },
           body: JSON.stringify({
             catalogo_inicial: nuevoCatalogo
+          })
+        });
+
+        // 2. Guardar en tienda_sync_cloud (para que el Visor del Dueño lo vea de inmediato)
+        await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            stock_productos: prodsFisicos,
+            ultima_actualizacion: new Date().toISOString()
           })
         });
       }
