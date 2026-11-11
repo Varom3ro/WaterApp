@@ -1,0 +1,2097 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>WaterApp - Visor Supervisor</title>
+  <!-- Metadatos PWA y Pantalla Móvil -->
+  <meta name="theme-color" content="#0B131E" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Visor Supervisor" />
+  <meta name="application-name" content="Visor Supervisor" />
+  <meta name="description" content="Panel de Control y Supervisión Operativa de Inventarios y Tanque para WaterApp" />
+  <link rel="manifest" href="manifest-visor-supervisor.json" />
+  <link rel="apple-touch-icon" href="img/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="img/icon-512.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B131E;
+      --surface: #152232;
+      --surface-card: #1C2D42;
+      --border: rgba(255, 255, 255, 0.08);
+      --primary: #10B981;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+      --accent: #06B6D4;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --radius: 16px;
+      --bottom-nav-height: 70px;
+
+      /* Sistema Cerámico Neumórfico */
+      --neu-bg: #EAECEF;
+      --neu-surface: #EFF1F5;
+      --neu-pill-dark: #121417;
+      --neu-pill-hover: #1F2228;
+      --neu-card-dark: #1A1D22;
+      --neu-coral: #FF3B30;
+      --neu-coral-glow: rgba(255, 59, 48, 0.35);
+      --neu-green: #10B981;
+      --neu-green-glow: rgba(16, 185, 129, 0.3);
+      --neu-blue: #0284C7;
+      --neu-text-main: #181A1F;
+      --neu-text-muted: #848B98;
+      --neu-text-subtle: #A6ADB9;
+      
+      --neu-shadow-out: 8px 8px 18px #cbcfd8, -8px -8px 18px #ffffff;
+      --neu-shadow-sm: 4px 4px 10px #d0d4de, -4px -4px 10px #ffffff;
+      --neu-shadow-inset: inset 3px 3px 6px #cbcfd8, inset -3px -3px 6px #ffffff;
+      --neu-shadow-dark: 6px 6px 14px rgba(0, 0, 0, 0.25), -2px -2px 6px rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--neu-bg);
+      color: var(--neu-text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .app-container {
+      max-width: 440px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--neu-bg);
+      padding-bottom: 95px;
+    }
+
+    /* Pantalla de Login */
+    #auth-screen {
+      padding: 2.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 100vh;
+      background: radial-gradient(circle at top right, #0F2D3D 0%, var(--bg) 65%);
+      color: #fff;
+    }
+
+    .login-brand {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .brand-icon {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      box-shadow: 0 10px 25px rgba(2, 132, 199, 0.35);
+      margin-bottom: 1rem;
+    }
+
+    .brand-title {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .brand-subtitle {
+      font-size: 0.88rem;
+      color: #94A3B8;
+      margin-top: 4px;
+    }
+
+    .card-login {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-control {
+      width: 100%;
+      height: 48px;
+      padding: 0 16px;
+      background: #0D1826;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .form-control:focus {
+      border-color: #0284C7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.3);
+    }
+
+    .btn {
+      width: 100%;
+      height: 48px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #0284C7;
+      color: #ffffff;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    /* Top Header */
+    .top-header {
+      padding: 1.1rem 1.25rem 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: rgba(234, 236, 239, 0.92);
+      backdrop-filter: blur(14px);
+      z-index: 50;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: 0 4px 12px rgba(180, 185, 195, 0.25);
+    }
+
+    .header-store-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .store-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--neu-text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .badge-sede {
+      font-size: 0.72rem;
+      background: var(--neu-pill-dark);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 700;
+    }
+
+    .badge-supervisor {
+      font-size: 0.7rem;
+      background: #E0F2FE;
+      color: #0369A1;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 3px;
+    }
+
+    .live-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--neu-text-muted);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 6px #10B981;
+    }
+
+    .btn-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--neu-surface);
+      border: 1px solid #ffffff;
+      box-shadow: var(--neu-shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--neu-text-main);
+      transition: all 0.2s;
+    }
+
+    .btn-icon:active {
+      box-shadow: var(--neu-shadow-inset);
+      transform: scale(0.96);
+    }
+
+    /* Barra Selectora de Sedes (Multi-Sede) */
+    .refill-sede-bar {
+      padding: 10px 14px 4px;
+      background: var(--neu-bg);
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .sede-bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .sede-bar-title {
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--neu-text-muted);
+    }
+
+    .sede-pills-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: none;
+    }
+    .sede-pills-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .sede-pill-btn {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid #ffffff;
+      background: var(--neu-surface);
+      box-shadow: var(--neu-shadow-sm);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--neu-text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sede-pill-btn.active {
+      background: var(--neu-pill-dark);
+      color: #fff;
+      box-shadow: var(--neu-shadow-dark);
+      border-color: var(--neu-pill-dark);
+    }
+
+    .sede-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+    .sede-status-dot.online { background: #10B981; }
+    .sede-status-dot.offline { background: #94A3B8; }
+
+    /* Secciones de Vistas */
+    .view-section {
+      display: none;
+      padding: 1rem 1.1rem;
+      animation: fadeIn 0.25s ease-out;
+    }
+    .view-section.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: var(--neu-text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* Tarjetas Neumórficas */
+    .card-neu {
+      background: var(--neu-surface);
+      border: 1px solid #ffffff;
+      border-radius: 24px;
+      box-shadow: var(--neu-shadow-out);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Hero de Tanque */
+    .tank-hero-card {
+      background: var(--neu-surface);
+      border: 1px solid #ffffff;
+      border-radius: 28px;
+      box-shadow: var(--neu-shadow-out);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      text-align: center;
+    }
+
+    .tank-dial-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+
+    .tank-dial {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: var(--neu-bg);
+      box-shadow: var(--neu-shadow-out);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .tank-dial-inner {
+      width: 115px;
+      height: 115px;
+      border-radius: 50%;
+      background: var(--neu-surface);
+      box-shadow: var(--neu-shadow-inset);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tank-pct-number {
+      font-size: 1.85rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      color: #0284C7;
+      line-height: 1;
+    }
+
+    .tank-pct-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--neu-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    .tank-litros-main {
+      font-size: 1.9rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--neu-text-main);
+      margin-bottom: 4px;
+    }
+
+    .tank-capacidad-sub {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--neu-text-muted);
+    }
+
+    /* Grid de Métricas Operativas */
+    .ops-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+
+    .ops-card {
+      background: var(--neu-surface);
+      border: 1px solid #ffffff;
+      border-radius: 20px;
+      box-shadow: var(--neu-shadow-sm);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ops-icon {
+      font-size: 1.3rem;
+      margin-bottom: 2px;
+    }
+
+    .ops-val {
+      font-size: 1.45rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--neu-text-main);
+    }
+
+    .ops-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--neu-text-muted);
+    }
+
+    /* Botones de Acción Operativa */
+    .action-btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+
+    .btn-action-neu {
+      border: 1px solid #ffffff;
+      background: var(--neu-surface);
+      box-shadow: var(--neu-shadow-sm);
+      border-radius: 16px;
+      padding: 12px 10px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: var(--neu-text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-action-neu:active {
+      box-shadow: var(--neu-shadow-inset);
+      transform: scale(0.97);
+    }
+
+    .btn-action-neu.primary {
+      background: #0284C7;
+      color: #fff;
+      border-color: #0284C7;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    }
+
+    /* Listado de Productos en Stock */
+    .product-stock-card {
+      background: var(--neu-surface);
+      border: 1px solid #ffffff;
+      border-radius: 20px;
+      box-shadow: var(--neu-shadow-sm);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .prod-stock-info {
+      flex: 1;
+      padding-right: 10px;
+    }
+
+    .prod-stock-name {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--neu-text-main);
+      margin-bottom: 3px;
+    }
+
+    .prod-stock-sub {
+      font-size: 0.75rem;
+      color: var(--neu-text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .prod-stock-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .badge-in-stock { background: #DCFCE7; color: #15803D; }
+    .badge-low-stock { background: #FEF3C7; color: #B45309; }
+    .badge-out-stock { background: #FEE2E2; color: #DC2626; }
+
+    .prod-stock-val {
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      color: #0284C7;
+      margin-right: 12px;
+    }
+
+    .prod-stock-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-mini-stock {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid #ffffff;
+      background: var(--neu-bg);
+      box-shadow: var(--neu-shadow-sm);
+      color: var(--neu-text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .btn-mini-stock:active {
+      box-shadow: var(--neu-shadow-inset);
+    }
+
+    /* Catálogo & Filtros */
+    .cat-filter-pills {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      background: var(--neu-bg);
+      padding: 4px;
+      border-radius: 20px;
+      box-shadow: var(--neu-shadow-inset);
+    }
+
+    .cat-filter-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 16px;
+      border: none;
+      background: transparent;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--neu-text-muted);
+      cursor: pointer;
+      text-align: center;
+    }
+    .cat-filter-btn.active {
+      background: var(--neu-pill-dark);
+      color: #ffffff;
+      box-shadow: var(--neu-shadow-dark);
+    }
+
+    /* Bottom Nav Flotante */
+    .bottom-nav {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 32px);
+      max-width: 408px;
+      height: 64px;
+      background: rgba(18, 20, 23, 0.94);
+      backdrop-filter: blur(16px);
+      border-radius: 36px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-btn {
+      background: none;
+      border: none;
+      color: #848B98;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 64px;
+      transition: all 0.2s;
+    }
+
+    .nav-btn.active {
+      color: #38BDF8;
+    }
+
+    .nav-icon {
+      font-size: 1.25rem;
+    }
+
+    /* Modales */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .modal-card {
+      background: var(--neu-surface);
+      border: 1px solid #ffffff;
+      border-radius: 24px;
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+      color: var(--neu-text-main);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      padding-bottom: 10px;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--neu-text-muted);
+    }
+
+    .input-neu {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px;
+      background: #ffffff;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      color: #0F172A;
+      font-size: 0.95rem;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .input-neu:focus {
+      border-color: #0284C7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+    }
+
+    .select-neu {
+      width: 100%;
+      height: 44px;
+      padding: 0 12px;
+      background: #ffffff;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      color: #0F172A;
+      font-size: 0.92rem;
+      outline: none;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- ========================================================================= -->
+  <!-- 1. PANTALLA DE LOGIN DEL SUPERVISOR                                       -->
+  <!-- ========================================================================= -->
+  <div id="auth-screen">
+    <div class="login-brand">
+      <div class="brand-icon">🛡️</div>
+      <h1 class="brand-title">WaterApp Supervisor</h1>
+      <p class="brand-subtitle">Auditoría Operativa de Tanque, Stock y Catálogo</p>
+    </div>
+
+    <div class="card-login">
+      <div class="form-group">
+        <label class="form-label">Usuario o Correo de Supervisor</label>
+        <input type="text" id="login-user" class="form-control" placeholder="Ej: supervisor.carlos o correo" autocomplete="username" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Clave de Acceso</label>
+        <div style="position: relative;">
+          <input type="password" id="login-pwd" class="form-control" placeholder="Introduce tu clave" autocomplete="current-password" style="padding-right: 46px;" onkeydown="if(event.key === 'Enter') document.getElementById('btn-login').click()"/>
+          <button type="button" id="btn-toggle-pwd" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-muted);">👁️</button>
+        </div>
+      </div>
+
+      <div id="login-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem; display: none; font-weight: 600;">
+        ⚠️ Credenciales incorrectas.
+      </div>
+
+      <button id="btn-login" class="btn btn-primary" style="margin-top: 0.5rem;">
+        🔐 Iniciar Sesión como Supervisor
+      </button>
+
+      <div style="margin-top: 1.25rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; text-align: center;">
+        💡 Tu usuario y clave te los suministra directamente el dueño de tu planta o tienda.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. APLICACIÓN PRINCIPAL DEL SUPERVISOR (OPERATIVA)                         -->
+  <!-- ========================================================================= -->
+  <div id="main-app" style="display: none;">
+    
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-store-info">
+        <div class="store-name" style="flex-wrap: wrap; gap: 6px;">
+          <span id="txt-store-name">Planta</span>
+          <span id="badge-sede" class="badge-sede" style="display: none;">Sede</span>
+        </div>
+        <div class="badge-supervisor" id="badge-supervisor-user">
+          <span>🛡️</span> <span id="txt-supervisor-name">Supervisor</span>
+        </div>
+        <div class="live-status">
+          <span class="live-dot"></span>
+          <span id="txt-conn-status">EN LÍNEA</span> · <span id="txt-last-sync">Ahora</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-icon" id="btn-sync-now" title="Actualizar datos">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+        <button class="btn-icon" id="btn-logout" title="Cerrar sesión">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- BARRA SELECTORA DE SEDES (Visible si supervisa más de 1 tienda) -->
+    <div id="supervisor-sede-bar" class="refill-sede-bar" style="display: none;">
+      <div class="sede-bar-header">
+        <span class="sede-bar-title">Sedes Asignadas:</span>
+        <span id="sede-syncing-indicator" style="display: none; font-size: 0.72rem; color: #0284C7; font-weight: 700;">🔄 Cambiando...</span>
+      </div>
+      <div class="sede-pills-scroll" id="supervisor-sede-pills">
+        <!-- Render dinámico de sedes -->
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- PESTAÑA 1: 🚰 TANQUE Y FLUJO OPERATIVO                                   -->
+    <!-- ======================================================================= -->
+    <div id="tab-tanque" class="view-section active">
+      
+      <!-- Hero de Nivel de Tanque -->
+      <div class="tank-hero-card">
+        <div style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: var(--neu-text-muted);">
+          Nivel de Agua Potable Purificada
+        </div>
+
+        <div class="tank-dial-wrap">
+          <div class="tank-dial">
+            <div class="tank-dial-inner">
+              <span class="tank-pct-number" id="txt-tank-pct">0%</span>
+              <span class="tank-pct-label">Lleno</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tank-litros-main" id="txt-tank-litros">0 L</div>
+        <div class="tank-capacidad-sub" id="txt-tank-capacidad">de 30,000 L de capacidad máxima</div>
+      </div>
+
+      <!-- Acciones de Tanque -->
+      <div class="action-btn-row">
+        <button class="btn-action-neu primary" id="btn-abrir-modal-tanque">
+          <span>⚡</span> Calibrar Tanque
+        </button>
+        <button class="btn-action-neu" id="btn-abrir-modal-cisterna" style="color: #0369A1;">
+          <span>🚚</span> Registrar Cisterna
+        </button>
+      </div>
+
+      <!-- Resumen de Flujo Físico de Hoy (Métricas Operativas, Sin Dinero) -->
+      <h3 class="section-title">
+        <span>🌊 Flujo Físico Despachado Hoy</span>
+      </h3>
+      <div class="ops-grid">
+        <div class="ops-card">
+          <span class="ops-icon">💧</span>
+          <div class="ops-val" id="txt-ops-litros">0 L</div>
+          <div class="ops-label">Agua Despachada</div>
+        </div>
+        <div class="ops-card">
+          <span class="ops-icon">🍶</span>
+          <div class="ops-val" id="txt-ops-botellones">0</div>
+          <div class="ops-label">Botellones Llenados</div>
+        </div>
+        <div class="ops-card">
+          <span class="ops-icon">📦</span>
+          <div class="ops-val" id="txt-ops-prods">0 un.</div>
+          <div class="ops-label">Productos Físicos</div>
+        </div>
+        <div class="ops-card">
+          <span class="ops-icon">🧹</span>
+          <div class="ops-val" id="txt-ops-merma">0 L</div>
+          <div class="ops-label">Mermas de Lavado</div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 10px;">
+        <button class="btn-action-neu" id="btn-abrir-modal-merma" style="width: 100%; color: #B45309;">
+          <span>🧹</span> Registrar Merma o Lavado de Botellones
+        </button>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- PESTAÑA 2: 📦 STOCK DE PRODUCTOS FÍSICOS                                 -->
+    <!-- ======================================================================= -->
+    <div id="tab-stock" class="view-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div>
+          <h3 class="section-title" style="margin: 0;">📦 Inventario Físico en Planta</h3>
+          <p style="font-size: 0.75rem; color: var(--neu-text-muted); margin-top: 2px;">Envases vacíos, tapas, bombas y accesorios</p>
+        </div>
+        <button type="button" class="btn-action-neu" id="btn-nuevo-ajuste-stock" style="padding: 6px 12px; font-size: 0.78rem;">
+          <span>➕</span> Ajuste
+        </button>
+      </div>
+
+      <div id="container-productos-stock">
+        <!-- Render dinámico de productos físicos -->
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- PESTAÑA 3: 🏷️ CATÁLOGO DE RECARGAS Y PRODUCTOS                           -->
+    <!-- ======================================================================= -->
+    <div id="tab-catalogo" class="view-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div>
+          <h3 class="section-title" style="margin: 0;">🏷️ Catálogo de Planta</h3>
+          <p style="font-size: 0.75rem; color: var(--neu-text-muted); margin-top: 2px;">Crear y modificar recargas de agua y productos</p>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-action-neu primary" id="btn-crear-recarga" style="padding: 6px 10px; font-size: 0.75rem;">
+            <span>💧</span> + Recarga
+          </button>
+          <button type="button" class="btn-action-neu" id="btn-crear-producto" style="padding: 6px 10px; font-size: 0.75rem; color: #0369A1;">
+            <span>📦</span> + Producto
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtro de Categoría -->
+      <div class="cat-filter-pills">
+        <button class="cat-filter-btn active" id="filter-cat-todos" onclick="filtrarCatalogo('todos')">Todos</button>
+        <button class="cat-filter-btn" id="filter-cat-recargas" onclick="filtrarCatalogo('relleno')">💧 Recargas</button>
+        <button class="cat-filter-btn" id="filter-cat-prods" onclick="filtrarCatalogo('producto')">📦 Físicos</button>
+      </div>
+
+      <div id="container-catalogo-items">
+        <!-- Render dinámico de ítems del catálogo -->
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- PESTAÑA 4: 🏢 ESTADO DE SEDES / CHECKLIST                                -->
+    <!-- ======================================================================= -->
+    <div id="tab-sedes" class="view-section">
+      <h3 class="section-title">🏢 Auditoría de Sedes Asignadas</h3>
+      <p style="font-size: 0.78rem; color: var(--neu-text-muted); margin-top: -6px; margin-bottom: 14px;">
+        Supervisión en vivo de nivel de tanque y conectividad por sucursal
+      </p>
+
+      <div id="container-sedes-audit-list">
+        <!-- Render dinámico de auditoría de sedes -->
+      </div>
+    </div>
+
+    <!-- Navegación Inferior Flotante -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" onclick="cambiarTab('tanque')">
+        <span class="nav-icon">🚰</span>
+        <span>Tanque</span>
+      </button>
+      <button class="nav-btn" onclick="cambiarTab('stock')">
+        <span class="nav-icon">📦</span>
+        <span>Stock</span>
+      </button>
+      <button class="nav-btn" onclick="cambiarTab('catalogo')">
+        <span class="nav-icon">🏷️</span>
+        <span>Catálogo</span>
+      </button>
+      <button class="nav-btn" onclick="cambiarTab('sedes')">
+        <span class="nav-icon">🏢</span>
+        <span>Sedes</span>
+      </button>
+    </nav>
+
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODALES OPERATIVOS (CALIBRAR TANQUE, CISTERNA, MERMA, STOCK, CATÁLOGO)     -->
+<!-- ========================================================================= -->
+
+<!-- Modal Calibrar Tanque -->
+<div id="modal-calibrar-tanque" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">⚡ Calibrar Nivel de Tanque</h3>
+      <button class="modal-close" onclick="cerrarModales()">✕</button>
+    </div>
+    <form id="form-calibrar-tanque">
+      <label class="form-label" style="color: #475569;">Litros Actuales en Tanque *</label>
+      <input type="number" id="input-calibrar-litros" class="input-neu" placeholder="Ej: 22000" min="0" required />
+
+      <label class="form-label" style="color: #475569;">Capacidad Máxima del Tanque (Litros) *</label>
+      <input type="number" id="input-calibrar-capacidad" class="input-neu" placeholder="Ej: 30000" min="1000" required />
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+        <button type="button" class="btn-action-neu" onclick="cerrarModales()">Cancelar</button>
+        <button type="submit" class="btn-action-neu primary">💾 Guardar Nivel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Registrar Cisterna -->
+<div id="modal-cisterna" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">🚚 Registrar Cisterna de Agua</h3>
+      <button class="modal-close" onclick="cerrarModales()">✕</button>
+    </div>
+    <form id="form-cisterna">
+      <label class="form-label" style="color: #475569;">Litros Recibidos de la Cisterna *</label>
+      <input type="number" id="input-cisterna-litros" class="input-neu" placeholder="Ej: 10000" min="500" step="100" required />
+
+      <label class="form-label" style="color: #475569;">Nota / Proveedor (Opcional)</label>
+      <input type="text" id="input-cisterna-nota" class="input-neu" placeholder="Ej: Cisterna Hidrocapital / Camión #4" />
+
+      <div style="font-size: 0.8rem; color: #0284C7; margin-bottom: 12px; background: rgba(2,132,199,0.08); padding: 8px 12px; border-radius: 8px;">
+        💧 Esta cantidad se sumará automáticamente al inventario actual del tanque de la planta.
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+        <button type="button" class="btn-action-neu" onclick="cerrarModales()">Cancelar</button>
+        <button type="submit" class="btn-action-neu primary">➕ Ingresar Agua</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Registrar Merma -->
+<div id="modal-merma" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">🧹 Registrar Merma de Agua</h3>
+      <button class="modal-close" onclick="cerrarModales()">✕</button>
+    </div>
+    <form id="form-merma">
+      <label class="form-label" style="color: #475569;">Litros de Merma o Lavado *</label>
+      <input type="number" id="input-merma-litros" class="input-neu" placeholder="Ej: 50" min="1" required />
+
+      <label class="form-label" style="color: #475569;">Motivo</label>
+      <select id="select-merma-motivo" class="select-neu">
+        <option value="Lavado de botellones">Lavado de botellones</option>
+        <option value="Fuga o goteo">Fuga o goteo en tubería</option>
+        <option value="Mantenimiento de filtros">Mantenimiento de filtros</option>
+        <option value="Derrame accidental">Derrame accidental</option>
+        <option value="Otro">Otro motivo</option>
+      </select>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+        <button type="button" class="btn-action-neu" onclick="cerrarModales()">Cancelar</button>
+        <button type="submit" class="btn-action-neu" style="background:#EF4444; color:#fff; border-color:#EF4444;">Restar Litros</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Ajuste de Stock Físico -->
+<div id="modal-ajuste-stock" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">📦 Ajuste de Stock Físico</h3>
+      <button class="modal-close" onclick="cerrarModales()">✕</button>
+    </div>
+    <form id="form-ajuste-stock">
+      <input type="hidden" id="ajuste-stock-prod-id" />
+
+      <div style="font-size: 0.95rem; font-weight: 800; color: #0F172A; margin-bottom: 8px;" id="lbl-ajuste-prod-nombre">
+        Producto
+      </div>
+
+      <label class="form-label" style="color: #475569;">Tipo de Movimiento *</label>
+      <select id="select-ajuste-tipo" class="select-neu">
+        <option value="entrada">➕ Entrada de Mercancía (Sumar unidades)</option>
+        <option value="fijar">✏️ Conteo Físico Exacto (Fijar stock exacto)</option>
+        <option value="salida">➖ Salida / Merma de Producto (Restar unidades)</option>
+      </select>
+
+      <label class="form-label" id="lbl-ajuste-cant" style="color: #475569;">Cantidad de Unidades a Sumar *</label>
+      <input type="number" id="input-ajuste-cant" class="input-neu" placeholder="Ej: 25" min="0" required />
+
+      <div id="box-ajuste-resumen" style="font-size: 0.85rem; font-weight: 700; color: #0284C7; background: rgba(2,132,199,0.08); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px;">
+        Stock resultante: <span id="txt-nuevo-stock-calc">0 un.</span>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+        <button type="button" class="btn-action-neu" onclick="cerrarModales()">Cancelar</button>
+        <button type="submit" class="btn-action-neu primary">💾 Guardar Stock</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Crear / Editar Ítem del Catálogo (Recargas o Productos) -->
+<div id="modal-item-catalogo" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title" id="titulo-modal-catalogo">➕ Nuevo Ítem</h3>
+      <button class="modal-close" onclick="cerrarModales()">✕</button>
+    </div>
+    <form id="form-item-catalogo">
+      <input type="hidden" id="cat-item-id" />
+
+      <label class="form-label" style="color: #475569;">Tipo de Ítem *</label>
+      <select id="cat-item-categoria" class="select-neu">
+        <option value="relleno">💧 Recarga de Agua (Solo líquido)</option>
+        <option value="producto">📦 Producto Físico (Envase, Tapa, Accesorio)</option>
+      </select>
+
+      <label class="form-label" style="color: #475569;">Nombre del Ítem *</label>
+      <input type="text" id="cat-item-nombre" class="input-neu" placeholder="Ej: Botellón 20 Litros" required />
+
+      <div id="grp-cat-litros">
+        <label class="form-label" style="color: #475569;">Capacidad en Litros de Agua *</label>
+        <input type="number" id="cat-item-litros" class="input-neu" placeholder="20" min="1" value="20" />
+      </div>
+
+      <div id="grp-cat-stock" style="display: none;">
+        <label class="form-label" style="color: #475569;">Stock Físico Inicial *</label>
+        <input type="number" id="cat-item-stock" class="input-neu" placeholder="0" min="0" value="0" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px;">
+        <div>
+          <label class="form-label" style="color: #475569;">Moneda</label>
+          <select id="cat-item-moneda" class="select-neu">
+            <option value="USD">Dólar ($)</option>
+            <option value="VES">Bolívares (Bs)</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="color: #475569;">Precio de Venta *</label>
+          <input type="number" step="0.01" id="cat-item-precio" class="input-neu" placeholder="1.50" min="0" required />
+        </div>
+      </div>
+
+      <!-- Selector de Ámbito Multi-Sede (Si aplica) -->
+      <div id="grp-cat-multi-sede" style="display: none; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 12px; padding: 10px; margin-bottom: 12px;">
+        <label class="form-label" style="color: #334155; font-weight: 800; margin-bottom: 6px;">Alcance del Cambio:</label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; margin-bottom: 6px; cursor: pointer;">
+          <input type="radio" name="radio-ambito" value="sede" checked />
+          <span>📍 Aplicar solo a esta sede actual</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; cursor: pointer;">
+          <input type="radio" name="radio-ambito" value="grupo" />
+          <span>🌐 Replicar a <strong>todas mis sedes asignadas</strong></span>
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+        <button type="button" class="btn-action-neu" onclick="cerrarModales()">Cancelar</button>
+        <button type="submit" class="btn-action-neu primary">💾 Guardar Ítem</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- JAVASCRIPT DEL VISOR DE SUPERVISORES                                      -->
+<!-- ========================================================================= -->
+<script>
+  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
+  const SUPABASE_LIC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
+
+  // Sesión y Estado del Supervisor
+  let supervisorSession = null;
+  let currentStoreEmail = '';
+  let cacheGlobalTiendas = {};
+  let currentCatalogo = [];
+  let autoRefreshInterval = null;
+  let filtroCatalogoActual = 'todos';
+
+  // Configuración de Sedes Refill H2O conocidas
+  const REFILLH2O_SEDES = {
+    'refillh2o.lcf@gmail.com': { id: 'lcf', email: 'refillh2o.lcf@gmail.com', sede: 'La California Sur', codigo: 'LCF' },
+    'refillh2o.se@gmail.com': { id: 'se', email: 'refillh2o.se@gmail.com', sede: 'Santa Eduvigis', codigo: 'SE' },
+    'refillh2o.ldc@gmail.com': { id: 'ldc', email: 'refillh2o.ldc@gmail.com', sede: 'Los Dos Caminos', codigo: 'LDC' },
+    'refillh2o.sr@gmail.com': { id: 'sr', email: 'refillh2o.sr@gmail.com', sede: 'Santa Rosa', codigo: 'SR' },
+    'refillh2o.sp@gmail.com': { id: 'sp', email: 'refillh2o.sp@gmail.com', sede: 'Santa Paula', codigo: 'SP' },
+    'refillh2o.sf@gmail.com': { id: 'sf', email: 'refillh2o.sf@gmail.com', sede: 'Santa Fe', codigo: 'SF' }
+  };
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+  }
+
+  function formatNumber(num) {
+    return new Intl.NumberFormat('es-VE').format(num || 0);
+  }
+
+  // Alternar Ver Clave (Ojito)
+  const btnTogglePwd = document.getElementById('btn-toggle-pwd');
+  const loginPwd = document.getElementById('login-pwd');
+  if (btnTogglePwd && loginPwd) {
+    btnTogglePwd.addEventListener('click', () => {
+      loginPwd.type = (loginPwd.type === 'password') ? 'text' : 'password';
+      btnTogglePwd.textContent = (loginPwd.type === 'password') ? '👁️' : '🙈';
+    });
+  }
+
+  // =========================================================================
+  // AUTENTICACIÓN DEL SUPERVISOR
+  // =========================================================================
+  document.getElementById('btn-login').addEventListener('click', async () => {
+    const userInp = document.getElementById('login-user').value.trim().toLowerCase();
+    const pwdInp = document.getElementById('login-pwd').value.trim();
+    const errorBox = document.getElementById('login-error');
+    const btn = document.getElementById('btn-login');
+
+    if (!userInp || !pwdInp) {
+      errorBox.textContent = '⚠️ Introduce tu usuario y clave de acceso.';
+      errorBox.style.display = 'block';
+      return;
+    }
+
+    errorBox.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = '⏳ Verificando credenciales...';
+
+    try {
+      const authResult = await autenticarSupervisor(userInp, pwdInp);
+      btn.disabled = false;
+      btn.textContent = '🔐 Iniciar Sesión como Supervisor';
+
+      if (!authResult.ok) {
+        errorBox.textContent = authResult.razon || 'Credenciales no válidas.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      // Guardar sesión
+      supervisorSession = authResult.session;
+      localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
+
+      iniciarAplicacionSupervisor();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '🔐 Iniciar Sesión como Supervisor';
+      errorBox.textContent = 'Error al conectar: ' + err.message;
+      errorBox.style.display = 'block';
+    }
+  });
+
+  async function autenticarSupervisor(usuario, clave) {
+    try {
+      // 1. Caso especial: Acceso directo con correo master de Refill H2O
+      if (usuario === 'refillh2o@gmail.com' && (clave === 'rh2o' || clave === 'admin')) {
+        const sedesRefill = Object.keys(REFILLH2O_SEDES);
+        return {
+          ok: true,
+          session: {
+            usuario: 'refillh2o@gmail.com',
+            nombre: 'Supervisor General Refill H2O',
+            owner_email: 'refillh2o@gmail.com',
+            sedes: sedesRefill
+          }
+        };
+      }
+
+      // 2. Búsqueda de supervisor creado por los dueños en licencia_agua_clientes
+      const res = await fetch(`${SUPABASE_LIC_URL}?select=id,email,nombre_empresa,visor_actividad,activo,dias_prueba,fecha_registro`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) throw new Error('Error al conectar con el servidor de licencias');
+      const clientes = await res.json();
+
+      let supervisorEncontrado = null;
+      let ownerCuenta = null;
+
+      for (const c of clientes) {
+        if (!c.activo) continue;
+        const actividad = c.visor_actividad || {};
+        const listaSupervisores = Array.isArray(actividad.supervisores) ? actividad.supervisores : [];
+
+        const match = listaSupervisores.find(s => 
+          (s.usuario && s.usuario.toLowerCase() === usuario) &&
+          (s.clave === clave) &&
+          (s.activo !== false)
+        );
+
+        if (match) {
+          supervisorEncontrado = match;
+          ownerCuenta = c;
+          break;
+        }
+
+        // Si el usuario ingresó el correo de la tienda y la clave_visor como supervisor directo
+        if (c.email && c.email.toLowerCase() === usuario && c.clave_visor === clave) {
+          supervisorEncontrado = {
+            id: 'owner_as_sup',
+            usuario: c.email,
+            nombre: `Supervisor (${c.nombre_empresa || 'Tienda'})`,
+            clave: clave,
+            sedes: (c.email === 'refillh2o@gmail.com' || c.email.startsWith('refillh2o.')) 
+              ? Object.keys(REFILLH2O_SEDES) 
+              : [c.email]
+          };
+          ownerCuenta = c;
+          break;
+        }
+      }
+
+      if (!supervisorEncontrado || !ownerCuenta) {
+        return { ok: false, razon: '🔑 Usuario o clave incorrecta. Verifica con el dueño de la planta.' };
+      }
+
+      // Determinar sedes asignadas
+      let sedesAsignadas = supervisorEncontrado.sedes;
+      if (!Array.isArray(sedesAsignadas) || sedesAsignadas.length === 0) {
+        if (ownerCuenta.email === 'refillh2o@gmail.com' || ownerCuenta.email.startsWith('refillh2o.')) {
+          sedesAsignadas = Object.keys(REFILLH2O_SEDES);
+        } else {
+          sedesAsignadas = [ownerCuenta.email];
+        }
+      }
+
+      return {
+        ok: true,
+        session: {
+          usuario: supervisorEncontrado.usuario,
+          nombre: supervisorEncontrado.nombre || 'Supervisor',
+          owner_email: ownerCuenta.email,
+          sedes: sedesAsignadas
+        }
+      };
+    } catch (e) {
+      console.error('Error en autenticación:', e);
+      return { ok: false, razon: 'Error de conexión con la nube.' };
+    }
+  }
+
+  // =========================================================================
+  // INICIO DE LA APLICACIÓN TRAS LOGIN
+  // =========================================================================
+  function iniciarAplicacionSupervisor() {
+    if (!supervisorSession) return;
+
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+
+    document.getElementById('txt-supervisor-name').textContent = supervisorSession.nombre;
+
+    // Seleccionar primera sede asignada o última guardada
+    const savedSede = localStorage.getItem('visor_sup_selected_sede');
+    if (savedSede && supervisorSession.sedes.includes(savedSede)) {
+      currentStoreEmail = savedSede;
+    } else {
+      currentStoreEmail = supervisorSession.sedes[0] || supervisorSession.owner_email;
+    }
+
+    // Configurar barra de sedes si tiene más de 1 sede
+    actualizarBarraSedesSupervisor();
+
+    // Cargar datos
+    cargarDatosEnVivoSupervisor();
+
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(cargarDatosEnVivoSupervisor, 6000);
+  }
+
+  function actualizarBarraSedesSupervisor() {
+    const bar = document.getElementById('supervisor-sede-bar');
+    const container = document.getElementById('supervisor-sede-pills');
+    const multiSedeGrpCat = document.getElementById('grp-cat-multi-sede');
+
+    if (!bar || !container) return;
+
+    const tieneVariasSedes = supervisorSession && Array.isArray(supervisorSession.sedes) && supervisorSession.sedes.length > 1;
+
+    if (!tieneVariasSedes) {
+      bar.style.display = 'none';
+      if (multiSedeGrpCat) multiSedeGrpCat.style.display = 'none';
+      return;
+    }
+
+    bar.style.display = 'block';
+    if (multiSedeGrpCat) multiSedeGrpCat.style.display = 'block';
+
+    container.innerHTML = supervisorSession.sedes.map(email => {
+      const info = REFILLH2O_SEDES[email.toLowerCase()] || { sede: email, codigo: 'SEDE' };
+      const isActive = email.toLowerCase() === currentStoreEmail.toLowerCase();
+      const activeClass = isActive ? 'active' : '';
+      const cached = cacheGlobalTiendas[email];
+      const online = estaEnLinea(cached?.ultima_actualizacion);
+
+      return `
+        <button type="button" class="sede-pill-btn ${activeClass}" onclick="cambiarSedeSupervisor('${email}')">
+          <span class="sede-status-dot ${online ? 'online' : 'offline'}"></span>
+          <span>${escapeHtml(info.sede)}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function estaEnLinea(fechaIso) {
+    if (!fechaIso) return false;
+    const diffMin = (Date.now() - new Date(fechaIso).getTime()) / (1000 * 60);
+    return diffMin <= 7;
+  }
+
+  window.cambiarSedeSupervisor = async function(nuevoEmail) {
+    if (!nuevoEmail || nuevoEmail === currentStoreEmail) return;
+
+    const ind = document.getElementById('sede-syncing-indicator');
+    if (ind) ind.style.display = 'inline-block';
+
+    currentStoreEmail = nuevoEmail;
+    localStorage.setItem('visor_sup_selected_sede', nuevoEmail);
+
+    actualizarBarraSedesSupervisor();
+    await cargarDatosEnVivoSupervisor();
+
+    if (ind) ind.style.display = 'none';
+  };
+
+  // =========================================================================
+  // CARGA DE DATOS EN VIVO (OPERATIVA, SIN DINERO)
+  // =========================================================================
+  async function cargarDatosEnVivoSupervisor() {
+    if (!currentStoreEmail) return;
+
+    try {
+      // 1. Obtener datos de tienda_sync_cloud
+      const resSync = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (resSync.ok) {
+        const list = await resSync.json();
+        if (list && list.length > 0) {
+          const storeData = list[0];
+          cacheGlobalTiendas[currentStoreEmail] = storeData;
+          renderizarDatosOperativos(storeData);
+        }
+      }
+
+      // 2. Obtener catálogo y ajustes de licencia_agua_clientes
+      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=catalogo_inicial,nombre_empresa,visor_actividad`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (resLic.ok) {
+        const licList = await resLic.json();
+        if (licList && licList.length > 0) {
+          const lData = licList[0];
+          if (Array.isArray(lData.catalogo_inicial)) {
+            currentCatalogo = lData.catalogo_inicial;
+            renderizarCatalogo(currentCatalogo);
+            renderizarStockFisico(currentCatalogo);
+          }
+        }
+      }
+
+      // Si tiene varias sedes, actualizar la auditoría de sedes
+      if (supervisorSession && supervisorSession.sedes.length > 1) {
+        cargarAuditoriaSedes();
+      }
+    } catch (e) {
+      console.warn('Error al cargar datos en vivo del supervisor:', e);
+    }
+  }
+
+  function renderizarDatosOperativos(storeData) {
+    // Cabecera
+    const txtStore = document.getElementById('txt-store-name');
+    const badgeSede = document.getElementById('badge-sede');
+    const infoRefill = REFILLH2O_SEDES[currentStoreEmail.toLowerCase()];
+
+    if (infoRefill) {
+      if (txtStore) txtStore.textContent = 'Refill H2O';
+      if (badgeSede) {
+        badgeSede.textContent = infoRefill.sede;
+        badgeSede.style.display = 'inline-flex';
+      }
+    } else {
+      if (txtStore) txtStore.textContent = storeData.nombre_empresa || currentStoreEmail;
+      if (badgeSede) badgeSede.style.display = 'none';
+    }
+
+    // Estado en línea
+    const connOnline = estaEnLinea(storeData.ultima_actualizacion);
+    const txtConn = document.getElementById('txt-conn-status');
+    const txtLast = document.getElementById('txt-last-sync');
+    if (txtConn) {
+      txtConn.textContent = connOnline ? 'EN LÍNEA' : 'DESCONECTADA';
+      txtConn.style.color = connOnline ? '#10B981' : '#64748B';
+    }
+    if (txtLast && storeData.ultima_actualizacion) {
+      const d = new Date(storeData.ultima_actualizacion);
+      txtLast.textContent = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // 1. Tanque de Agua
+    const tanque = storeData.nivel_tanque || {};
+    const litros = parseInt(tanque.litros) || 0;
+    const capacidad = parseInt(tanque.capacidadTanque) || 30000;
+    const pct = capacidad > 0 ? Math.min(100, Math.round((litros / capacidad) * 100)) : 0;
+
+    const elLitros = document.getElementById('txt-tank-litros');
+    const elCap = document.getElementById('txt-tank-capacidad');
+    const elPct = document.getElementById('txt-tank-pct');
+
+    if (elLitros) elLitros.textContent = `${formatNumber(litros)} L`;
+    if (elCap) elCap.textContent = `de ${formatNumber(capacidad)} L de capacidad máxima`;
+    if (elPct) elPct.textContent = `${pct}%`;
+
+    // 2. Métricas Físicas del Día (Sin Dinero)
+    const r = storeData.resumen_hoy || {};
+    const elOpsLitros = document.getElementById('txt-ops-litros');
+    const elOpsBot = document.getElementById('txt-ops-botellones');
+    const elOpsMerma = document.getElementById('txt-ops-merma');
+    const elOpsProds = document.getElementById('txt-ops-prods');
+
+    if (elOpsLitros) elOpsLitros.textContent = `${formatNumber(r.litros || 0)} L`;
+    if (elOpsBot) elOpsBot.textContent = formatNumber(r.botellones || 0);
+    if (elOpsMerma) elOpsMerma.textContent = `${formatNumber(r.litrosMermasHoy || 0)} L`;
+
+    // Conteo de productos físicos vendidos hoy
+    let prodsVendidosHoy = 0;
+    const ultimos = storeData.ultimos_movimientos || [];
+    ultimos.forEach(m => {
+      if (m.tipo === 'producto' && m.cantidad) {
+        prodsVendidosHoy += (parseInt(m.cantidad) || 0);
+      }
+    });
+    if (elOpsProds) elOpsProds.textContent = `${prodsVendidosHoy} un.`;
+  }
+
+  // =========================================================================
+  // RENDERIZADO DE STOCK FÍSICO
+  // =========================================================================
+  function renderizarStockFisico(catalogo) {
+    const cont = document.getElementById('container-productos-stock');
+    if (!cont) return;
+
+    const fisicos = catalogo.filter(item => item.categoria === 'producto');
+
+    if (fisicos.length === 0) {
+      cont.innerHTML = `
+        <div style="text-align: center; padding: 2rem; color: var(--neu-text-muted); font-size: 0.85rem;">
+          📦 No hay productos físicos registrados aún.<br/>
+          Ve a la pestaña <strong>Catálogo</strong> para agregar botellones nuevos, tapas o bombas.
+        </div>
+      `;
+      return;
+    }
+
+    cont.innerHTML = fisicos.map((p, idx) => {
+      const stock = parseInt(p.stock) || 0;
+      let badgeClass = 'badge-in-stock';
+      let badgeText = '🟢 En Stock';
+
+      if (stock === 0) {
+        badgeClass = 'badge-out-stock';
+        badgeText = '🔴 Agotado';
+      } else if (stock < 10) {
+        badgeClass = 'badge-low-stock';
+        badgeText = '🟡 Stock Bajo';
+      }
+
+      return `
+        <div class="product-stock-card">
+          <div class="prod-stock-info">
+            <div class="prod-stock-name">${escapeHtml(p.nombre)}</div>
+            <div class="prod-stock-sub">
+              <span class="prod-stock-badge ${badgeClass}">${badgeText}</span>
+              <span>· Precio: $${(parseFloat(p.precio) || 0).toFixed(2)}</span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <div class="prod-stock-val">${stock}</div>
+            <div class="prod-stock-btns">
+              <button type="button" class="btn-mini-stock" title="Entrada (+)" onclick="abrirAjusteStockDirecto('${p.id}', 'entrada')">➕</button>
+              <button type="button" class="btn-mini-stock" title="Fijar (=)" onclick="abrirAjusteStockDirecto('${p.id}', 'fijar')">✏️</button>
+              <button type="button" class="btn-mini-stock" title="Salida (-)" onclick="abrirAjusteStockDirecto('${p.id}', 'salida')">➖</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // =========================================================================
+  // RENDERIZADO DEL CATÁLOGO (RECARGAS Y PRODUCTOS)
+  // =========================================================================
+  function renderizarCatalogo(catalogo) {
+    const cont = document.getElementById('container-catalogo-items');
+    if (!cont) return;
+
+    let items = catalogo;
+    if (filtroCatalogoActual !== 'todos') {
+      items = catalogo.filter(x => x.categoria === filtroCatalogoActual);
+    }
+
+    if (items.length === 0) {
+      cont.innerHTML = `
+        <div style="text-align: center; padding: 2rem; color: var(--neu-text-muted); font-size: 0.85rem;">
+          🏷️ No hay ítems en esta categoría.
+        </div>
+      `;
+      return;
+    }
+
+    cont.innerHTML = items.map((item, idx) => {
+      const isRecarga = item.categoria === 'relleno';
+      const icono = isRecarga ? '💧' : '📦';
+      const precio = parseFloat(item.precio) || 0;
+      const monedaSimbolo = (item.moneda === 'VES' || item.moneda === 'Bs') ? 'Bs.' : '$';
+
+      return `
+        <div class="card-neu" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.5rem;">${icono}</span>
+            <div>
+              <div style="font-weight: 800; font-size: 0.95rem; color: #0F172A;">${escapeHtml(item.nombre)}</div>
+              <div style="font-size: 0.78rem; color: #64748B;">
+                ${isRecarga ? `Capacidad: <strong>${item.litros || 20}L</strong>` : `Stock actual: <strong>${item.stock || 0} un.</strong>`}
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 1.15rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: #0284C7;">
+              ${monedaSimbolo} ${precio.toFixed(2)}
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" class="btn-mini-stock" onclick="abrirEditarCatalogo('${item.id}')" title="Editar">✏️</button>
+              <button type="button" class="btn-mini-stock" style="color: #EF4444;" onclick="eliminarItemCatalogo('${item.id}')" title="Eliminar">🗑️</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.filtrarCatalogo = function(tipo) {
+    filtroCatalogoActual = tipo;
+    document.querySelectorAll('.cat-filter-btn').forEach(b => b.classList.remove('active'));
+    if (tipo === 'todos') document.getElementById('filter-cat-todos').classList.add('active');
+    else if (tipo === 'relleno') document.getElementById('filter-cat-recargas').classList.add('active');
+    else if (tipo === 'producto') document.getElementById('filter-cat-prods').classList.add('active');
+
+    renderizarCatalogo(currentCatalogo);
+  };
+
+  // =========================================================================
+  // AUDITORÍA DE SEDES ASIGNADAS
+  // =========================================================================
+  async function cargarAuditoriaSedes() {
+    const cont = document.getElementById('container-sedes-audit-list');
+    if (!cont || !supervisorSession) return;
+
+    const sedes = supervisorSession.sedes || [];
+    cont.innerHTML = sedes.map(email => {
+      const info = REFILLH2O_SEDES[email.toLowerCase()] || { sede: email, codigo: 'SEDE' };
+      const cached = cacheGlobalTiendas[email] || {};
+      const online = estaEnLinea(cached.ultima_actualizacion);
+      const tanque = cached.nivel_tanque || {};
+      const litros = parseInt(tanque.litros) || 0;
+      const cap = parseInt(tanque.capacidadTanque) || 30000;
+      const pct = cap > 0 ? Math.round((litros / cap) * 100) : 0;
+      const r = cached.resumen_hoy || {};
+
+      return `
+        <div class="card-neu" style="margin-bottom: 10px; cursor: pointer;" onclick="cambiarSedeSupervisor('${email}')">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="sede-status-dot ${online ? 'online' : 'offline'}"></span>
+              <strong style="font-size: 0.95rem; color: #0F172A;">${escapeHtml(info.sede)}</strong>
+            </div>
+            <span style="font-size: 0.72rem; font-weight: 700; color: ${online ? '#10B981' : '#64748B'}; background: ${online ? '#DCFCE7' : '#F1F5F9'}; padding: 2px 8px; border-radius: 10px;">
+              ${online ? 'En Línea' : 'Desconectada'}
+            </span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; background: var(--neu-bg); padding: 8px 12px; border-radius: 12px;">
+            <div>🚰 Tanque: <strong>${formatNumber(litros)} L (${pct}%)</strong></div>
+            <div>💧 Despachado: <strong>${formatNumber(r.litros || 0)} L</strong></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // =========================================================================
+  // GESTIÓN DE MODALES OPERATIVOS
+  // =========================================================================
+  window.cerrarModales = function() {
+    document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+  };
+
+  // 1. Calibrar Tanque
+  document.getElementById('btn-abrir-modal-tanque').addEventListener('click', () => {
+    const cached = cacheGlobalTiendas[currentStoreEmail];
+    const t = cached?.nivel_tanque || {};
+    document.getElementById('input-calibrar-litros').value = t.litros || 20000;
+    document.getElementById('input-calibrar-capacidad').value = t.capacidadTanque || 30000;
+    document.getElementById('modal-calibrar-tanque').style.display = 'flex';
+  });
+
+  document.getElementById('form-calibrar-tanque').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const litros = parseInt(document.getElementById('input-calibrar-litros').value);
+    const cap = parseInt(document.getElementById('input-calibrar-capacidad').value);
+
+    if (isNaN(litros) || isNaN(cap) || cap <= 0) {
+      alert('Valores inválidos.');
+      return;
+    }
+
+    const pct = Math.min(100, Math.round((litros / cap) * 100));
+
+    // Actualizar Supabase
+    await aplicarAjusteTanqueRemoto(litros, cap, pct, 'Calibración manual de tanque');
+    cerrarModales();
+    cargarDatosEnVivoSupervisor();
+    alert('✅ Nivel de tanque calibrado con éxito.');
+  });
+
+  // 2. Registrar Cisterna
+  document.getElementById('btn-abrir-modal-cisterna').addEventListener('click', () => {
+    document.getElementById('input-cisterna-litros').value = '10000';
+    document.getElementById('input-cisterna-nota').value = '';
+    document.getElementById('modal-cisterna').style.display = 'flex';
+  });
+
+  document.getElementById('form-cisterna').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const litrosCisterna = parseInt(document.getElementById('input-cisterna-litros').value);
+    const nota = document.getElementById('input-cisterna-nota').value.trim();
+
+    if (isNaN(litrosCisterna) || litrosCisterna <= 0) {
+      alert('Cantidad inválida.');
+      return;
+    }
+
+    const cached = cacheGlobalTiendas[currentStoreEmail];
+    const prevLitros = parseInt(cached?.nivel_tanque?.litros) || 0;
+    const cap = parseInt(cached?.nivel_tanque?.capacidadTanque) || 30000;
+    const nuevoLitros = Math.min(cap, prevLitros + litrosCisterna);
+    const pct = Math.min(100, Math.round((nuevoLitros / cap) * 100));
+
+    await aplicarAjusteTanqueRemoto(nuevoLitros, cap, pct, `Cisterna +${litrosCisterna}L (${nota})`);
+    cerrarModales();
+    cargarDatosEnVivoSupervisor();
+    alert(`✅ Cisterna de ${formatNumber(litrosCisterna)}L registrada con éxito.`);
+  });
+
+  // 3. Registrar Merma
+  document.getElementById('btn-abrir-modal-merma').addEventListener('click', () => {
+    document.getElementById('input-merma-litros').value = '50';
+    document.getElementById('modal-merma').style.display = 'flex';
+  });
+
+  document.getElementById('form-merma').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const litrosMerma = parseInt(document.getElementById('input-merma-litros').value);
+    const motivo = document.getElementById('select-merma-motivo').value;
+
+    if (isNaN(litrosMerma) || litrosMerma <= 0) {
+      alert('Cantidad inválida.');
+      return;
+    }
+
+    const cached = cacheGlobalTiendas[currentStoreEmail];
+    const prevLitros = parseInt(cached?.nivel_tanque?.litros) || 0;
+    const cap = parseInt(cached?.nivel_tanque?.capacidadTanque) || 30000;
+    const nuevoLitros = Math.max(0, prevLitros - litrosMerma);
+    const pct = Math.min(100, Math.round((nuevoLitros / cap) * 100));
+
+    await aplicarAjusteTanqueRemoto(nuevoLitros, cap, pct, `Merma -${litrosMerma}L (${motivo})`);
+    cerrarModales();
+    cargarDatosEnVivoSupervisor();
+    alert(`✅ Merma de ${litrosMerma}L registrada.`);
+  });
+
+  async function aplicarAjusteTanqueRemoto(litros, cap, pct, motivoTexto) {
+    try {
+      // 1. Actualizar tienda_sync_cloud
+      await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nivel_tanque: { litros, capacidadTanque: cap, nivelPct: pct },
+          ultima_actualizacion: new Date().toISOString()
+        })
+      });
+
+      // 2. Registrar comando remoto en licencia_agua_clientes para el POS
+      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=id,visor_actividad`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (resLic.ok) {
+        const list = await resLic.json();
+        if (list && list.length > 0) {
+          const c = list[0];
+          const act = c.visor_actividad || {};
+          const nuevosAjustes = {
+            ...act,
+            ajustes_remotos: {
+              tanque: { litros, capacidadTanque: cap },
+              motivo: motivoTexto,
+              supervisor: supervisorSession?.nombre || 'Supervisor',
+              timestamp: Date.now()
+            }
+          };
+
+          await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ visor_actividad: nuevosAjustes })
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Error aplicando ajuste de tanque:', e);
+    }
+  }
+
+  // 4. Ajuste de Stock
+  window.abrirAjusteStockDirecto = function(prodId, tipoMov) {
+    const prod = currentCatalogo.find(p => p.id === prodId);
+    if (!prod) return;
+
+    document.getElementById('ajuste-stock-prod-id').value = prod.id;
+    document.getElementById('lbl-ajuste-prod-nombre').textContent = `📦 ${prod.nombre} (Stock actual: ${prod.stock || 0} un.)`;
+    document.getElementById('select-ajuste-tipo').value = tipoMov;
+
+    const cantInp = document.getElementById('input-ajuste-cant');
+    cantInp.value = (tipoMov === 'fijar') ? (prod.stock || 0) : '10';
+
+    recalcularStockModal();
+    document.getElementById('modal-ajuste-stock').style.display = 'flex';
+  };
+
+  document.getElementById('btn-nuevo-ajuste-stock').addEventListener('click', () => {
+    const fisicos = currentCatalogo.filter(p => p.categoria === 'producto');
+    if (fisicos.length === 0) {
+      alert('No hay productos físicos registrados aún.');
+      return;
+    }
+    abrirAjusteStockDirecto(fisicos[0].id, 'entrada');
+  });
+
+  function recalcularStockModal() {
+    const prodId = document.getElementById('ajuste-stock-prod-id').value;
+    const prod = currentCatalogo.find(p => p.id === prodId);
+    const stockActual = prod ? (parseInt(prod.stock) || 0) : 0;
+    const mov = document.getElementById('select-ajuste-tipo').value;
+    const cant = parseInt(document.getElementById('input-ajuste-cant').value) || 0;
+    const lbl = document.getElementById('lbl-ajuste-cant');
+
+    let nuevo = stockActual;
+    if (mov === 'entrada') {
+      lbl.textContent = 'Cantidad de Unidades a Sumar *';
+      nuevo = stockActual + cant;
+    } else if (mov === 'fijar') {
+      lbl.textContent = 'Nuevo Conteo Físico Exacto *';
+      nuevo = cant;
+    } else if (mov === 'salida') {
+      lbl.textContent = 'Cantidad de Unidades a Restar *';
+      nuevo = Math.max(0, stockActual - cant);
+    }
+
+    document.getElementById('txt-nuevo-stock-calc').textContent = `${nuevo} unidades`;
+  }
+
+  document.getElementById('select-ajuste-tipo').addEventListener('change', recalcularStockModal);
+  document.getElementById('input-ajuste-cant').addEventListener('input', recalcularStockModal);
+
+  document.getElementById('form-ajuste-stock').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const prodId = document.getElementById('ajuste-stock-prod-id').value;
+    const prod = currentCatalogo.find(p => p.id === prodId);
+    if (!prod) return;
+
+    const stockActual = parseInt(prod.stock) || 0;
+    const mov = document.getElementById('select-ajuste-tipo').value;
+    const cant = parseInt(document.getElementById('input-ajuste-cant').value) || 0;
+
+    let nuevoStock = stockActual;
+    if (mov === 'entrada') nuevoStock = stockActual + cant;
+    else if (mov === 'fijar') nuevoStock = cant;
+    else if (mov === 'salida') nuevoStock = Math.max(0, stockActual - cant);
+
+    prod.stock = nuevoStock;
+
+    await guardarCatalogoEnSupabase(currentCatalogo, [currentStoreEmail]);
+    cerrarModales();
+    renderizarStockFisico(currentCatalogo);
+    renderizarCatalogo(currentCatalogo);
+    alert(`✅ Stock de ${prod.nombre} actualizado a ${nuevoStock} unidades.`);
+  });
+
+  // 5. Crear / Editar Ítem del Catálogo
+  document.getElementById('btn-crear-recarga').addEventListener('click', () => abrirFormularioCatalogo('relleno'));
+  document.getElementById('btn-crear-producto').addEventListener('click', () => abrirFormularioCatalogo('producto'));
+
+  function abrirFormularioCatalogo(categoriaPredeterminada = 'relleno', item = null) {
+    const isEdit = !!item;
+    document.getElementById('titulo-modal-catalogo').textContent = isEdit ? '✏️ Editar Ítem' : '➕ Nuevo Ítem';
+    document.getElementById('cat-item-id').value = isEdit ? item.id : '';
+
+    const catSelect = document.getElementById('cat-item-categoria');
+    catSelect.value = isEdit ? item.categoria : categoriaPredeterminada;
+
+    document.getElementById('cat-item-nombre').value = isEdit ? item.nombre : '';
+    document.getElementById('cat-item-litros').value = (isEdit && item.litros !== undefined) ? item.litros : 20;
+    document.getElementById('cat-item-stock').value = (isEdit && item.stock !== undefined) ? item.stock : 0;
+    document.getElementById('cat-item-moneda').value = (isEdit && item.moneda) ? item.moneda : 'USD';
+    document.getElementById('cat-item-precio').value = (isEdit && item.precio !== undefined) ? item.precio : '1.50';
+
+    alternarCamposCatalogo();
+    document.getElementById('modal-item-catalogo').style.display = 'flex';
+  }
+
+  function alternarCamposCatalogo() {
+    const cat = document.getElementById('cat-item-categoria').value;
+    const isProd = cat === 'producto';
+    document.getElementById('grp-cat-litros').style.display = isProd ? 'none' : 'block';
+    document.getElementById('grp-cat-stock').style.display = isProd ? 'block' : 'none';
+  }
+
+  document.getElementById('cat-item-categoria').addEventListener('change', alternarCamposCatalogo);
+
+  window.abrirEditarCatalogo = function(id) {
+    const item = currentCatalogo.find(x => x.id === id);
+    if (item) abrirFormularioCatalogo(item.categoria, item);
+  };
+
+  window.eliminarItemCatalogo = async function(id) {
+    const item = currentCatalogo.find(x => x.id === id);
+    if (!item) return;
+
+    if (confirm(`¿Estás seguro de eliminar "${item.nombre}"?`)) {
+      currentCatalogo = currentCatalogo.filter(x => x.id !== id);
+      await guardarCatalogoEnSupabase(currentCatalogo, [currentStoreEmail]);
+      renderizarCatalogo(currentCatalogo);
+      renderizarStockFisico(currentCatalogo);
+      alert('✅ Ítem eliminado del catálogo.');
+    }
+  };
+
+  document.getElementById('form-item-catalogo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('cat-item-id').value;
+    const categoria = document.getElementById('cat-item-categoria').value;
+    const nombre = document.getElementById('cat-item-nombre').value.trim();
+    const litros = categoria === 'relleno' ? (parseInt(document.getElementById('cat-item-litros').value) || 20) : 0;
+    const stock = categoria === 'producto' ? (parseInt(document.getElementById('cat-item-stock').value) || 0) : 0;
+    const moneda = document.getElementById('cat-item-moneda').value;
+    const precio = parseFloat(document.getElementById('cat-item-precio').value) || 0;
+
+    if (!nombre) {
+      alert('Introduce el nombre del ítem.');
+      return;
+    }
+
+    const isEdit = !!id;
+    let itemId = id || ('item_' + Date.now().toString(36));
+
+    if (isEdit) {
+      const idx = currentCatalogo.findIndex(x => x.id === id);
+      if (idx !== -1) {
+        currentCatalogo[idx] = { ...currentCatalogo[idx], categoria, nombre, litros, stock, moneda, precio };
+      }
+    } else {
+      currentCatalogo.push({
+        id: itemId,
+        categoria,
+        nombre,
+        litros,
+        stock,
+        moneda,
+        precio
+      });
+    }
+
+    // Determinar sedes de destino
+    const radioAmbito = document.querySelector('input[name="radio-ambito"]:checked');
+    const replicarGrupo = radioAmbito && radioAmbito.value === 'grupo';
+    const sedesDestino = (replicarGrupo && supervisorSession) ? supervisorSession.sedes : [currentStoreEmail];
+
+    await guardarCatalogoEnSupabase(currentCatalogo, sedesDestino);
+    cerrarModales();
+    renderizarCatalogo(currentCatalogo);
+    renderizarStockFisico(currentCatalogo);
+    alert(`✅ Ítem guardado correctamente${replicarGrupo ? ' en todas las sedes asignadas' : ''}.`);
+  });
+
+  async function guardarCatalogoEnSupabase(nuevoCatalogo, listaSedes) {
+    try {
+      for (const sedeEmail of listaSedes) {
+        await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            catalogo_inicial: nuevoCatalogo
+          })
+        });
+      }
+    } catch (e) {
+      console.warn('Error guardando catálogo:', e);
+    }
+  }
+
+  // =========================================================================
+  // CONTROL DE PESTAÑAS
+  // =========================================================================
+  window.cambiarTab = function(tabName) {
+    document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    const targetSec = document.getElementById(`tab-${tabName}`);
+    if (targetSec) targetSec.classList.add('active');
+
+    const btns = document.querySelectorAll('.nav-btn');
+    if (tabName === 'tanque' && btns[0]) btns[0].classList.add('active');
+    else if (tabName === 'stock' && btns[1]) btns[1].classList.add('active');
+    else if (tabName === 'catalogo' && btns[2]) btns[2].classList.add('active');
+    else if (tabName === 'sedes' && btns[3]) btns[3].classList.add('active');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Refrescar Datos
+  document.getElementById('btn-sync-now').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-sync-now');
+    btn.style.transform = 'rotate(180deg)';
+    await cargarDatosEnVivoSupervisor();
+    setTimeout(() => { btn.style.transform = 'rotate(0deg)'; }, 300);
+  });
+
+  // Cerrar Sesión
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    localStorage.removeItem('visor_sup_session');
+    localStorage.removeItem('visor_sup_selected_sede');
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    location.reload();
+  });
+
+  // =========================================================================
+  // AUTO-LOGIN SI YA HABÍA INICIADO SESIÓN
+  // =========================================================================
+  const savedSup = localStorage.getItem('visor_sup_session');
+  if (savedSup) {
+    try {
+      supervisorSession = JSON.parse(savedSup);
+      iniciarAplicacionSupervisor();
+    } catch (e) {
+      localStorage.removeItem('visor_sup_session');
+    }
+  }
+</script>
+
+</body>
+</html>

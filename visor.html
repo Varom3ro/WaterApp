@@ -1734,6 +1734,9 @@ body {
         <button class="btn-icon" id="btn-pwa-header" style="display: none;" title="Instalar App en el Móvil">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
         </button>
+        <button class="btn-icon" id="btn-manage-supervisores" title="Gestionar Supervisores">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </button>
         <button class="btn-icon" id="btn-sync-now" title="Actualizar datos">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
         </button>
@@ -3531,6 +3534,344 @@ function cambiarTab(tabName) {
     if (modal) modal.style.display = 'none';
   });
 
+  // =========================================================================
+  // GESTIÓN DE SUPERVISORES POR EL DUEÑO
+  // =========================================================================
+  let listaSupervisoresOwner = [];
+
+  function getOwnerMasterEmail() {
+    return localStorage.getItem('visor_owner_email') || currentStoreEmail || '';
+  }
+
+  const btnManageSup = document.getElementById('btn-manage-supervisores');
+  const modalSup = document.getElementById('modal-supervisores');
+  const btnCloseModalSup = document.getElementById('btn-close-modal-supervisores');
+  const btnNuevoSup = document.getElementById('btn-nuevo-supervisor');
+  const btnCancelSupForm = document.getElementById('btn-cancelar-sup-form');
+  const btnGuardarSup = document.getElementById('btn-guardar-supervisor');
+  const btnToggleAllSedes = document.getElementById('btn-toggle-all-sedes');
+
+  if (btnManageSup) {
+    btnManageSup.addEventListener('click', async () => {
+      if (modalSup) modalSup.style.display = 'flex';
+      ocultarFormularioSupervisor();
+      await cargarSupervisoresDeCuenta();
+    });
+  }
+
+  if (btnCloseModalSup) {
+    btnCloseModalSup.addEventListener('click', () => {
+      if (modalSup) modalSup.style.display = 'none';
+    });
+  }
+
+  function mostrarFormularioSupervisor(sup = null) {
+    const secForm = document.getElementById('sec-supervisores-form');
+    const titulo = document.getElementById('form-sup-titulo');
+    const inputId = document.getElementById('sup-form-id');
+    const inputNombre = document.getElementById('sup-nombre');
+    const inputUsuario = document.getElementById('sup-usuario');
+    const inputClave = document.getElementById('sup-clave');
+
+    if (secForm) secForm.style.display = 'block';
+
+    const sedesListContainer = document.getElementById('sup-sedes-checklist');
+    const ownerEmail = getOwnerMasterEmail();
+    const esRefill = esCuentaRefillH2O(ownerEmail);
+
+    // Generar checkboxes de sedes
+    if (sedesListContainer) {
+      if (esRefill) {
+        document.getElementById('sup-sedes-container').style.display = 'block';
+        const sedesArr = Object.values(REFILLH2O_SEDES);
+        const asignadas = sup ? (sup.sedes || []) : sedesArr.map(s => s.email);
+
+        sedesListContainer.innerHTML = sedesArr.map(s => {
+          const checked = asignadas.includes(s.email) ? 'checked' : '';
+          return `
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; cursor: pointer; padding: 2px 0;">
+              <input type="checkbox" class="chk-sup-sede" value="${s.email}" ${checked} />
+              <span><strong>${escapeHtml(s.codigo)}</strong> - ${escapeHtml(s.sede)}</span>
+            </label>
+          `;
+        }).join('');
+      } else {
+        document.getElementById('sup-sedes-container').style.display = 'block';
+        sedesListContainer.innerHTML = `
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; padding: 2px 0;">
+            <input type="checkbox" class="chk-sup-sede" value="${ownerEmail}" checked disabled />
+            <span>🏪 ${escapeHtml(ownerEmail)} (Tienda Principal)</span>
+          </label>
+        `;
+      }
+    }
+
+    if (sup) {
+      if (titulo) titulo.textContent = '✏️ Editar Supervisor';
+      if (inputId) inputId.value = sup.id || '';
+      if (inputNombre) inputNombre.value = sup.nombre || '';
+      if (inputUsuario) inputUsuario.value = sup.usuario || '';
+      if (inputClave) inputClave.value = sup.clave || '';
+    } else {
+      if (titulo) titulo.textContent = '➕ Registrar Nuevo Supervisor';
+      if (inputId) inputId.value = '';
+      if (inputNombre) inputNombre.value = '';
+      if (inputUsuario) inputUsuario.value = '';
+      if (inputClave) inputClave.value = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+  }
+
+  function ocultarFormularioSupervisor() {
+    const secForm = document.getElementById('sec-supervisores-form');
+    if (secForm) secForm.style.display = 'none';
+  }
+
+  if (btnNuevoSup) btnNuevoSup.addEventListener('click', () => mostrarFormularioSupervisor(null));
+  if (btnCancelSupForm) btnCancelSupForm.addEventListener('click', ocultarFormularioSupervisor);
+
+  if (btnToggleAllSedes) {
+    btnToggleAllSedes.addEventListener('click', () => {
+      const chks = document.querySelectorAll('.chk-sup-sede');
+      const allChecked = Array.from(chks).every(c => c.checked);
+      chks.forEach(c => { if (!c.disabled) c.checked = !allChecked; });
+      btnToggleAllSedes.textContent = allChecked ? 'Seleccionar Todas' : 'Desmarcar Todas';
+    });
+  }
+
+  async function cargarSupervisoresDeCuenta() {
+    const ownerEmail = getOwnerMasterEmail();
+    const cont = document.getElementById('lista-supervisores-items');
+    if (!cont) return;
+
+    cont.innerHTML = '<div style="text-align:center; padding: 12px; color: var(--neu-text-muted); font-size: 0.85rem;">⏳ Cargando supervisores...</div>';
+
+    try {
+      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(ownerEmail)}&select=id,visor_actividad`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) throw new Error('Error al conectar con la base de datos');
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        cont.innerHTML = '<div style="text-align:center; padding: 12px; color: var(--neu-text-muted); font-size: 0.85rem;">No se encontró la cuenta.</div>';
+        return;
+      }
+
+      const client = data[0];
+      const actividad = client.visor_actividad || {};
+      listaSupervisoresOwner = Array.isArray(actividad.supervisores) ? actividad.supervisores : [];
+
+      renderListaSupervisores();
+    } catch (err) {
+      console.warn('Error al cargar supervisores:', err);
+      cont.innerHTML = '<div style="text-align:center; color: var(--danger); font-size: 0.85rem;">Error al cargar datos.</div>';
+    }
+  }
+
+  function renderListaSupervisores() {
+    const cont = document.getElementById('lista-supervisores-items');
+    if (!cont) return;
+
+    if (listaSupervisoresOwner.length === 0) {
+      cont.innerHTML = `
+        <div style="text-align: center; padding: 16px; background: rgba(0,0,0,0.03); border-radius: 12px; color: var(--neu-text-muted); font-size: 0.85rem;">
+          👤 No tienes supervisores creados aún.<br/>
+          Toca en <strong>"+ Nuevo"</strong> para crear el primero.
+        </div>
+      `;
+      return;
+    }
+
+    cont.innerHTML = listaSupervisoresOwner.map((s, idx) => {
+      const numSedes = (s.sedes && Array.isArray(s.sedes)) ? s.sedes.length : 1;
+      return `
+        <div style="background: #ffffff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 12px 14px; box-shadow: var(--neu-shadow-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.95rem; color: #0F172A;">${escapeHtml(s.nombre || 'Supervisor')}</div>
+              <div style="font-size: 0.78rem; color: #64748B;">Usuario: <strong style="color: #0284C7;">${escapeHtml(s.usuario)}</strong> · Clave: <code style="background: #F1F5F9; padding: 2px 6px; border-radius: 4px; font-weight:700;">${escapeHtml(s.clave)}</code></div>
+            </div>
+            <span style="background: #DCFCE7; color: #15803D; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;">Activo</span>
+          </div>
+          <div style="font-size: 0.75rem; color: #64748B; margin-bottom: 10px;">
+            🏢 Sedes autorizadas: <strong>${numSedes} sucursal(es)</strong>
+          </div>
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button type="button" class="btn-copiar-wa-sup" data-idx="${idx}" style="background: #25D366; color: #fff; border: none; padding: 5px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <span>📲</span> WhatsApp
+            </button>
+            <button type="button" class="btn-editar-sup" data-idx="${idx}" style="background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; padding: 5px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+              ✏️ Editar
+            </button>
+            <button type="button" class="btn-eliminar-sup" data-idx="${idx}" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; padding: 5px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    cont.querySelectorAll('.btn-editar-sup').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        const sup = listaSupervisoresOwner[idx];
+        if (sup) mostrarFormularioSupervisor(sup);
+      });
+    });
+
+    cont.querySelectorAll('.btn-eliminar-sup').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const idx = parseInt(btn.dataset.idx);
+        const sup = listaSupervisoresOwner[idx];
+        if (sup && confirm(`¿Deseas eliminar al supervisor "${sup.nombre}"? Ya no podrá acceder.`)) {
+          listaSupervisoresOwner.splice(idx, 1);
+          await sincronizarSupervisoresSupabase();
+          renderListaSupervisores();
+        }
+      });
+    });
+
+    cont.querySelectorAll('.btn-copiar-wa-sup').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        const sup = listaSupervisoresOwner[idx];
+        if (!sup) return;
+
+        const sedesNombres = (sup.sedes || []).map(email => {
+          const info = obtenerInfoSedeRefill(email);
+          return info ? info.sede : email;
+        }).join(', ');
+
+        const texto = `👋 ¡Hola ${sup.nombre}! Te compartimos tus accesos al *Visor de Supervisores WaterApp*:\n\n🌐 *Enlace:* https://varom3ro.github.io/WaterApp/visor-supervisor.html\n👤 *Usuario:* ${sup.usuario}\n🔑 *Clave:* ${sup.clave}\n🏢 *Sedes asignadas:* ${sedesNombres || 'Todas'}\n\n_(Panel para auditar inventario, nivel de tanque y catálogo físico)_`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(texto).then(() => {
+            alert('✅ Datos copiados al portapapeles. ¡Pégalos en WhatsApp para enviárselos al supervisor!');
+          }).catch(() => {
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, '_blank');
+          });
+        } else {
+          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, '_blank');
+        }
+      });
+    });
+  }
+
+  if (btnGuardarSup) {
+    btnGuardarSup.addEventListener('click', async () => {
+      const id = document.getElementById('sup-form-id').value;
+      const nombre = document.getElementById('sup-nombre').value.trim();
+      const usuario = document.getElementById('sup-usuario').value.trim().toLowerCase();
+      const clave = document.getElementById('sup-clave').value.trim();
+
+      if (!nombre || !usuario || !clave) {
+        alert('⚠️ Por favor completa el nombre, usuario y clave.');
+        return;
+      }
+
+      // Obtener sedes seleccionadas
+      const ownerEmail = getOwnerMasterEmail();
+      const esRefill = esCuentaRefillH2O(ownerEmail);
+      let sedesSeleccionadas = [];
+
+      if (esRefill) {
+        document.querySelectorAll('.chk-sup-sede:checked').forEach(c => sedesSeleccionadas.push(c.value));
+        if (sedesSeleccionadas.length === 0) {
+          alert('⚠️ Debes asignar al menos una sede al supervisor.');
+          return;
+        }
+      } else {
+        sedesSeleccionadas = [ownerEmail];
+      }
+
+      btnGuardarSup.disabled = true;
+      btnGuardarSup.textContent = '⏳ Guardando...';
+
+      if (id) {
+        const idx = listaSupervisoresOwner.findIndex(s => s.id === id);
+        if (idx !== -1) {
+          listaSupervisoresOwner[idx] = {
+            ...listaSupervisoresOwner[idx],
+            nombre,
+            usuario,
+            clave,
+            sedes: sedesSeleccionadas,
+            actualizado_el: new Date().toISOString()
+          };
+        }
+      } else {
+        // Verificar que no repita usuario
+        if (listaSupervisoresOwner.some(s => s.usuario === usuario)) {
+          alert('⚠️ Ya existe un supervisor con ese usuario. Elige otro identificador.');
+          btnGuardarSup.disabled = false;
+          btnGuardarSup.textContent = '💾 Guardar';
+          return;
+        }
+
+        listaSupervisoresOwner.push({
+          id: 'sup_' + Date.now().toString(36),
+          nombre,
+          usuario,
+          clave,
+          sedes: sedesSeleccionadas,
+          activo: true,
+          creado_el: new Date().toISOString()
+        });
+      }
+
+      const ok = await sincronizarSupervisoresSupabase();
+      btnGuardarSup.disabled = false;
+      btnGuardarSup.textContent = '💾 Guardar';
+
+      if (ok) {
+        ocultarFormularioSupervisor();
+        renderListaSupervisores();
+        alert('✅ Supervisor guardado exitosamente.');
+      } else {
+        alert('❌ Error al guardar en la nube. Revisa tu conexión.');
+      }
+    });
+  }
+
+  async function sincronizarSupervisoresSupabase() {
+    const ownerEmail = getOwnerMasterEmail();
+    try {
+      const resGet = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(ownerEmail)}&select=id,visor_actividad`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!resGet.ok) return false;
+      const data = await resGet.json();
+      if (!data || data.length === 0) return false;
+
+      const c = data[0];
+      const prevAct = c.visor_actividad || {};
+      const newAct = {
+        ...prevAct,
+        supervisores: listaSupervisoresOwner
+      };
+
+      const resPatch = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ visor_actividad: newAct })
+      });
+
+      return resPatch.ok;
+    } catch (e) {
+      console.error('Error al sincronizar supervisores:', e);
+      return false;
+    }
+  }
+
   window.addEventListener('appinstalled', () => {
     console.log('[PWA] Visor instalado con éxito');
     ocultarOpcionesInstalacion();
@@ -3554,6 +3895,81 @@ function cambiarTab(tabName) {
   <div class="pwa-banner-actions">
     <button id="btn-pwa-banner-install" class="btn-pwa-action">Instalar</button>
     <button id="btn-pwa-banner-close" class="btn-pwa-dismiss" title="Cerrar">✕</button>
+  </div>
+</div>
+
+<!-- Modal Gestión de Supervisores para Dueños -->
+<div id="modal-supervisores" class="ios-modal-overlay" style="display: none; align-items: center; z-index: 10001;">
+  <div class="ios-modal-card" style="max-width: 440px; text-align: left; max-height: 90vh; overflow-y: auto; background: var(--neu-surface, #EFF1F5); color: var(--neu-text-main, #181A1F); border-radius: 24px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); padding: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 10px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.4rem;">👥</span>
+        <div>
+          <h3 style="font-size: 1.1rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; margin: 0; color: var(--neu-text-main);">Gestión de Supervisores</h3>
+          <p style="font-size: 0.75rem; color: var(--neu-text-muted); margin: 0;">Crea accesos operativos sin datos financieros</p>
+        </div>
+      </div>
+      <button type="button" id="btn-close-modal-supervisores" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--neu-text-muted);">✕</button>
+    </div>
+
+    <!-- Lista de Supervisores Activos -->
+    <div id="sec-supervisores-lista">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--neu-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Supervisores Registrados</span>
+        <button type="button" id="btn-nuevo-supervisor" style="background: var(--neu-pill-dark, #121417); color: #fff; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+          <span>➕</span> Nuevo
+        </button>
+      </div>
+
+      <div id="lista-supervisores-items" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+        <!-- Render dinámico de supervisores -->
+      </div>
+    </div>
+
+    <!-- Formulario Crear / Editar Supervisor (Oculto por defecto) -->
+    <div id="sec-supervisores-form" style="display: none; background: var(--neu-bg, #EAECEF); padding: 14px; border-radius: 18px; box-shadow: var(--neu-shadow-inset); margin-bottom: 14px;">
+      <h4 id="form-sup-titulo" style="font-size: 0.95rem; font-weight: 800; margin-bottom: 12px; color: var(--neu-text-main);">➕ Registrar Nuevo Supervisor</h4>
+      <input type="hidden" id="sup-form-id" value="" />
+
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin-bottom: 4px; display: block;">Nombre del Supervisor *</label>
+        <input type="text" id="sup-nombre" class="form-control" placeholder="Ej: Carlos Gómez" style="background: #fff; border: 1px solid #CBD5E1; color: #1E293B; height: 42px; border-radius: 10px; font-size: 0.9rem;" />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin-bottom: 4px; display: block;">Usuario o Correo de Acceso *</label>
+        <input type="text" id="sup-usuario" class="form-control" placeholder="Ej: supervisor.carlos o correo" style="background: #fff; border: 1px solid #CBD5E1; color: #1E293B; height: 42px; border-radius: 10px; font-size: 0.9rem;" />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin-bottom: 4px; display: block;">Clave de Acceso *</label>
+        <div style="position: relative;">
+          <input type="text" id="sup-clave" class="form-control" placeholder="Clave secreta" style="background: #fff; border: 1px solid #CBD5E1; color: #1E293B; height: 42px; border-radius: 10px; font-size: 0.9rem;" />
+        </div>
+      </div>
+
+      <!-- Selector de Sedes Asignadas -->
+      <div id="sup-sedes-container" style="margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin: 0;">Sedes Asignadas</label>
+          <button type="button" id="btn-toggle-all-sedes" style="background: none; border: none; font-size: 0.75rem; color: #0284C7; font-weight: 700; cursor: pointer;">Seleccionar Todas</button>
+        </div>
+        <div id="sup-sedes-checklist" style="display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto; background: #fff; border: 1px solid #CBD5E1; border-radius: 10px; padding: 8px;">
+          <!-- Checkboxes de sedes -->
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" id="btn-cancelar-sup-form" style="background: #E2E8F0; color: #475569; border: none; padding: 8px 14px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">Cancelar</button>
+        <button type="button" id="btn-guardar-supervisor" style="background: var(--primary, #10B981); color: #fff; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">💾 Guardar</button>
+      </div>
+    </div>
+
+    <!-- Enlace directo al Visor de Supervisores -->
+    <div style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 14px; padding: 12px; font-size: 0.8rem; color: #0369A1; line-height: 1.4;">
+      💡 <strong>Enlace oficial del Visor Supervisor:</strong><br/>
+      <span style="font-family: monospace; word-break: break-all; color: #0F172A; font-weight: 600;">https://varom3ro.github.io/WaterApp/visor-supervisor.html</span>
+    </div>
   </div>
 </div>
 

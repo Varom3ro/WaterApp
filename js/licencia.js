@@ -267,6 +267,23 @@ export const Licencia = {
           }
         }
       }
+
+      // Inyección automática de Ajustes Remotos del Supervisor (Tanque y Calibraciones)
+      const ajustesRemotos = user.visor_actividad && user.visor_actividad.ajustes_remotos;
+      if (ajustesRemotos && typeof ajustesRemotos === 'object' && s) {
+        const lastAjusteTs = ajustesRemotos.timestamp || 0;
+        const localAjusteTs = parseInt(localStorage.getItem('ultimo_ajuste_remoto_aplicado') || '0');
+        if (lastAjusteTs > localAjusteTs) {
+          if (ajustesRemotos.tanque && typeof ajustesRemotos.tanque === 'object') {
+            const { litros, capacidadTanque } = ajustesRemotos.tanque;
+            if (litros !== undefined && capacidadTanque !== undefined) {
+              s.setConfig('inventario', { litros, capacidadTanque });
+              console.log('[Licencia] Ajuste remoto de tanque inyectado desde Visor Supervisor:', litros, capacidadTanque);
+            }
+          }
+          localStorage.setItem('ultimo_ajuste_remoto_aplicado', String(lastAjusteTs));
+        }
+      }
     } catch (e) {
       console.warn('[Licencia] Error al aplicar catálogo/logo remoto:', e);
     }
