@@ -2190,6 +2190,18 @@
       iniciarAplicacionSupervisor();
     }
   }
+
+  // Registrar Service Worker Supervisor
+  if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw-visor-supervisor.js')
+        .then(reg => {
+          reg.update();
+          console.log('[SW-Visor-Sup] Registrado:', reg.scope);
+        })
+        .catch(err => console.warn('[SW-Visor-Sup] Error al registrar:', err));
+    });
+  }
 </script>
 
 </body>
