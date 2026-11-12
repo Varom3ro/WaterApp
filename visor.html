@@ -1273,8 +1273,12 @@ body {
   box-shadow: 0 2px 6px var(--neu-green-glow);
 }
 .cierre-check-icon.pending {
+  background: #FEF3C7;
+  color: #D97706;
+}
+.cierre-check-icon.idle {
   background: #E2E8F0;
-  color: #64748B;
+  color: #94A3B8;
 }
 .consolidado-total-card {
   background: linear-gradient(135deg, #121417 0%, #1E2229 100%);
@@ -1283,6 +1287,128 @@ body {
   padding: 24px;
   box-shadow: var(--neu-shadow-dark);
   margin-bottom: 20px;
+}
+
+/* Veredicto de Cuadre y Auditoría */
+.cuadre-veredicto-card {
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--neu-shadow-sm);
+  border: 1px solid #fff;
+  margin-top: 10px;
+  transition: all 0.2s ease;
+}
+.cuadre-veredicto-card.status-cuadrado {
+  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+  border: 1.5px solid #10B981;
+  color: #065F46;
+}
+.cuadre-veredicto-card.status-faltante {
+  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+  border: 1.5px solid #EF4444;
+  color: #991B1B;
+}
+.cuadre-veredicto-card.status-sobrante {
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  border: 1.5px solid #3B82F6;
+  color: #1E40AF;
+}
+.cuadre-veredicto-card.status-operacion {
+  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+  border: 1.5px solid #F59E0B;
+  color: #92400E;
+}
+
+.veredicto-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+.veredicto-body {
+  flex: 1;
+}
+.veredicto-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.veredicto-sub {
+  font-size: 0.74rem;
+  margin-top: 2px;
+  opacity: 0.88;
+  line-height: 1.35;
+}
+
+.badge-status-cierre {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-status-cierre.cuadrado { background: #DCFCE7; color: #166534; }
+.badge-status-cierre.faltante { background: #FEE2E2; color: #991B1B; }
+.badge-status-cierre.sobrante { background: #DBEAFE; color: #1E40AF; }
+.badge-status-cierre.operacion { background: #FEF3C7; color: #92400E; }
+
+/* Historial de Cierres Cards */
+.historial-cierre-item {
+  background: var(--neu-surface);
+  border: 1px solid #ffffff;
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: var(--neu-shadow-sm);
+  transition: all 0.2s ease;
+}
+.historial-cierre-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.historial-cierre-date {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: var(--neu-text-main);
+}
+.historial-cierre-time {
+  font-size: 0.72rem;
+  color: var(--neu-text-muted);
+  font-weight: 600;
+}
+.historial-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  text-align: center;
+}
+.historial-col-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.historial-col-lbl {
+  font-size: 0.68rem;
+  color: var(--neu-text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+.historial-cierre-foot {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.04);
+  font-size: 0.72rem;
+  color: var(--neu-text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Barra de Navegación Inferior Flotante */
@@ -2079,17 +2205,17 @@ body.hide-montos #cierre-digital-usd {
 
       <!-- Checklist de Cierre de Todas las Tiendas (Para Supervisor y Dueños) -->
       <div class="cierres-checklist-card" id="multisede-cierres-checklist">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <div>
-            <h3 style="font-size: 1rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
+            <h3 style="font-size: 1rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main); margin: 0;">
               📋 Estado de Cierres de Tiendas
             </h3>
-            <p style="font-size: 0.76rem; color: var(--neu-text-muted); margin-top: 2px;">
+            <p style="font-size: 0.74rem; color: var(--neu-text-muted); margin-top: 3px; margin-bottom: 0;">
               Seguimiento en vivo del arqueo y cierre de caja de hoy
             </p>
           </div>
-          <span id="badge-cierres-count" style="background: var(--neu-bg); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; box-shadow: var(--neu-shadow-inset);">
-            0/0 Cerradas
+          <span id="badge-cierres-count" style="background: var(--neu-surface); padding: 5px 12px; border-radius: 20px; font-size: 0.76rem; font-weight: 800; border: 1px solid #fff; box-shadow: var(--neu-shadow-sm); color: #0284C7;">
+            0/6 Cerradas
           </span>
         </div>
 
@@ -2129,44 +2255,89 @@ body.hide-montos #cierre-digital-usd {
         </div>
       </div>
 
-      <div class="card-hero" style="background: var(--neu-surface) !important; border: 1px solid #fff !important; color: var(--neu-text-main) !important;">
+      <!-- Sección de Cierre de la Tienda Seleccionada -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 10px;">
+        <h3 class="section-title" style="margin: 0;">
+          🏢 Cierre de Hoy · <span id="cierre-sede-nombre" style="color: #0284C7;">Esta Tienda</span>
+        </h3>
+        <span id="badge-cuadre-status" class="badge-status-cierre operacion">
+          ⏳ En Operación
+        </span>
+      </div>
+
+      <!-- Card Banner de Estado de Cuadre (Cuadró / Faltante / Sobrante / En Operación) -->
+      <div id="card-cuadre-veredicto" class="cuadre-veredicto-card status-operacion">
+        <div class="veredicto-icon" id="txt-veredicto-icon">⏳</div>
+        <div class="veredicto-body">
+          <div class="veredicto-title" id="txt-veredicto-title">CAJA EN OPERACIÓN (PENDIENTE DE CIERRE)</div>
+          <div class="veredicto-sub" id="txt-veredicto-sub">El cajero aún no ha cerrado caja hoy. Los datos se actualizan en vivo.</div>
+        </div>
+      </div>
+
+      <!-- Card de Efectivo Físico a Rendir -->
+      <div class="card-hero" style="background: var(--neu-surface) !important; border: 1px solid #fff !important; color: var(--neu-text-main) !important; margin-top: 12px;">
         <div class="hero-label" style="color: var(--neu-text-muted) !important;">💵 Efectivo a Rendir (Esta Tienda)</div>
         <div class="hero-amount" id="cierre-efectivo-usd">$ 0.00</div>
-        <div class="hero-bs" id="cierre-efectivo-bs-hero" style="color: #6EE7B7; font-size: 1.15rem; font-weight: 700; margin-top: 4px;">+ Bs 0.00 en efectivo</div>
-        <div style="font-size: 0.8rem; color: #C7D2FE; margin-top: 6px;">
-          Billetes físicos que el cajero debe entregarte al cierre.
+        <div class="hero-bs" id="cierre-efectivo-bs-hero" style="color: #10B981; font-size: 1.15rem; font-weight: 700; margin-top: 4px;">+ Bs 0.00 en efectivo</div>
+        <div style="font-size: 0.78rem; color: var(--neu-text-muted); margin-top: 6px;">
+          Billetes físicos que el cajero debe entregarte en mano al cierre.
         </div>
       </div>
 
-      <h3 class="section-title">📋 Resumen de Cuadre del Día</h3>
-      <div class="card-login" style="padding: 1.25rem;">
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-          <span style="color: var(--text-muted); font-size: 0.9rem;">Total Facturado:</span>
-          <strong id="cierre-total-usd">$ 0.00</strong>
+      <!-- Resumen Detallado de Cuadre del Día -->
+      <div class="card-login" style="padding: 1.25rem; margin-top: 14px; background: var(--neu-surface); border: 1px solid #fff; box-shadow: var(--neu-shadow-sm);">
+        <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 10px; color: var(--neu-text-main);">
+          📊 Detalle de Cuadre del Día
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-          <span style="color: var(--text-muted); font-size: 0.9rem;">Pagos Digitales (Banco):</span>
-          <strong id="cierre-digital-usd">$ 0.00</strong>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Total Facturado:</span>
+          <strong id="cierre-total-usd" style="color: var(--neu-text-main); font-size: 0.95rem;">$ 0.00</strong>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-          <span style="color: var(--text-muted); font-size: 0.9rem;">Total Efectivo ($):</span>
-          <strong style="color: var(--primary); font-size: 1.05rem;" id="cierre-efectivo-usd-2">$ 0.00</strong>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Pagos Digitales (Banco):</span>
+          <strong id="cierre-digital-usd" style="color: #6366F1; font-size: 0.95rem;">$ 0.00</strong>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-          <span style="color: var(--text-muted); font-size: 0.9rem;">Total Efectivo (Bs):</span>
-          <strong style="color: #34D399; font-size: 1.05rem;" id="cierre-efectivo-bs">Bs 0.00</strong>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Efectivo en Sistema ($):</span>
+          <strong id="cierre-efectivo-usd-2" style="color: #0284C7; font-size: 0.95rem;">$ 0.00</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Efectivo en Sistema (Bs):</span>
+          <strong id="cierre-efectivo-bs" style="color: #10B981; font-size: 0.95rem;">Bs 0.00</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);" id="row-cierre-diferencia">
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Diferencia de Caja:</span>
+          <strong id="cierre-diferencia-texto" style="font-size: 0.95rem; color: #F59E0B;">Pendiente de arqueo</strong>
         </div>
         <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-          <span style="color: var(--text-muted); font-size: 0.9rem;">Mermas de Agua Reportadas:</span>
-          <strong style="color: var(--warning);" id="cierre-merma-litros">0 Litros</strong>
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Mermas de Agua Reportadas:</span>
+          <strong style="color: #D97706; font-size: 0.95rem;" id="cierre-merma-litros">0 Litros</strong>
         </div>
       </div>
 
-      <div style="margin-top: 1.5rem; text-align: center;">
-        <button class="btn btn-primary" onclick="alert('✅ Cuadre de caja verificado correctamente. Datos respaldados en la nube.')">
-          🔒 Validar y Guardar Cierre del Día
-        </button>
+      <!-- ===================================================================== -->
+      <!-- NUEVO: HISTORIAL DE LOS ÚLTIMOS 5 CIERRES DE CAJA                     -->
+      <!-- ===================================================================== -->
+      <div style="margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div>
+            <h3 class="section-title" style="margin: 0;">📑 Últimos 5 Cierres de Caja</h3>
+            <p style="font-size: 0.74rem; color: var(--neu-text-muted); margin-top: 2px; margin-bottom: 0;">
+              Historial de arqueos diarios finalizados de esta sede
+            </p>
+          </div>
+          <span style="font-size: 0.72rem; color: #0284C7; font-weight: 700; background: #E0F2FE; padding: 3px 8px; border-radius: 12px;">
+            Auditoría
+          </span>
+        </div>
+
+        <div id="historial-cierres-container" style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="text-align: center; padding: 1.5rem; color: var(--neu-text-muted); font-size: 0.85rem;">
+            ⏳ Cargando historial de cierres...
+          </div>
+        </div>
       </div>
+
     </div>
 
     <!-- Navegación Inferior -->
@@ -2898,6 +3069,7 @@ async function cargarTodasLasSedesRefill() {
     const sedesListHtml = [];
 
     const sedesKeys = Object.keys(REFILLH2O_SEDES);
+    const hoyStr = new Date().toISOString().substring(0, 10);
 
     sedesKeys.forEach(email => {
       totalSedesCount++;
@@ -2908,24 +3080,55 @@ async function cargarTodasLasSedesRefill() {
       const statusConn = calcularTiempoDesconexion(tienda?.ultima_actualizacion);
       
       // Chequear si la tienda ya cerró caja hoy
-      // Se detecta si hay turnos/arqueos cerrados en su configuración o si ya no tiene movimientos pendientes
-      const backup = tienda?.respaldo_completo;
       let cerradoHoy = false;
       let horaCierre = '';
-      
-      const hoyStr = new Date().toISOString().substring(0, 10);
-      if (backup && Array.isArray(backup.configuracion)) {
-        const arqueosCfg = backup.configuracion.find(c => c.id === 'tuempresa_arqueos');
-        if (arqueosCfg && Array.isArray(arqueosCfg.value)) {
-          const arqHoy = arqueosCfg.value.find(a => a.fecha === hoyStr);
-          if (arqHoy) {
-            cerradoHoy = true;
-            horaCierre = arqHoy.hora || 'Cerrado';
+      let estadoCierre = 'en_operacion';
+      let difUSD = 0;
+
+      // 1. Resumen directo de cierre si fue enviado por cloud-sync
+      if (r.cierre && r.cierre.cerrado) {
+        cerradoHoy = true;
+        horaCierre = r.cierre.hora || 'Cerrado';
+        estadoCierre = r.cierre.estado || 'cuadrado';
+        difUSD = r.cierre.diferenciaUSD || 0;
+      }
+
+      // 2. Revisar historial_reciente de la fila de la tienda
+      if (!cerradoHoy && Array.isArray(tienda?.historial_reciente)) {
+        const arqHoy = tienda.historial_reciente.find(a => (a.fecha || '').trim() === hoyStr);
+        if (arqHoy) {
+          cerradoHoy = true;
+          horaCierre = arqHoy.hora || 'Cerrado';
+          const decUsd = parseFloat(arqHoy.declaracion?.efectivo_usd) || 0;
+          const espUsd = r.efectivoUSD || 0;
+          difUSD = decUsd - espUsd;
+          if (difUSD < -0.05) estadoCierre = 'faltante';
+          else if (difUSD > 0.05) estadoCierre = 'sobrante';
+          else estadoCierre = 'cuadrado';
+        }
+      }
+
+      // 3. Revisar en respaldo_completo.configuracion
+      if (!cerradoHoy) {
+        const backup = tienda?.respaldo_completo;
+        if (backup && Array.isArray(backup.configuracion)) {
+          const arqueosCfg = backup.configuracion.find(c => c && c.id === 'tuempresa_arqueos');
+          if (arqueosCfg && Array.isArray(arqueosCfg.value)) {
+            const arqHoy = arqueosCfg.value.find(a => (a.fecha || '').trim() === hoyStr);
+            if (arqHoy) {
+              cerradoHoy = true;
+              horaCierre = arqHoy.hora || 'Cerrado';
+              const decUsd = parseFloat(arqHoy.declaracion?.efectivo_usd) || 0;
+              const espUsd = r.efectivoUSD || 0;
+              difUSD = decUsd - espUsd;
+              if (difUSD < -0.05) estadoCierre = 'faltante';
+              else if (difUSD > 0.05) estadoCierre = 'sobrante';
+              else estadoCierre = 'cuadrado';
+            }
           }
         }
       }
 
-      // Si el supervisor tiene movimientos y la última actualización fue tarde
       if (cerradoHoy) sedesCerradasCount++;
 
       // Acumular consolidado
@@ -2945,15 +3148,29 @@ async function cargarTodasLasSedesRefill() {
       // Guardar en cache global
       if (tienda) cacheGlobalTiendas[email] = tienda;
 
-      // Item del checklist
+      // Badge de estado para la fila
+      let statusBadgeHtml = '';
+      if (cerradoHoy) {
+        if (estadoCierre === 'faltante') {
+          statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#EF4444; background:#FEE2E2; padding:2px 7px; border-radius:10px;">⚠️ Faltante -$${Math.abs(difUSD).toFixed(2)}</span>`;
+        } else if (estadoCierre === 'sobrante') {
+          statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#2563EB; background:#DBEAFE; padding:2px 7px; border-radius:10px;">🔵 Sobrante +$${difUSD.toFixed(2)}</span>`;
+        } else {
+          statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#10B981; background:#DCFCE7; padding:2px 7px; border-radius:10px;">✓ Cuadre Exacto</span>`;
+        }
+      } else {
+        statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:700; color:#D97706; background:#FEF3C7; padding:2px 7px; border-radius:10px;">⏳ En Operación</span>`;
+      }
+
+      // Item interactivo del checklist (hacer click cambia a esa tienda)
       sedesListHtml.push(`
-        <div class="sede-cierre-row">
+        <div class="sede-cierre-row" onclick="cambiarSedeRefillH2O('${email}')" style="cursor: pointer; transition: transform 0.15s ease;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
           <div class="sede-cierre-info">
             <div class="cierre-check-icon ${cerradoHoy ? 'done' : 'pending'}">
               ${cerradoHoy ? '✓' : '⏳'}
             </div>
             <div>
-              <div style="font-size: 0.88rem; font-weight: 700; color: var(--neu-text-main);">
+              <div style="font-size: 0.88rem; font-weight: 800; color: var(--neu-text-main);">
                 ${info.sede}
               </div>
               <div style="font-size: 0.72rem; color: var(--neu-text-muted);">
@@ -2962,11 +3179,11 @@ async function cargarTodasLasSedesRefill() {
             </div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 0.9rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
+            <div style="font-size: 0.92rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
               $ ${tUSD.toFixed(2)}
             </div>
-            <div style="font-size: 0.72rem; font-weight: 700; color: ${cerradoHoy ? '#10B981' : '#F59E0B'};">
-              ${cerradoHoy ? (horaCierre || 'Cerrada') : 'En Operación'}
+            <div style="margin-top: 2px;">
+              ${statusBadgeHtml}
             </div>
           </div>
         </div>
@@ -3012,6 +3229,10 @@ function cambiarTab(tabName) {
     const idx = ['hoy', 'stats', 'inv', 'cierre'].indexOf(tabName);
     if (idx !== -1) {
       document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+    }
+
+    if (tabName === 'cierre') {
+      cargarTodasLasSedesRefill();
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3078,6 +3299,9 @@ function cambiarTab(tabName) {
         // Datos de muestra si aún no ha sincronizado
         console.log('No data yet, using sample data');
       }
+
+      // 🛡️ Supervisión Multisede y Checklist de Cierres en vivo
+      await cargarTodasLasSedesRefill();
 
       document.getElementById('txt-last-time').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch (e) {
@@ -3660,6 +3884,297 @@ function cambiarTab(tabName) {
     document.getElementById('cierre-digital-usd').textContent = `$ ${totalDigital.toFixed(2)}`;
     const mermaEl = document.getElementById('cierre-merma-litros');
     if (mermaEl) mermaEl.textContent = `${r.litrosMermasHoy || 0} Litros`;
+
+    // 🛡️ Renderizar Veredicto de Cuadre y Últimos 5 Cierres de Caja
+    renderizarCuadreYUltimos5Cierres(storeData);
+  }
+
+  // =========================================================================
+  // SISTEMA DE VEREDICTO DE CUADRE Y AUDITORÍA DE ÚLTIMOS 5 CIERRES
+  // =========================================================================
+  function renderizarCuadreYUltimos5Cierres(storeData) {
+    if (!storeData) return;
+
+    const activeEmail = (storeData.empresa_email || currentStoreEmail || '').toLowerCase();
+    const esRefill = esCuentaRefillH2O(activeEmail);
+    const sedeInfo = esRefill ? obtenerInfoSedeRefill(activeEmail) : null;
+    const sedeNombre = sedeInfo ? sedeInfo.sede : (storeData.nombre_empresa || 'Esta Tienda');
+
+    const lblSede = document.getElementById('cierre-sede-nombre');
+    if (lblSede) lblSede.textContent = sedeNombre;
+
+    const r = storeData.resumen_hoy || {};
+    const hoyStr = new Date().toISOString().substring(0, 10);
+
+    // 1. Detectar si hoy ya cerró o sigue en operación
+    let arqHoy = null;
+
+    if (r.cierre && r.cierre.cerrado) {
+      arqHoy = {
+        fecha: hoyStr,
+        hora: r.cierre.hora,
+        estado: r.cierre.estado,
+        diferenciaUSD: r.cierre.diferenciaUSD,
+        diferenciaBs: r.cierre.diferenciaBs,
+        declaradoUSD: r.cierre.declaradoUSD,
+        declaradoBs: r.cierre.declaradoBs
+      };
+    }
+
+    if (!arqHoy && Array.isArray(storeData.historial_reciente)) {
+      const found = storeData.historial_reciente.find(a => (a.fecha || '').trim() === hoyStr);
+      if (found) {
+        const dec = found.declaracion || {};
+        const decUsd = parseFloat(dec.efectivo_usd) || 0;
+        const decBs = parseFloat(dec.efectivo_bs) || 0;
+        const espUsd = r.efectivoUSD || 0;
+        const espBs = r.efectivoBs || 0;
+        arqHoy = {
+          fecha: hoyStr,
+          hora: found.hora || 'Cerrado',
+          declaradoUSD: decUsd,
+          declaradoBs: decBs,
+          diferenciaUSD: decUsd - espUsd,
+          diferenciaBs: decBs - espBs
+        };
+      }
+    }
+
+    if (!arqHoy && storeData.respaldo_completo?.configuracion) {
+      const rawCfg = storeData.respaldo_completo.configuracion;
+      if (Array.isArray(rawCfg)) {
+        const arqCfg = rawCfg.find(c => c && c.id === 'tuempresa_arqueos');
+        if (arqCfg && Array.isArray(arqCfg.value)) {
+          const found = arqCfg.value.find(a => (a.fecha || '').trim() === hoyStr);
+          if (found) {
+            const dec = found.declaracion || {};
+            const decUsd = parseFloat(dec.efectivo_usd) || 0;
+            const decBs = parseFloat(dec.efectivo_bs) || 0;
+            const espUsd = r.efectivoUSD || 0;
+            const espBs = r.efectivoBs || 0;
+            arqHoy = {
+              fecha: hoyStr,
+              hora: found.hora || 'Cerrado',
+              declaradoUSD: decUsd,
+              declaradoBs: decBs,
+              diferenciaUSD: decUsd - espUsd,
+              diferenciaBs: decBs - espBs
+            };
+          }
+        }
+      }
+    }
+
+    // Elementos de veredicto
+    const cardVeredicto = document.getElementById('card-cuadre-veredicto');
+    const txtIcon = document.getElementById('txt-veredicto-icon');
+    const txtTitle = document.getElementById('txt-veredicto-title');
+    const txtSub = document.getElementById('txt-veredicto-sub');
+    const badgeStatus = document.getElementById('badge-cuadre-status');
+    const txtDiferencia = document.getElementById('cierre-diferencia-texto');
+
+    if (cardVeredicto && txtIcon && txtTitle && txtSub) {
+      cardVeredicto.className = 'cuadre-veredicto-card';
+
+      if (arqHoy) {
+        const difUsd = arqHoy.diferenciaUSD !== undefined ? arqHoy.diferenciaUSD : 0;
+        const difBs = arqHoy.diferenciaBs !== undefined ? arqHoy.diferenciaBs : 0;
+
+        if (difUsd < -0.05 || difBs < -5) {
+          // FALTANTE
+          cardVeredicto.classList.add('status-faltante');
+          txtIcon.textContent = '🔴';
+          txtTitle.textContent = `FALTANTE EN CAJA: -$${Math.abs(difUsd).toFixed(2)}`;
+          txtSub.textContent = `Faltan $${Math.abs(difUsd).toFixed(2)} USD (y Bs ${Math.abs(difBs).toFixed(2)}) entre el efectivo físico reportado y lo facturado.`;
+          if (badgeStatus) {
+            badgeStatus.className = 'badge-status-cierre faltante';
+            badgeStatus.innerHTML = `🔴 Faltante -$${Math.abs(difUsd).toFixed(2)}`;
+          }
+          if (txtDiferencia) {
+            txtDiferencia.style.color = '#EF4444';
+            txtDiferencia.textContent = `🔴 Faltante -$${Math.abs(difUsd).toFixed(2)}`;
+          }
+        } else if (difUsd > 0.05 || difBs > 5) {
+          // SOBRANTE
+          cardVeredicto.classList.add('status-sobrante');
+          txtIcon.textContent = '🔵';
+          txtTitle.textContent = `SOBRANTE EN CAJA: +$${difUsd.toFixed(2)}`;
+          txtSub.textContent = `Hay un excedente de +$${difUsd.toFixed(2)} USD (y Bs ${difBs.toFixed(2)}) en el efectivo físico reportado.`;
+          if (badgeStatus) {
+            badgeStatus.className = 'badge-status-cierre sobrante';
+            badgeStatus.innerHTML = `🔵 Sobrante +$${difUsd.toFixed(2)}`;
+          }
+          if (txtDiferencia) {
+            txtDiferencia.style.color = '#3B82F6';
+            txtDiferencia.textContent = `🔵 Sobrante +$${difUsd.toFixed(2)}`;
+          }
+        } else {
+          // CUADRE EXACTO
+          cardVeredicto.classList.add('status-cuadrado');
+          txtIcon.textContent = '🟢';
+          txtTitle.textContent = `CUADRE EXACTO (Cierre Conforme)`;
+          txtSub.textContent = `El dinero físico en caja coincide exactamente con el sistema (Cierre a las ${arqHoy.hora || 'fin de jornada'}).`;
+          if (badgeStatus) {
+            badgeStatus.className = 'badge-status-cierre cuadrado';
+            badgeStatus.innerHTML = `✓ Cuadre Exacto`;
+          }
+          if (txtDiferencia) {
+            txtDiferencia.style.color = '#10B981';
+            txtDiferencia.textContent = `🟢 Exacto (Sin diferencias)`;
+          }
+        }
+      } else {
+        // EN OPERACIÓN
+        cardVeredicto.classList.add('status-operacion');
+        txtIcon.textContent = '⏳';
+        txtTitle.textContent = 'CAJA EN OPERACIÓN (PENDIENTE DE CIERRE)';
+        txtSub.textContent = 'El cajero aún no ha realizado el arqueo y cierre físico de caja de hoy. Mostrando valores acumulados en vivo.';
+        if (badgeStatus) {
+          badgeStatus.className = 'badge-status-cierre operacion';
+          badgeStatus.innerHTML = `⏳ En Operación`;
+        }
+        if (txtDiferencia) {
+          txtDiferencia.style.color = '#F59E0B';
+          txtDiferencia.textContent = `⏳ Pendiente de arqueo físico`;
+        }
+      }
+    }
+
+    // 2. CONSTRUIR HISTORIAL DE LOS ÚLTIMOS 5 CIERRES DE CAJA
+    const containerHist = document.getElementById('historial-cierres-container');
+    if (!containerHist) return;
+
+    const ventas = storeData.respaldo_completo?.ventas || [];
+    
+    let arqueosList = [];
+    if (Array.isArray(storeData.historial_reciente)) {
+      arqueosList = arqueosList.concat(storeData.historial_reciente);
+    }
+    if (storeData.respaldo_completo?.configuracion) {
+      const rawCfg = storeData.respaldo_completo.configuracion;
+      if (Array.isArray(rawCfg)) {
+        const arqCfg = rawCfg.find(c => c && c.id === 'tuempresa_arqueos');
+        if (arqCfg && Array.isArray(arqCfg.value)) {
+          arqueosList = arqueosList.concat(arqCfg.value);
+        }
+      }
+    }
+
+    const ventasPorDia = {};
+    ventas.forEach(v => {
+      if (!v.fecha) return;
+      const dia = v.fecha.substring(0, 10);
+      // Excluir el día de hoy si aún no ha cerrado caja para mantener los 5 cierres pasados finalizados
+      if (dia === hoyStr && !arqHoy) return;
+
+      if (!ventasPorDia[dia]) {
+        ventasPorDia[dia] = {
+          fecha: dia,
+          totalUSD: 0,
+          efectivoUSD: 0,
+          efectivoBs: 0,
+          digitalUSD: 0,
+          ventasCount: 0,
+          botellones: 0
+        };
+      }
+      const d = ventasPorDia[dia];
+      d.totalUSD += (v.total || 0);
+      d.ventasCount++;
+
+      if (Array.isArray(v.detalles)) {
+        v.detalles.forEach(it => {
+          d.botellones += (it.cantidad || 0);
+        });
+      }
+
+      if (v.pagos && Array.isArray(v.pagos)) {
+        v.pagos.forEach(p => {
+          const met = (p.metodo || '').toLowerCase();
+          if (met.includes('efectivo') && met.includes('usd')) {
+            d.efectivoUSD += (p.montoUSD || p.monto || 0);
+          } else if (met.includes('efectivo')) {
+            d.efectivoBs += (p.montoBs || p.monto || 0);
+          } else {
+            d.digitalUSD += (p.montoUSD || p.monto || 0);
+          }
+        });
+      }
+    });
+
+    const diasOrdenados = Object.keys(ventasPorDia).sort((a, b) => b.localeCompare(a));
+    const ultimos5Dias = diasOrdenados.slice(0, 5);
+
+    if (ultimos5Dias.length === 0) {
+      containerHist.innerHTML = `
+        <div style="text-align: center; padding: 1.5rem; color: var(--neu-text-muted); font-size: 0.85rem;">
+          No hay cierres anteriores registrados en el sistema para esta tienda.
+        </div>
+      `;
+      return;
+    }
+
+    const cardsHtml = ultimos5Dias.map(diaStr => {
+      const dataDia = ventasPorDia[diaStr];
+      const arqDia = arqueosList.find(a => (a.fecha || '').trim() === diaStr);
+      
+      let statusBadge = '<span class="badge-status-cierre cuadrado">✓ Cierre Conforme</span>';
+      if (arqDia) {
+        const decUsd = parseFloat(arqDia.declaracion?.efectivo_usd) || 0;
+        const dif = decUsd - dataDia.efectivoUSD;
+        if (dif < -0.05) {
+          statusBadge = `<span class="badge-status-cierre faltante">🔴 Faltante -$${Math.abs(dif).toFixed(2)}</span>`;
+        } else if (dif > 0.05) {
+          statusBadge = `<span class="badge-status-cierre sobrante">🔵 Sobrante +$${dif.toFixed(2)}</span>`;
+        } else {
+          statusBadge = '<span class="badge-status-cierre cuadrado">🟢 Cuadre Exacto</span>';
+        }
+      }
+
+      let fechaLegible = diaStr;
+      try {
+        const partes = diaStr.split('-');
+        const dObj = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
+        fechaLegible = dObj.toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric', month: 'short' });
+        fechaLegible = fechaLegible.charAt(0).toUpperCase() + fechaLegible.slice(1);
+      } catch(e) {}
+
+      const horaLabel = arqDia?.hora ? `Cerrado ${arqDia.hora}` : 'Cierre Diario';
+
+      return `
+        <div class="historial-cierre-item">
+          <div class="historial-cierre-head">
+            <div>
+              <span class="historial-cierre-date">📅 ${fechaLegible}</span>
+              <span class="historial-cierre-time" style="margin-left: 6px;">· ${horaLabel}</span>
+            </div>
+            <div>${statusBadge}</div>
+          </div>
+
+          <div class="historial-grid-3">
+            <div>
+              <div class="historial-col-val" style="color: var(--neu-text-main);">$ ${dataDia.totalUSD.toFixed(2)}</div>
+              <div class="historial-col-lbl">Facturado</div>
+            </div>
+            <div>
+              <div class="historial-col-val" style="color: #0284C7;">$ ${dataDia.efectivoUSD.toFixed(2)}</div>
+              <div class="historial-col-lbl">${dataDia.efectivoBs > 0 ? `+Bs ${dataDia.efectivoBs.toFixed(0)}` : 'Efectivo'}</div>
+            </div>
+            <div>
+              <div class="historial-col-val" style="color: #6366F1;">$ ${dataDia.digitalUSD.toFixed(2)}</div>
+              <div class="historial-col-lbl">Digital / Bancos</div>
+            </div>
+          </div>
+
+          <div class="historial-cierre-foot">
+            <span>💧 <strong>${dataDia.botellones}</strong> botellones recargados</span>
+            <span>🧾 <strong>${dataDia.ventasCount}</strong> ventas</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    containerHist.innerHTML = cardsHtml;
   }
 
   // Control de secciones colapsables en el feed de movimientos
