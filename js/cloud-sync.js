@@ -408,16 +408,72 @@ export async function syncToCloud(isManual = false) {
             }
             return c;
           });
+          // Inyectar arqueos y turnos en la configuración del respaldo para que persistan en la nube
+          try {
+            const arqs = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+            const trns = JSON.parse(localStorage.getItem('tuempresa_turnos_caja') || '[]');
+            respaldoObj.configuracion.push({ id: 'tuempresa_arqueos', value: arqs });
+            respaldoObj.configuracion.push({ id: 'tuempresa_turnos_caja', value: trns });
+          } catch(e) {}
         }
       } catch (bErr) {
         console.warn('[CloudSync] Error generando snapshot de respaldo:', bErr);
       }
     }
 
+    // 🛡️ Detección de Arqueos y Cierres de Caja para el Visor Ejecutivo
+    let arqueosLocales = [];
+    let turnosLocales = [];
+    try {
+      arqueosLocales = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
+      turnosLocales = JSON.parse(localStorage.getItem('tuempresa_turnos_caja') || '[]');
+    } catch(e) {}
+
+    const arqHoy = arqueosLocales.find(a => (a.fecha || '').trim() === hoy);
+    const turnosHoy = turnosLocales.filter(t => (t.fecha || '').trim() === hoy);
+    const ultimoTurno = turnosHoy.length > 0 ? turnosHoy[turnosHoy.length - 1] : null;
+
+    let cierreHoyInfo = {
+      cerrado: false,
+      estado: 'en_operacion',
+      hora: null,
+      diferenciaUSD: 0,
+      diferenciaBs: 0,
+      declaradoUSD: 0,
+      declaradoBs: 0,
+      esperadoUSD: efectivoUSD,
+      esperadoBs: efectivoBs
+    };
+
+    if (arqHoy || (ultimoTurno && ultimoTurno.estado === 'cerrado')) {
+      const dec = arqHoy?.declaracion || ultimoTurno?.declaracion || {};
+      const decUsd = parseFloat(dec.efectivo_usd) || 0;
+      const decBs = parseFloat(dec.efectivo_bs) || 0;
+      const difUsd = decUsd - efectivoUSD;
+      const difBs = decBs - efectivoBs;
+      let est = 'cuadrado';
+      if (difUsd < -0.05 || difBs < -5) est = 'faltante';
+      else if (difUsd > 0.05 || difBs > 5) est = 'sobrante';
+
+      cierreHoyInfo = {
+        cerrado: true,
+        estado: est,
+        hora: arqHoy?.hora || (ultimoTurno?.fin ? ultimoTurno.fin.substring(11, 16) : 'Cerrado'),
+        diferenciaUSD: difUsd,
+        diferenciaBs: difBs,
+        declaradoUSD: decUsd,
+        declaradoBs: decBs,
+        esperadoUSD: efectivoUSD,
+        esperadoBs: efectivoBs,
+        observaciones: arqHoy?.observaciones || ultimoTurno?.observaciones || ''
+      };
+    }
+
     const payload = {
       empresa_email: email,
       nombre_empresa: empresaNombre,
       ultima_actualizacion: new Date().toISOString(),
+      historial_reciente: arqueosLocales.slice(-10),
       resumen_hoy: {
         totalUSD,
         totalBs,
@@ -434,7 +490,8 @@ export async function syncToCloud(isManual = false) {
         transferencia,
         credito,
         litrosMermasHoy,
-        desglose_metodos: desgloseMetodos
+        desglose_metodos: desgloseMetodos,
+        cierre: cierreHoyInfo
       },
       nivel_tanque: {
         litros: inventario.litros || 0,
