@@ -2144,6 +2144,21 @@ body.hide-montos #cierre-digital-usd {
         </div>
       </div>
 
+      <!-- Acceso Rápido al Consolidado Multisede (Suma de Todas las Tiendas) -->
+      <div onclick="cambiarSedeRefillH2O('todas')" style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; color: #fff; box-shadow: 0 4px 14px rgba(15,23,42,0.18); margin-bottom: 18px; cursor: pointer; border: 1px solid rgba(56,189,248,0.35);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(56,189,248,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">🏢</div>
+          <div>
+            <div style="font-size: 0.8rem; font-weight: 800; color: #38BDF8; letter-spacing: 0.4px;">SUMA DE TODAS LAS TIENDAS</div>
+            <div style="font-size: 0.7rem; color: #94A3B8;">Toca aquí para ver los totales de toda la red (Semana y Mes)</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 800; color: #38BDF8; background: rgba(56,189,248,0.15); padding: 5px 12px; border-radius: 20px;">
+          <span>Ver Red</span>
+          <span>➔</span>
+        </div>
+      </div>
+
       <!-- Desglose de Caja -->
       <h3 class="section-title">💵 Desglose de Caja Hoy</h3>
       <div class="caja-grid" id="caja-grid-container">
@@ -2729,7 +2744,7 @@ body.hide-montos #cierre-digital-usd {
     if (!bar || !container) return;
 
     // La barra de sedes se muestra para el supervisor o cuentas Refill H2O
-    if (!esSupervisorRefill() && !esCuentaRefillH2O(activeEmail)) {
+    if (!esSupervisorRefill() && !esCuentaRefillH2O(activeEmail) && activeEmail !== 'todas') {
       bar.style.display = 'none';
       return;
     }
@@ -2737,12 +2752,22 @@ body.hide-montos #cierre-digital-usd {
     bar.style.display = 'block';
 
     const sedesArray = Object.values(REFILLH2O_SEDES);
-    if (!REFILLH2O_SEDES[activeEmail.toLowerCase()] && activeEmail.startsWith('refillh2o.')) {
+    if (!REFILLH2O_SEDES[activeEmail.toLowerCase()] && activeEmail.startsWith('refillh2o.') && activeEmail !== 'todas') {
       const extra = obtenerInfoSedeRefill(activeEmail);
       if (extra) sedesArray.push(extra);
     }
 
-    container.innerHTML = sedesArray.map(s => {
+    const isTodas = activeEmail.toLowerCase() === 'todas';
+
+    let html = `
+      <button type="button" class="sede-pill-btn ${isTodas ? 'active' : ''}" onclick="cambiarSedeRefillH2O('todas')" title="Consolidado de toda la red Refill H2O (Suma de todas las tiendas)" style="${isTodas ? 'background: linear-gradient(135deg, #0284C7, #0369A1); color: #fff; font-weight: 800; border-color: #38BDF8;' : 'border-color: #0284C7; color: #0284C7; font-weight: 700;'}">
+        <span class="sede-status-dot online" style="background: #38BDF8; box-shadow: 0 0 6px #38BDF8;"></span>
+        <span>🌐 TODAS (Red)</span>
+        <span class="pill-conn-text online" style="color: ${isTodas ? '#E0F2FE' : '#0284C7'};">Suma total</span>
+      </button>
+    `;
+
+    html += sedesArray.map(s => {
       const isActive = s.email.toLowerCase() === activeEmail.toLowerCase();
       const activeClass = isActive ? 'active' : '';
       const cached = cacheGlobalTiendas[s.email];
@@ -2755,6 +2780,8 @@ body.hide-montos #cierre-digital-usd {
         </button>
       `;
     }).join('');
+
+    container.innerHTML = html;
   }
 
   async function cambiarSedeRefillH2O(nuevoEmail) {
@@ -2773,6 +2800,26 @@ body.hide-montos #cierre-digital-usd {
         btn.classList.remove('active');
       }
     });
+
+    if (nuevoEmail === 'todas') {
+      const badge = document.getElementById('badge-sede');
+      if (badge) {
+        badge.textContent = '🌐 TODA LA RED (MULTISEDE)';
+        badge.style.display = 'inline-flex';
+      }
+      const txtOwner = document.getElementById('txt-owner-email');
+      if (txtOwner) txtOwner.style.display = 'none';
+
+      try {
+        await cargarTodasLasSedesRefill();
+        renderizarConsolidadoEnPantallaPrincipal();
+      } catch (err) {
+        console.warn('Error al consolidar todas las sedes:', err);
+      } finally {
+        if (indicator) indicator.style.display = 'none';
+      }
+      return;
+    }
 
     const info = obtenerInfoSedeRefill(nuevoEmail);
     if (info) {
@@ -3077,6 +3124,11 @@ window.cambiarPeriodoVentas = function(periodo) {
   document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
   const btn = document.getElementById(`btn-period-${periodo}`);
   if (btn) btn.classList.add('active');
+
+  if (currentStoreEmail === 'todas') {
+    renderizarConsolidadoEnPantallaPrincipal();
+    return;
+  }
 
   const currentData = cacheGlobalTiendas[currentStoreEmail];
   if (currentData) {
@@ -3602,6 +3654,110 @@ function renderizarConsolidadoYRankingMultisede(periodo = 'hoy') {
   }
 }
 
+// 🌐 Calcula los totales consolidados de la red sumando todas las sedes
+function calcularTotalesPeriodoRed(periodo) {
+  const sedesKeys = Object.keys(REFILLH2O_SEDES);
+  let totalUSD = 0, totalBs = 0, efectivoUSD = 0, efectivoBs = 0, bancosUSD = 0, botellones = 0, litros = 0, numVentas = 0;
+
+  sedesKeys.forEach(email => {
+    const tienda = cacheGlobalTiendas[email.toLowerCase()];
+    if (tienda) {
+      const s = calcularTotalesPeriodoTienda(tienda, periodo);
+      totalUSD += (s.totalUSD || 0);
+      totalBs += (s.totalBs || 0);
+      efectivoUSD += (s.efectivoUSD || 0);
+      efectivoBs += (s.efectivoBs || 0);
+      bancosUSD += (s.bancosUSD || 0);
+      botellones += (s.botellones || 0);
+      litros += (s.litros || 0);
+      numVentas += (s.numVentas || 0);
+    }
+  });
+
+  return { totalUSD, totalBs, efectivoUSD, efectivoBs, bancosUSD, botellones, litros, numVentas };
+}
+
+// 🌐 Renderiza el Consolidado de Toda la Red directamente en la pantalla principal (En Vivo)
+function renderizarConsolidadoEnPantallaPrincipal() {
+  const liveStatusEl = document.querySelector('.live-status');
+  if (liveStatusEl) {
+    liveStatusEl.innerHTML = `
+      <span class="live-dot" style="background:#10B981;"></span>
+      <span style="color:#059669; font-weight:700;">RED CONECTADA</span> · <span style="color:#475569;">Consolidado de 6 sedes en tiempo real</span>
+    `;
+  }
+
+  const redHoy = calcularTotalesPeriodoRed('hoy');
+  const redSemana = calcularTotalesPeriodoRed('semana');
+  const redMes = calcularTotalesPeriodoRed('mes');
+
+  // Mini cards
+  const elMiniHoy = document.getElementById('mini-total-hoy');
+  if (elMiniHoy) elMiniHoy.textContent = `$ ${redHoy.totalUSD.toFixed(2)}`;
+  const elMiniSemana = document.getElementById('mini-total-semana');
+  if (elMiniSemana) elMiniSemana.textContent = `$ ${redSemana.totalUSD.toFixed(2)}`;
+  const elMiniMes = document.getElementById('mini-total-mes');
+  if (elMiniMes) elMiniMes.textContent = `$ ${redMes.totalUSD.toFixed(2)}`;
+
+  // Destacar mini card activo
+  const cardHoy = document.getElementById('card-mini-hoy');
+  if (cardHoy) cardHoy.style.border = (periodoActivo === 'hoy') ? '1.5px solid #0284C7' : '1px solid #fff';
+  const cardSemana = document.getElementById('card-mini-semana');
+  if (cardSemana) cardSemana.style.border = (periodoActivo === 'semana') ? '1.5px solid #10B981' : '1px solid #fff';
+  const cardMes = document.getElementById('card-mini-mes');
+  if (cardMes) cardMes.style.border = (periodoActivo === 'mes') ? '1.5px solid #8B5CF6' : '1px solid #fff';
+
+  let current = redHoy;
+  const heroLabel = document.querySelector('.hero-label');
+  if (periodoActivo === 'hoy') {
+    if (heroLabel) heroLabel.textContent = 'Facturación Toda la Red (Hoy)';
+    current = redHoy;
+  } else if (periodoActivo === 'semana') {
+    if (heroLabel) heroLabel.textContent = 'Facturación Toda la Red (Esta Semana)';
+    current = redSemana;
+  } else if (periodoActivo === 'mes') {
+    if (heroLabel) heroLabel.textContent = 'Facturación Toda la Red (Este Mes)';
+    current = redMes;
+  }
+
+  const txtUSD = document.getElementById('txt-total-usd');
+  if (txtUSD) txtUSD.textContent = `$ ${current.totalUSD.toFixed(2)}`;
+  const txtBs = document.getElementById('txt-total-bs');
+  if (txtBs) txtBs.textContent = `≈ Bs ${current.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+  const txtBots = document.getElementById('txt-botellones');
+  if (txtBots) txtBots.textContent = current.botellones;
+  const txtLts = document.getElementById('txt-litros');
+  if (txtLts) txtLts.textContent = `${current.litros.toLocaleString()} L`;
+  const txtVentas = document.getElementById('txt-ventas-count');
+  if (txtVentas) txtVentas.textContent = current.numVentas;
+
+  // Actualizar caja con métodos consolidados de la red
+  const cajaCont = document.getElementById('caja-grid-container');
+  if (cajaCont) {
+    const tasa = (current.totalUSD > 0 && current.totalBs > 0) ? (current.totalBs / current.totalUSD) : 890;
+    const efBsEnUSD = current.efectivoBs > 0 ? (current.efectivoBs / tasa) : 0;
+    const totalEfUSD = current.efectivoUSD + efBsEnUSD;
+
+    cajaCont.innerHTML = `
+      <div class="caja-card" style="border-left: 3px solid #10B981; grid-column: span 2;">
+        <div class="caja-label">💵 Efectivo Físico Total (Red)</div>
+        <div class="caja-value">$ ${totalEfUSD.toFixed(2)}</div>
+        <div class="caja-sub">$ ${current.efectivoUSD.toFixed(2)} + Bs ${current.efectivoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+      </div>
+      <div class="caja-card" style="border-left: 3px solid #3B82F6;">
+        <div class="caja-label">💳 Bancos / Digital (Red)</div>
+        <div class="caja-value">$ ${current.bancosUSD.toFixed(2)}</div>
+        <div class="caja-sub">Transferencias / Punto / PM</div>
+      </div>
+      <div class="caja-card" style="border-left: 3px solid #8B5CF6;">
+        <div class="caja-label">🏢 Red Multisede</div>
+        <div class="caja-value">6 Tiendas</div>
+        <div class="caja-sub">Consolidado Total</div>
+      </div>
+    `;
+  }
+}
+
 function cambiarTab(tabName) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -3625,6 +3781,16 @@ function cambiarTab(tabName) {
   // Cargar Datos de Supabase
   async function cargarDatosEnVivo() {
     if (!currentStoreEmail) return;
+
+    if (currentStoreEmail === 'todas') {
+      try {
+        await cargarTodasLasSedesRefill();
+        renderizarConsolidadoEnPantallaPrincipal();
+      } catch (err) {
+        console.warn('Error al consolidar sedes:', err);
+      }
+      return;
+    }
 
     // Verificar en caliente si la cuenta sigue activa o fue suspendida por el admin
     const licCheck = await verificarLicencia(currentStoreEmail);
