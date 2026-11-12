@@ -17,30 +17,49 @@ function formatHora(isoStr) {
   }
 }
 
-function getNombreTiendaCompleto() {
+export function getNombreTiendaCompleto() {
   let userEmail = '';
+  let nombreLic = '';
   try {
     const lic = JSON.parse(localStorage.getItem('licencia_usuario') || '{}');
     userEmail = (lic.email || '').trim().toLowerCase();
     if (lic.nombre_empresa && lic.nombre_empresa !== 'None' && lic.nombre_empresa.trim()) {
-      return lic.nombre_empresa.trim();
+      nombreLic = lic.nombre_empresa.trim();
     }
   } catch (e) {}
 
-  if (userEmail.startsWith('refillh2o.')) {
-    const sedesMap = {
-      'refillh2o.lcf@gmail.com': 'Refill H2O - La California Sur',
-      'refillh2o.se@gmail.com': 'Refill H2O - Santa Eduvigis',
-      'refillh2o.ldc@gmail.com': 'Refill H2O - Los Dos Caminos',
-      'refillh2o.sr@gmail.com': 'Refill H2O - Santa Rosa',
-      'refillh2o.sp@gmail.com': 'Refill H2O - Santa Paula',
-      'refillh2o.sf@gmail.com': 'Refill H2O - Santa Fe'
-    };
-    if (sedesMap[userEmail]) return sedesMap[userEmail];
+  if (!userEmail) {
+    try {
+      userEmail = (localStorage.getItem('user_email') || localStorage.getItem('visor_refill_selected_sede') || '').trim().toLowerCase();
+    } catch (e) {}
   }
 
+  // 1. Mapeo específico de sedes Refill H2O (prioritario para reflejar la sede exacta en cabecera)
+  const sedesMap = {
+    'refillh2o.lcf@gmail.com': 'Refill H2O - La California Sur',
+    'refillh2o.se@gmail.com': 'Refill H2O - Santa Eduvigis',
+    'refillh2o.ldc@gmail.com': 'Refill H2O - Los Dos Caminos',
+    'refillh2o.sr@gmail.com': 'Refill H2O - Santa Rosa',
+    'refillh2o.sp@gmail.com': 'Refill H2O - Santa Paula',
+    'refillh2o.sf@gmail.com': 'Refill H2O - Santa Fe'
+  };
+
+  if (userEmail && sedesMap[userEmail]) {
+    return sedesMap[userEmail];
+  }
+
+  // 2. Nombre de empresa registrado en la licencia si es específico
+  if (nombreLic && nombreLic !== 'Tu Empresa') {
+    return nombreLic;
+  }
+
+  // 3. Nombre configurado en el sistema local
   const nombreCfg = (store.getConfig('empresaNombre') || '').trim();
-  return nombreCfg || 'Tu Empresa';
+  if (nombreCfg && nombreCfg !== 'Tu Empresa') {
+    return nombreCfg;
+  }
+
+  return 'Refill H2O';
 }
 
 function getMethodsList() {
@@ -573,7 +592,7 @@ function renderConsolidadoZ(turnos, fecha, methods) {
           📄 Imprimir Reporte Z (PDF)
         </button>
         <button id="btn-imprimir-reporte-txt" class="btn btn-secondary" style="font-weight: 700; height: 40px; padding: 0 16px; margin-left: 8px;">
-          📋 Descargar Reporte (.txt)
+          📋 Descargar Reporte Cierre
         </button>
       </div>
     </div>
@@ -1834,7 +1853,7 @@ export function renderCierreCaja(container) {
           <input type="date" class="form-control" id="cierre-fecha-home" style="max-width:160px; height:36px; padding:4px 8px; font-size:14px;" value="${today}"/>
         </div>
         <button id="btn-generar-pdf-home" class="btn btn-primary" style="height:36px; padding:0 12px; font-size:13px;">📄 Generar Z (PDF)</button>
-        <button id="btn-generar-txt-home" class="btn btn-secondary" style="height:36px; padding:0 12px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">📋 Reporte (.txt)</button>
+        <button id="btn-generar-txt-home" class="btn btn-secondary" style="height:36px; padding:0 12px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">📋 Reporte Cierre</button>
       </div>
     </div>
     <div id="cierre-caja-home-content"></div>
