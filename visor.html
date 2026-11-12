@@ -1289,6 +1289,66 @@ body {
   margin-bottom: 20px;
 }
 
+/* Selector de Período Multisede */
+.multisede-period-pills {
+  display: inline-flex;
+  gap: 3px;
+  background: rgba(255,255,255,0.08);
+  padding: 3px;
+  border-radius: 14px;
+}
+.btn-period-multi {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-period-multi.active {
+  background: #0284C7;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Tarjeta de Totales por Tienda y Barras de Progreso */
+.tienda-totales-card {
+  background: var(--neu-surface);
+  border: 1px solid #ffffff;
+  border-radius: 18px;
+  padding: 13px 15px;
+  box-shadow: var(--neu-shadow-sm);
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.tienda-totales-card:active {
+  transform: scale(0.985);
+}
+.tienda-progress-track {
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.tienda-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0284C7, #38BDF8);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.periodo-mini-card {
+  transition: all 0.2s ease;
+}
+.periodo-mini-card:active {
+  transform: scale(0.96);
+}
+
 /* Veredicto de Cuadre y Auditoría */
 .cuadre-veredicto-card {
   border-radius: 20px;
@@ -2068,6 +2128,22 @@ body.hide-montos #cierre-digital-usd {
         </div>
       </div>
 
+      <!-- Resumen de Totales de Esta Tienda: Hoy / Semana / Mes -->
+      <div class="tienda-periodos-resumen" id="tienda-periodos-resumen-bar" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0 16px 0;">
+        <div class="periodo-mini-card" onclick="cambiarPeriodoVentas('hoy')" id="card-mini-hoy" style="background: var(--neu-surface); border: 1.5px solid #0284C7; border-radius: 14px; padding: 8px 6px; text-align: center; cursor: pointer; box-shadow: var(--neu-shadow-sm);">
+          <div style="font-size: 0.66rem; color: var(--neu-text-muted); font-weight: 800; text-transform: uppercase;">⚡ Hoy</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #0284C7; margin-top: 2px;" id="mini-total-hoy">$ 0.00</div>
+        </div>
+        <div class="periodo-mini-card" onclick="cambiarPeriodoVentas('semana')" id="card-mini-semana" style="background: var(--neu-surface); border: 1px solid #fff; border-radius: 14px; padding: 8px 6px; text-align: center; cursor: pointer; box-shadow: var(--neu-shadow-sm);">
+          <div style="font-size: 0.66rem; color: var(--neu-text-muted); font-weight: 800; text-transform: uppercase;">📅 Semana</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #10B981; margin-top: 2px;" id="mini-total-semana">$ 0.00</div>
+        </div>
+        <div class="periodo-mini-card" onclick="cambiarPeriodoVentas('mes')" id="card-mini-mes" style="background: var(--neu-surface); border: 1px solid #fff; border-radius: 14px; padding: 8px 6px; text-align: center; cursor: pointer; box-shadow: var(--neu-shadow-sm);">
+          <div style="font-size: 0.66rem; color: var(--neu-text-muted); font-weight: 800; text-transform: uppercase;">🗓️ Mes</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #8B5CF6; margin-top: 2px;" id="mini-total-mes">$ 0.00</div>
+        </div>
+      </div>
+
       <!-- Desglose de Caja -->
       <h3 class="section-title">💵 Desglose de Caja Hoy</h3>
       <div class="caja-grid" id="caja-grid-container">
@@ -2138,10 +2214,68 @@ body.hide-montos #cierre-digital-usd {
 
     </div>
 
-    <!-- PESTAÑA 2: ESTADÍSTICAS Y ANÁLISIS -->
+    <!-- PESTAÑA 2: ESTADÍSTICAS Y ANÁLISIS MULTISEDE -->
     <div id="tab-stats" class="view-section">
-      <div class="card-hero" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-color: rgba(6, 182, 212, 0.3);">
-        <div class="hero-label" style="color: #475569;">Facturado este Mes</div>
+
+      <!-- Sección Comparativa Multisede -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <h3 class="section-title" style="margin: 0;">🏢 Rendimiento Multisede</h3>
+          <p style="font-size: 0.74rem; color: var(--neu-text-muted); margin-top: 2px; margin-bottom: 0;">
+            Totales consolidados y comparativa por tienda
+          </p>
+        </div>
+        <div class="multisede-period-pills" style="background: var(--neu-surface); border: 1px solid #fff; box-shadow: var(--neu-shadow-sm);">
+          <button type="button" class="btn-period-multi active" id="btn-multi-stats-hoy" onclick="cambiarPeriodoConsolidado('hoy')" style="color: #64748B;">Hoy</button>
+          <button type="button" class="btn-period-multi" id="btn-multi-stats-semana" onclick="cambiarPeriodoConsolidado('semana')" style="color: #64748B;">Semana</button>
+          <button type="button" class="btn-period-multi" id="btn-multi-stats-mes" onclick="cambiarPeriodoConsolidado('mes')" style="color: #64748B;">Mes</button>
+        </div>
+      </div>
+
+      <!-- Hero Card Consolidado en Stats -->
+      <div class="consolidado-total-card" style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-size: 0.74rem; font-weight: 800; text-transform: uppercase; color: #94A3B8;" id="txt-stats-consolidado-label">
+            SUMA DE TODAS LAS TIENDAS
+          </div>
+          <span id="badge-stats-periodo" style="font-size: 0.7rem; background: rgba(2, 132, 199, 0.25); color: #38BDF8; padding: 2px 8px; border-radius: 12px; font-weight: 700;">
+            HOY
+          </span>
+        </div>
+        <div style="font-size: 2.2rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; margin: 8px 0 2px 0;" id="txt-stats-consolidado-usd">
+          $ 0.00
+        </div>
+        <div style="font-size: 0.88rem; color: #34D399; font-weight: 700;" id="txt-stats-consolidado-bs">
+          ≈ Bs 0,00 facturado
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div>
+            <div style="font-size: 0.7rem; color: #94A3B8;">Botellones Despachados</div>
+            <div style="font-size: 1.05rem; font-weight: 800; color: #38BDF8;" id="txt-stats-consolidado-botellones">0 unid.</div>
+          </div>
+          <div>
+            <div style="font-size: 0.7rem; color: #94A3B8;">Transacciones Totales</div>
+            <div style="font-size: 1.05rem; font-weight: 800; color: #A78BFA;" id="txt-stats-consolidado-ventas">0 ventas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desglose de Totales de Cada Tienda en el Periodo Seleccionado -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 0.82rem; font-weight: 800; color: var(--neu-text-main); text-transform: uppercase; letter-spacing: 0.5px;">
+            📊 Totales por Tienda (<span id="txt-ranking-periodo-nombre">Hoy</span>)
+          </span>
+          <span style="font-size: 0.72rem; color: var(--neu-text-muted);">Toca para abrir sede</span>
+        </div>
+        <div id="container-ranking-sedes">
+          <!-- Tarjetas de cada tienda generadas dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Métricas individuales de la sede activa -->
+      <div class="card-hero" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-color: rgba(6, 182, 212, 0.3); margin-bottom: 18px;">
+        <div class="hero-label" style="color: #475569;">Facturado este Mes (<span id="txt-stats-sede-activa">Esta Tienda</span>)</div>
         <div class="hero-amount" id="stat-mes-usd">$ 0.00</div>
         <div class="hero-bs" style="color: #A5F3FC;" id="stat-mes-bs">≈ Bs 0.00</div>
         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;" id="stat-mes-botellones">
@@ -2228,13 +2362,22 @@ body.hide-montos #cierre-digital-usd {
 
       <!-- Consolidado Total de Cierre de Todas las Tiendas -->
       <div class="consolidado-total-card" id="multisede-consolidado-card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div style="font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8;">
-            TOTAL CONSOLIDADO MULTISEDE
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8;">
+              TOTAL CONSOLIDADO MULTISEDE
+            </div>
+            <div id="txt-consolidado-periodo-badge" style="font-size: 0.68rem; color: #38BDF8; font-weight: 700; margin-top: 2px;">
+              ⚡ Ventas de Hoy (Todas las Sedes)
+            </div>
           </div>
-          <span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 12px; font-weight: 700;">HOY</span>
+          <div class="multisede-period-pills">
+            <button type="button" class="btn-period-multi active" id="btn-multi-cierre-hoy" onclick="cambiarPeriodoConsolidado('hoy')">Hoy</button>
+            <button type="button" class="btn-period-multi" id="btn-multi-cierre-semana" onclick="cambiarPeriodoConsolidado('semana')">Semana</button>
+            <button type="button" class="btn-period-multi" id="btn-multi-cierre-mes" onclick="cambiarPeriodoConsolidado('mes')">Mes</button>
+          </div>
         </div>
-        <div style="font-size: 2.2rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; margin: 6px 0;" id="txt-consolidado-usd">
+        <div style="font-size: 2.2rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; margin: 8px 0 2px 0;" id="txt-consolidado-usd">
           $ 0.00
         </div>
         <div style="font-size: 0.9rem; color: #34D399; font-weight: 700;" id="txt-consolidado-bs">
@@ -2926,6 +3069,7 @@ body.hide-montos #cierre-digital-usd {
 // SISTEMA DE PERIODOS (HOY | SEMANA | MES), ESTADO EN LÍNEA Y CONSOLIDADO
 // =========================================================================
 let periodoActivo = 'hoy'; // 'hoy', 'semana', 'mes'
+let periodoConsolidadoMultisede = 'hoy'; // 'hoy', 'semana', 'mes'
 let cacheGlobalTiendas = {}; // Cache de datos de todas las sucursales
 
 window.cambiarPeriodoVentas = function(periodo) {
@@ -2938,6 +3082,11 @@ window.cambiarPeriodoVentas = function(periodo) {
   if (currentData) {
     aplicarPeriodoVentas(currentData, periodo);
   }
+};
+
+window.cambiarPeriodoConsolidado = function(periodo) {
+  periodoConsolidadoMultisede = periodo;
+  renderizarConsolidadoYRankingMultisede(periodo);
 };
 
 function calcularTiempoDesconexion(fechaIso) {
@@ -2965,82 +3114,211 @@ function calcularTiempoDesconexion(fechaIso) {
   return { online: false, texto: `Hace ${diffDias} d`, horaExacta, detalle: `${fechaExacta} ${horaExacta}` };
 }
 
-function aplicarPeriodoVentas(storeData, periodo) {
-  const r = storeData.resumen_hoy || {};
-  const stats = storeData.analisis_mes || {};
+// 🛡️ Calcula los totales precisos de una tienda para Hoy, Semana o Mes
+function calcularTotalesPeriodoTienda(tienda, periodo) {
+  if (!tienda) return { totalUSD: 0, totalBs: 0, efectivoUSD: 0, efectivoBs: 0, bancosUSD: 0, botellones: 0, litros: 0, numVentas: 0 };
 
-    // Actualizar indicador de conexión directa en la cabecera
-    const connInfo = calcularTiempoDesconexion(storeData.ultima_actualizacion);
-    const liveStatusEl = document.querySelector('.live-status');
-    if (liveStatusEl) {
-      if (connInfo.online) {
-        liveStatusEl.innerHTML = `
-          <span class="live-dot" style="background:#10B981;"></span>
-          <span style="color:#059669; font-weight:700;">EN LÍNEA</span> · <span style="color:#475569;">Activa ahora (${connInfo.horaExacta || 'Hoy'})</span>
-        `;
-      } else {
-        liveStatusEl.innerHTML = `
-          <span class="live-dot" style="background:#94A3B8; box-shadow:none;"></span>
-          <span style="color:#64748B; font-weight:700;">DESCONECTADA</span> · <span style="color:#475569;">Últ. conexión: <strong>${connInfo.texto}</strong> ${connInfo.horaExacta ? '(' + connInfo.horaExacta + ')' : ''}</span>
-        `;
-      }
+  const r = tienda.resumen_hoy || {};
+  const stats = tienda.analisis_mes || {};
+  const ventas = (tienda.respaldo_completo && Array.isArray(tienda.respaldo_completo.ventas)) ? tienda.respaldo_completo.ventas : [];
+  const now = new Date();
+  const hoyStr = now.toISOString().substring(0, 10);
+  const mesStr = now.toISOString().substring(0, 7);
+  const sieteDiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  let tasa = (r.totalUSD > 0 && r.totalBs > 0) ? (r.totalBs / r.totalUSD) : 890;
+
+  if (periodo === 'hoy') {
+    const tUSD = r.totalUSD || 0;
+    const tBs = r.totalBs || 0;
+    const efUSD = r.efectivoUSD || 0;
+    const efBs = r.efectivoBs || 0;
+    const efBsUSD = r.efectivoBsUSD || 0;
+    const bancos = Math.max(0, tUSD - efUSD - efBsUSD);
+    return {
+      totalUSD: tUSD,
+      totalBs: tBs,
+      efectivoUSD: efUSD,
+      efectivoBs: efBs,
+      bancosUSD: bancos,
+      botellones: r.botellones || 0,
+      litros: r.litros || 0,
+      numVentas: r.numVentas || 0
+    };
+  }
+
+  if (periodo === 'semana') {
+    const ventasSemana = ventas.filter(v => v.fecha && new Date(v.fecha) >= sieteDiasAtras);
+    if (ventasSemana.length > 0) {
+      let tUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
+      ventasSemana.forEach(v => {
+        const tot = parseFloat(v.total) || 0;
+        tUSD += tot;
+        const b = parseInt(v.botellones) || 0;
+        bots += b;
+        lts += parseFloat(v.litrosTotales) || (b * 20);
+
+        if (v.pagos && Array.isArray(v.pagos)) {
+          v.pagos.forEach(p => {
+            const m = (p.metodo || '').toLowerCase();
+            if (m.includes('efectivo') && m.includes('usd')) {
+              efUSD += (p.montoUSD || p.monto || 0);
+            } else if (m.includes('efectivo')) {
+              efBs += (p.montoBs || p.monto || 0);
+            } else {
+              digUSD += (p.montoUSD || p.monto || 0);
+            }
+          });
+        } else {
+          digUSD += tot;
+        }
+      });
+      return {
+        totalUSD: tUSD,
+        totalBs: tUSD * tasa,
+        efectivoUSD: efUSD,
+        efectivoBs: efBs,
+        bancosUSD: digUSD,
+        botellones: bots,
+        litros: lts,
+        numVentas: ventasSemana.length
+      };
+    } else {
+      return {
+        totalUSD: r.totalUSD || 0,
+        totalBs: r.totalBs || 0,
+        efectivoUSD: r.efectivoUSD || 0,
+        efectivoBs: r.efectivoBs || 0,
+        bancosUSD: Math.max(0, (r.totalUSD || 0) - (r.efectivoUSD || 0)),
+        botellones: r.botellones || 0,
+        litros: r.litros || 0,
+        numVentas: r.numVentas || 0
+      };
     }
-  const backup = storeData.respaldo_completo;
-  const ventas = (backup && Array.isArray(backup.ventas)) ? backup.ventas : [];
+  }
+
+  if (periodo === 'mes') {
+    const ventasMes = ventas.filter(v => v.fecha && v.fecha.startsWith(mesStr));
+    let tUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
+
+    if (ventasMes.length > 0) {
+      ventasMes.forEach(v => {
+        const tot = parseFloat(v.total) || 0;
+        tUSD += tot;
+        const b = parseInt(v.botellones) || 0;
+        bots += b;
+        lts += parseFloat(v.litrosTotales) || (b * 20);
+
+        if (v.pagos && Array.isArray(v.pagos)) {
+          v.pagos.forEach(p => {
+            const m = (p.metodo || '').toLowerCase();
+            if (m.includes('efectivo') && m.includes('usd')) {
+              efUSD += (p.montoUSD || p.monto || 0);
+            } else if (m.includes('efectivo')) {
+              efBs += (p.montoBs || p.monto || 0);
+            } else {
+              digUSD += (p.montoUSD || p.monto || 0);
+            }
+          });
+        } else {
+          digUSD += tot;
+        }
+      });
+      return {
+        totalUSD: tUSD,
+        totalBs: tUSD * tasa,
+        efectivoUSD: efUSD,
+        efectivoBs: efBs,
+        bancosUSD: digUSD,
+        botellones: bots,
+        litros: lts,
+        numVentas: ventasMes.length
+      };
+    } else if (stats.totalMesUSD) {
+      return {
+        totalUSD: stats.totalMesUSD || 0,
+        totalBs: stats.totalMesBs || (stats.totalMesUSD * tasa),
+        efectivoUSD: stats.totalMesUSD * 0.3,
+        efectivoBs: 0,
+        bancosUSD: stats.totalMesUSD * 0.7,
+        botellones: stats.totalBotellonesMes || 0,
+        litros: (stats.totalBotellonesMes ? stats.totalBotellonesMes * 20 : 0),
+        numVentas: r.numVentas || 0
+      };
+    } else {
+      return {
+        totalUSD: r.totalUSD || 0,
+        totalBs: r.totalBs || 0,
+        efectivoUSD: r.efectivoUSD || 0,
+        efectivoBs: r.efectivoBs || 0,
+        bancosUSD: Math.max(0, (r.totalUSD || 0) - (r.efectivoUSD || 0)),
+        botellones: r.botellones || 0,
+        litros: r.litros || 0,
+        numVentas: r.numVentas || 0
+      };
+    }
+  }
+
+  return { totalUSD: 0, totalBs: 0, efectivoUSD: 0, efectivoBs: 0, bancosUSD: 0, botellones: 0, litros: 0, numVentas: 0 };
+}
+
+function aplicarPeriodoVentas(storeData, periodo) {
+  const connInfo = calcularTiempoDesconexion(storeData.ultima_actualizacion);
+  const liveStatusEl = document.querySelector('.live-status');
+  if (liveStatusEl) {
+    if (connInfo.online) {
+      liveStatusEl.innerHTML = `
+        <span class="live-dot" style="background:#10B981;"></span>
+        <span style="color:#059669; font-weight:700;">EN LÍNEA</span> · <span style="color:#475569;">Activa ahora (${connInfo.horaExacta || 'Hoy'})</span>
+      `;
+    } else {
+      liveStatusEl.innerHTML = `
+        <span class="live-dot" style="background:#94A3B8; box-shadow:none;"></span>
+        <span style="color:#64748B; font-weight:700;">DESCONECTADA</span> · <span style="color:#475569;">Últ. conexión: <strong>${connInfo.texto}</strong> ${connInfo.horaExacta ? '(' + connInfo.horaExacta + ')' : ''}</span>
+      `;
+    }
+  }
+
+  // Totales calculados para los 3 periodos de esta tienda
+  const statsHoy = calcularTotalesPeriodoTienda(storeData, 'hoy');
+  const statsSemana = calcularTotalesPeriodoTienda(storeData, 'semana');
+  const statsMes = calcularTotalesPeriodoTienda(storeData, 'mes');
+
+  // Actualizar los mini-cards de periodos de esta tienda en la vista principal
+  const elMiniHoy = document.getElementById('mini-total-hoy');
+  if (elMiniHoy) elMiniHoy.textContent = `$ ${statsHoy.totalUSD.toFixed(2)}`;
+  const elMiniSemana = document.getElementById('mini-total-semana');
+  if (elMiniSemana) elMiniSemana.textContent = `$ ${statsSemana.totalUSD.toFixed(2)}`;
+  const elMiniMes = document.getElementById('mini-total-mes');
+  if (elMiniMes) elMiniMes.textContent = `$ ${statsMes.totalUSD.toFixed(2)}`;
+
+  // Destacar el mini-card activo
+  const cardHoy = document.getElementById('card-mini-hoy');
+  if (cardHoy) cardHoy.style.border = (periodo === 'hoy') ? '1.5px solid #0284C7' : '1px solid #fff';
+  const cardSemana = document.getElementById('card-mini-semana');
+  if (cardSemana) cardSemana.style.border = (periodo === 'semana') ? '1.5px solid #10B981' : '1px solid #fff';
+  const cardMes = document.getElementById('card-mini-mes');
+  if (cardMes) cardMes.style.border = (periodo === 'mes') ? '1.5px solid #8B5CF6' : '1px solid #fff';
 
   const heroLabel = document.querySelector('.hero-label');
-  let totalUSD = 0;
-  let totalBs = 0;
-  let botellones = 0;
-  let litros = 0;
-  let numVentas = 0;
-
-  const now = new Date();
+  let currentStats = statsHoy;
 
   if (periodo === 'hoy') {
     if (heroLabel) heroLabel.textContent = 'Total Facturado Hoy';
-    totalUSD = r.totalUSD || 0;
-    totalBs = r.totalBs || 0;
-    botellones = r.botellones || 0;
-    litros = r.litros || 0;
-    numVentas = r.numVentas || 0;
+    currentStats = statsHoy;
   } else if (periodo === 'semana') {
     if (heroLabel) heroLabel.textContent = 'Total Facturado Esta Semana';
-    // Últimos 7 días
-    const sieteDiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const ventasSemana = ventas.filter(v => v.fecha && new Date(v.fecha) >= sieteDiasAtras);
-    
-    if (ventasSemana.length > 0) {
-      ventasSemana.forEach(v => {
-        totalUSD += parseFloat(v.total) || 0;
-        botellones += parseInt(v.botellones) || 0;
-        litros += parseFloat(v.litrosTotales) || ((parseInt(v.botellones) || 0) * 20);
-      });
-      numVentas = ventasSemana.length;
-      const tasa = (r.totalUSD > 0 && r.totalBs > 0) ? (r.totalBs / r.totalUSD) : 890;
-      totalBs = totalUSD * tasa;
-    } else {
-      // Fallback si no hay ventas detalladas en respaldo
-      totalUSD = r.totalUSD || 0;
-      totalBs = r.totalBs || 0;
-      botellones = r.botellones || 0;
-      litros = r.litros || 0;
-      numVentas = r.numVentas || 0;
-    }
+    currentStats = statsSemana;
   } else if (periodo === 'mes') {
     if (heroLabel) heroLabel.textContent = 'Total Facturado Este Mes';
-    totalUSD = stats.totalMesUSD || r.totalUSD || 0;
-    totalBs = stats.totalMesBs || r.totalBs || 0;
-    botellones = stats.totalBotellonesMes || r.botellones || 0;
-    litros = (stats.totalBotellonesMes ? stats.totalBotellonesMes * 20 : (r.litros || 0));
-    numVentas = ventas.filter(v => v.fecha && v.fecha.startsWith(now.toISOString().substring(0, 7))).length || (r.numVentas || 0);
+    currentStats = statsMes;
   }
 
-  document.getElementById('txt-total-usd').textContent = `$ ${totalUSD.toFixed(2)}`;
-  document.getElementById('txt-total-bs').textContent = `≈ Bs ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
-  document.getElementById('txt-botellones').textContent = botellones;
-  document.getElementById('txt-litros').textContent = `${litros.toLocaleString()} L`;
-  document.getElementById('txt-ventas-count').textContent = numVentas;
+  document.getElementById('txt-total-usd').textContent = `$ ${currentStats.totalUSD.toFixed(2)}`;
+  document.getElementById('txt-total-bs').textContent = `≈ Bs ${currentStats.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+  document.getElementById('txt-botellones').textContent = currentStats.botellones;
+  document.getElementById('txt-litros').textContent = `${currentStats.litros.toLocaleString()} L`;
+  document.getElementById('txt-ventas-count').textContent = currentStats.numVentas;
 }
 
 // Cargar todas las tiendas para supervisión simultánea (Cierres + Consolidado)
@@ -3054,167 +3332,273 @@ async function cargarTodasLasSedesRefill() {
     });
     if (!res.ok) return;
     const allData = await res.json();
-    
-    let sumTotalUSD = 0;
-    let sumTotalBs = 0;
-    let sumEfectivoUSD = 0;
-    let sumEfectivoBs = 0;
-    let sumBancosUSD = 0;
-    let sumVentasCount = 0;
 
-    let totalSedesCount = 0;
-    let sedesCerradasCount = 0;
+    // Guardar en cache global de tiendas
+    allData.forEach(tienda => {
+      if (tienda.empresa_email) {
+        cacheGlobalTiendas[tienda.empresa_email.toLowerCase()] = tienda;
+      }
+    });
 
-    const checklistContainer = document.getElementById('container-sedes-cierre-list');
-    const sedesListHtml = [];
+    renderizarConsolidadoYRankingMultisede(periodoConsolidadoMultisede);
 
-    const sedesKeys = Object.keys(REFILLH2O_SEDES);
-    const hoyStr = new Date().toISOString().substring(0, 10);
+  } catch(e) {
+    console.warn('[Visor] Error al cargar todas las sedes:', e);
+  }
+}
 
-    sedesKeys.forEach(email => {
-      totalSedesCount++;
-      const info = REFILLH2O_SEDES[email];
-      const tienda = allData.find(t => (t.empresa_email || '').toLowerCase() === email.toLowerCase());
-      
-      const r = tienda?.resumen_hoy || {};
-      const statusConn = calcularTiempoDesconexion(tienda?.ultima_actualizacion);
-      
-      // Chequear si la tienda ya cerró caja hoy
-      let cerradoHoy = false;
-      let horaCierre = '';
-      let estadoCierre = 'en_operacion';
-      let difUSD = 0;
+// 🛡️ Renderiza el Consolidado Multisede (Suma de todas las tiendas) y el desglose de cada tienda para Hoy, Semana o Mes
+function renderizarConsolidadoYRankingMultisede(periodo = 'hoy') {
+  // Sincronizar botones de período multisede en ambas pantallas
+  ['hoy', 'semana', 'mes'].forEach(p => {
+    const bCierre = document.getElementById(`btn-multi-cierre-${p}`);
+    if (bCierre) bCierre.classList.toggle('active', p === periodo);
+    const bStats = document.getElementById(`btn-multi-stats-${p}`);
+    if (bStats) bStats.classList.toggle('active', p === periodo);
+  });
 
-      // 1. Resumen directo de cierre si fue enviado por cloud-sync
-      if (r.cierre && r.cierre.cerrado) {
+  const sedesKeys = Object.keys(REFILLH2O_SEDES);
+  const hoyStr = new Date().toISOString().substring(0, 10);
+
+  let sumTotalUSD = 0;
+  let sumTotalBs = 0;
+  let sumEfectivoUSD = 0;
+  let sumEfectivoBs = 0;
+  let sumBancosUSD = 0;
+  let sumBotellones = 0;
+  let sumVentasCount = 0;
+
+  let totalSedesCount = 0;
+  let sedesCerradasCount = 0;
+
+  const sedesDataList = [];
+
+  sedesKeys.forEach(email => {
+    totalSedesCount++;
+    const info = REFILLH2O_SEDES[email];
+    const tienda = cacheGlobalTiendas[email.toLowerCase()];
+    const statusConn = calcularTiempoDesconexion(tienda?.ultima_actualizacion);
+    const r = tienda?.resumen_hoy || {};
+
+    // 1. Detección de Cierre de Caja para Hoy
+    let cerradoHoy = false;
+    let horaCierre = '';
+    let estadoCierre = 'en_operacion';
+    let difUSD = 0;
+
+    if (r.cierre && r.cierre.cerrado) {
+      cerradoHoy = true;
+      horaCierre = r.cierre.hora || 'Cerrado';
+      estadoCierre = r.cierre.estado || 'cuadrado';
+      difUSD = r.cierre.diferenciaUSD || 0;
+    }
+
+    if (!cerradoHoy && Array.isArray(tienda?.historial_reciente)) {
+      const arqHoy = tienda.historial_reciente.find(a => (a.fecha || '').trim() === hoyStr);
+      if (arqHoy) {
         cerradoHoy = true;
-        horaCierre = r.cierre.hora || 'Cerrado';
-        estadoCierre = r.cierre.estado || 'cuadrado';
-        difUSD = r.cierre.diferenciaUSD || 0;
+        horaCierre = arqHoy.hora || 'Cerrado';
+        const decUsd = parseFloat(arqHoy.declaracion?.efectivo_usd) || 0;
+        const espUsd = r.efectivoUSD || 0;
+        difUSD = decUsd - espUsd;
+        if (difUSD < -0.05) estadoCierre = 'faltante';
+        else if (difUSD > 0.05) estadoCierre = 'sobrante';
+        else estadoCierre = 'cuadrado';
       }
+    }
 
-      // 2. Revisar historial_reciente de la fila de la tienda
-      if (!cerradoHoy && Array.isArray(tienda?.historial_reciente)) {
-        const arqHoy = tienda.historial_reciente.find(a => (a.fecha || '').trim() === hoyStr);
-        if (arqHoy) {
-          cerradoHoy = true;
-          horaCierre = arqHoy.hora || 'Cerrado';
-          const decUsd = parseFloat(arqHoy.declaracion?.efectivo_usd) || 0;
-          const espUsd = r.efectivoUSD || 0;
-          difUSD = decUsd - espUsd;
-          if (difUSD < -0.05) estadoCierre = 'faltante';
-          else if (difUSD > 0.05) estadoCierre = 'sobrante';
-          else estadoCierre = 'cuadrado';
-        }
-      }
-
-      // 3. Revisar en respaldo_completo.configuracion
-      if (!cerradoHoy) {
-        const backup = tienda?.respaldo_completo;
-        if (backup && Array.isArray(backup.configuracion)) {
-          const arqueosCfg = backup.configuracion.find(c => c && c.id === 'tuempresa_arqueos');
-          if (arqueosCfg && Array.isArray(arqueosCfg.value)) {
-            const arqHoy = arqueosCfg.value.find(a => (a.fecha || '').trim() === hoyStr);
-            if (arqHoy) {
-              cerradoHoy = true;
-              horaCierre = arqHoy.hora || 'Cerrado';
-              const decUsd = parseFloat(arqHoy.declaracion?.efectivo_usd) || 0;
-              const espUsd = r.efectivoUSD || 0;
-              difUSD = decUsd - espUsd;
-              if (difUSD < -0.05) estadoCierre = 'faltante';
-              else if (difUSD > 0.05) estadoCierre = 'sobrante';
-              else estadoCierre = 'cuadrado';
-            }
+    if (!cerradoHoy) {
+      const backup = tienda?.respaldo_completo;
+      if (backup && Array.isArray(backup.configuracion)) {
+        const arqueosCfg = backup.configuracion.find(c => c && c.id === 'tuempresa_arqueos');
+        if (arqueosCfg && Array.isArray(arqueosCfg.value)) {
+          const arqHoy = arqueosCfg.value.find(a => (a.fecha || '').trim() === hoyStr);
+          if (arqHoy) {
+            cerradoHoy = true;
+            horaCierre = arqHoy.hora || 'Cerrado';
+            const decUsd = parseFloat(arqHoy.declaracion?.efectivo_usd) || 0;
+            const espUsd = r.efectivoUSD || 0;
+            difUSD = decUsd - espUsd;
+            if (difUSD < -0.05) estadoCierre = 'faltante';
+            else if (difUSD > 0.05) estadoCierre = 'sobrante';
+            else estadoCierre = 'cuadrado';
           }
         }
       }
+    }
 
-      if (cerradoHoy) sedesCerradasCount++;
+    if (cerradoHoy) sedesCerradasCount++;
 
-      // Acumular consolidado
-      const tUSD = r.totalUSD || 0;
-      const tBs = r.totalBs || 0;
-      const efUSD = r.efectivoUSD || 0;
-      const efBs = r.efectivoBs || 0;
-      const tDigital = Math.max(0, tUSD - efUSD - (r.efectivoBsUSD || 0));
+    // 2. Calcular totales según el período seleccionado (hoy, semana, mes)
+    const statsPeriodo = calcularTotalesPeriodoTienda(tienda, periodo);
 
-      sumTotalUSD += tUSD;
-      sumTotalBs += tBs;
-      sumEfectivoUSD += efUSD;
-      sumEfectivoBs += efBs;
-      sumBancosUSD += tDigital;
-      sumVentasCount += (r.numVentas || 0);
+    sumTotalUSD += statsPeriodo.totalUSD;
+    sumTotalBs += statsPeriodo.totalBs;
+    sumEfectivoUSD += statsPeriodo.efectivoUSD;
+    sumEfectivoBs += statsPeriodo.efectivoBs;
+    sumBancosUSD += statsPeriodo.bancosUSD;
+    sumBotellones += statsPeriodo.botellones;
+    sumVentasCount += statsPeriodo.numVentas;
 
-      // Guardar en cache global
-      if (tienda) cacheGlobalTiendas[email] = tienda;
+    sedesDataList.push({
+      email,
+      sede: info.sede,
+      stats: statsPeriodo,
+      cerradoHoy,
+      horaCierre,
+      estadoCierre,
+      difUSD,
+      statusConn
+    });
+  });
 
-      // Badge de estado para la fila
-      let statusBadgeHtml = '';
-      if (cerradoHoy) {
-        if (estadoCierre === 'faltante') {
-          statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#EF4444; background:#FEE2E2; padding:2px 7px; border-radius:10px;">⚠️ Faltante -$${Math.abs(difUSD).toFixed(2)}</span>`;
-        } else if (estadoCierre === 'sobrante') {
-          statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#2563EB; background:#DBEAFE; padding:2px 7px; border-radius:10px;">🔵 Sobrante +$${difUSD.toFixed(2)}</span>`;
+  // Etiqueta legible del periodo
+  const periodoLabel = periodo === 'hoy' ? 'Hoy' : (periodo === 'semana' ? 'Esta Semana' : 'Este Mes');
+
+  // =========================================================================
+  // A) RENDERIZAR CONSOLIDADO EN TAB CIERRE
+  // =========================================================================
+  const txtConsUSD = document.getElementById('txt-consolidado-usd');
+  if (txtConsUSD) txtConsUSD.textContent = `$ ${sumTotalUSD.toFixed(2)}`;
+  const txtConsBs = document.getElementById('txt-consolidado-bs');
+  if (txtConsBs) txtConsBs.textContent = `≈ Bs ${sumTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} total facturado`;
+  const txtConsEfUSD = document.getElementById('txt-consolidado-efectivo-usd');
+  if (txtConsEfUSD) txtConsEfUSD.textContent = `$ ${sumEfectivoUSD.toFixed(2)}`;
+  const txtConsEfBs = document.getElementById('txt-consolidado-efectivo-bs');
+  if (txtConsEfBs) txtConsEfBs.textContent = `+ Bs ${sumEfectivoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+  const txtConsBancos = document.getElementById('txt-consolidado-bancos-usd');
+  if (txtConsBancos) txtConsBancos.textContent = `$ ${sumBancosUSD.toFixed(2)}`;
+  const txtConsCount = document.getElementById('txt-consolidado-ventas-count');
+  if (txtConsCount) txtConsCount.textContent = `${sumVentasCount} ventas totales · ${sumBotellones} bot.`;
+
+  const txtConsBadge = document.getElementById('txt-consolidado-periodo-badge');
+  if (txtConsBadge) {
+    txtConsBadge.textContent = periodo === 'hoy'
+      ? '⚡ Ventas de Hoy (Todas las Sedes)'
+      : (periodo === 'semana' ? '📅 Total Acumulado Esta Semana (7 días)' : '🗓️ Total Acumulado Este Mes');
+  }
+
+  const badgeCount = document.getElementById('badge-cierres-count');
+  if (badgeCount) {
+    badgeCount.textContent = `${sedesCerradasCount}/${totalSedesCount} Cerradas`;
+  }
+
+  // Renderizar checklist / desglose en tab Cierre
+  const checklistContainer = document.getElementById('container-sedes-cierre-list');
+  if (checklistContainer) {
+    const checklistHtml = sedesDataList.map(s => {
+      let badgeHtml = '';
+      if (periodo === 'hoy') {
+        if (s.cerradoHoy) {
+          if (s.estadoCierre === 'faltante') {
+            badgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#EF4444; background:#FEE2E2; padding:2px 7px; border-radius:10px;">⚠️ Faltante -$${Math.abs(s.difUSD).toFixed(2)}</span>`;
+          } else if (s.estadoCierre === 'sobrante') {
+            badgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#2563EB; background:#DBEAFE; padding:2px 7px; border-radius:10px;">🔵 Sobrante +$${s.difUSD.toFixed(2)}</span>`;
+          } else {
+            badgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#10B981; background:#DCFCE7; padding:2px 7px; border-radius:10px;">✓ Cuadre Exacto</span>`;
+          }
         } else {
-          statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#10B981; background:#DCFCE7; padding:2px 7px; border-radius:10px;">✓ Cuadre Exacto</span>`;
+          badgeHtml = `<span style="font-size:0.72rem; font-weight:700; color:#D97706; background:#FEF3C7; padding:2px 7px; border-radius:10px;">⏳ En Operación</span>`;
         }
       } else {
-        statusBadgeHtml = `<span style="font-size:0.72rem; font-weight:700; color:#D97706; background:#FEF3C7; padding:2px 7px; border-radius:10px;">⏳ En Operación</span>`;
+        const pct = sumTotalUSD > 0 ? (s.stats.totalUSD / sumTotalUSD * 100) : 0;
+        badgeHtml = `<span style="font-size:0.72rem; font-weight:800; color:#0284C7; background:#E0F2FE; padding:2px 7px; border-radius:10px;">${pct.toFixed(1)}% del consolidado</span>`;
       }
 
-      // Item interactivo del checklist (hacer click cambia a esa tienda)
-      sedesListHtml.push(`
-        <div class="sede-cierre-row" onclick="cambiarSedeRefillH2O('${email}')" style="cursor: pointer; transition: transform 0.15s ease;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      return `
+        <div class="sede-cierre-row" onclick="cambiarSedeRefillH2O('${s.email}')" style="cursor: pointer; transition: transform 0.15s ease;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
           <div class="sede-cierre-info">
-            <div class="cierre-check-icon ${cerradoHoy ? 'done' : 'pending'}">
-              ${cerradoHoy ? '✓' : '⏳'}
+            <div class="cierre-check-icon ${s.cerradoHoy ? 'done' : 'pending'}">
+              ${s.cerradoHoy ? '✓' : '⏳'}
             </div>
             <div>
               <div style="font-size: 0.88rem; font-weight: 800; color: var(--neu-text-main);">
-                ${info.sede}
+                ${s.sede}
               </div>
               <div style="font-size: 0.72rem; color: var(--neu-text-muted);">
-                ${statusConn.texto} · ${r.numVentas || 0} ventas hoy
+                ${s.statusConn.texto} · ${s.stats.numVentas} ventas · ${s.stats.botellones} botellones
               </div>
             </div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 0.92rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
-              $ ${tUSD.toFixed(2)}
+            <div style="font-size: 0.95rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
+              $ ${s.stats.totalUSD.toFixed(2)}
             </div>
             <div style="margin-top: 2px;">
-              ${statusBadgeHtml}
+              ${badgeHtml}
             </div>
           </div>
         </div>
-      `);
-    });
+      `;
+    }).join('');
 
-    // Renderizar Checklist
-    if (checklistContainer) {
-      checklistContainer.innerHTML = sedesListHtml.join('');
-    }
-    const badgeCount = document.getElementById('badge-cierres-count');
-    if (badgeCount) {
-      badgeCount.textContent = `${sedesCerradasCount}/${totalSedesCount} Cerradas`;
-    }
+    checklistContainer.innerHTML = checklistHtml;
+  }
 
-    // Renderizar Consolidado Multisede
-    const txtConsUSD = document.getElementById('txt-consolidado-usd');
-    if (txtConsUSD) txtConsUSD.textContent = `$ ${sumTotalUSD.toFixed(2)}`;
-    const txtConsBs = document.getElementById('txt-consolidado-bs');
-    if (txtConsBs) txtConsBs.textContent = `≈ Bs ${sumTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} total facturado`;
-    const txtConsEfUSD = document.getElementById('txt-consolidado-efectivo-usd');
-    if (txtConsEfUSD) txtConsEfUSD.textContent = `$ ${sumEfectivoUSD.toFixed(2)}`;
-    const txtConsEfBs = document.getElementById('txt-consolidado-efectivo-bs');
-    if (txtConsEfBs) txtConsEfBs.textContent = `+ Bs ${sumEfectivoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
-    const txtConsBancos = document.getElementById('txt-consolidado-bancos-usd');
-    if (txtConsBancos) txtConsBancos.textContent = `$ ${sumBancosUSD.toFixed(2)}`;
-    const txtConsCount = document.getElementById('txt-consolidado-ventas-count');
-    if (txtConsCount) txtConsCount.textContent = `${sumVentasCount} ventas totales`;
+  // =========================================================================
+  // B) RENDERIZAR CONSOLIDADO Y RANKING EN TAB STATS (ANÁLISIS)
+  // =========================================================================
+  const txtStatsUSD = document.getElementById('txt-stats-consolidado-usd');
+  if (txtStatsUSD) txtStatsUSD.textContent = `$ ${sumTotalUSD.toFixed(2)}`;
+  const txtStatsBs = document.getElementById('txt-stats-consolidado-bs');
+  if (txtStatsBs) txtStatsBs.textContent = `≈ Bs ${sumTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} facturado`;
+  const txtStatsBots = document.getElementById('txt-stats-consolidado-botellones');
+  if (txtStatsBots) txtStatsBots.textContent = `${sumBotellones} unid.`;
+  const txtStatsVentas = document.getElementById('txt-stats-consolidado-ventas');
+  if (txtStatsVentas) txtStatsVentas.textContent = `${sumVentasCount} ventas`;
+  const badgeStatsPeriodo = document.getElementById('badge-stats-periodo');
+  if (badgeStatsPeriodo) badgeStatsPeriodo.textContent = periodoLabel.toUpperCase();
+  const txtRankingPeriodoNombre = document.getElementById('txt-ranking-periodo-nombre');
+  if (txtRankingPeriodoNombre) txtRankingPeriodoNombre.textContent = periodoLabel;
 
-  } catch(e) {
-    console.warn('[Visor] Error al cargar todas las sedes:', e);
+  // Actualizar nombre de la sede activa en stats
+  const activeEmail = (currentStoreEmail || '').toLowerCase();
+  const activeInfo = REFILLH2O_SEDES[activeEmail];
+  const txtStatsSedeActiva = document.getElementById('txt-stats-sede-activa');
+  if (txtStatsSedeActiva && activeInfo) {
+    txtStatsSedeActiva.textContent = activeInfo.sede;
+  }
+
+  // Ranking ordenado de mayor a menor venta en el período seleccionado
+  const containerRanking = document.getElementById('container-ranking-sedes');
+  if (containerRanking) {
+    const sedesOrdenadas = [...sedesDataList].sort((a, b) => b.stats.totalUSD - a.stats.totalUSD);
+
+    containerRanking.innerHTML = sedesOrdenadas.map((s, idx) => {
+      const pct = sumTotalUSD > 0 ? (s.stats.totalUSD / sumTotalUSD * 100) : 0;
+      const isSelected = s.email.toLowerCase() === activeEmail;
+
+      return `
+        <div class="tienda-totales-card" onclick="cambiarSedeRefillH2O('${s.email}'); cambiarTab('hoy');" style="${isSelected ? 'border: 1.5px solid #0284C7; background: #F0F9FF;' : ''}">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.72rem; font-weight: 800; background: ${idx === 0 ? '#FEF3C7' : '#F1F5F9'}; color: ${idx === 0 ? '#B45309' : '#475569'}; padding: 2px 7px; border-radius: 8px;">
+                ${idx === 0 ? '👑 #1' : `#${idx + 1}`}
+              </span>
+              <div>
+                <div style="font-size: 0.92rem; font-weight: 800; color: var(--neu-text-main);">
+                  ${s.sede} ${isSelected ? '<span style="font-size:0.68rem; color:#0284C7; font-weight:700;">(Activa)</span>' : ''}
+                </div>
+                <div style="font-size: 0.7rem; color: var(--neu-text-muted);">
+                  ${s.stats.numVentas} ventas · ${s.stats.botellones} botellones · ${s.statusConn.texto}
+                </div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 1.05rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--neu-text-main);">
+                $ ${s.stats.totalUSD.toFixed(2)}
+              </div>
+              <div style="font-size: 0.7rem; font-weight: 700; color: #0284C7;">
+                ${pct.toFixed(1)}% de la red
+              </div>
+            </div>
+          </div>
+          <div class="tienda-progress-track">
+            <div class="tienda-progress-fill" style="width: ${Math.max(3, pct)}%;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 }
 
@@ -3231,7 +3615,7 @@ function cambiarTab(tabName) {
       document.querySelectorAll('.nav-btn')[idx].classList.add('active');
     }
 
-    if (tabName === 'cierre') {
+    if (tabName === 'cierre' || tabName === 'stats') {
       cargarTodasLasSedesRefill();
     }
 
