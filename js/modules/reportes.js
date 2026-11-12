@@ -4,6 +4,7 @@
 
 import { store } from '../store.js';
 import { Utils } from '../utils.js';
+import { getNombreTiendaCompleto } from './cierre.js';
 
 function sortProductosResumen(entries) {
   return entries.sort(([nameA, infoA], [nameB, infoB]) => {
@@ -983,7 +984,7 @@ function renderCartera(content) {
 }
 
 function getConsolidatedReportHTML(range, periodoLabel) {
-  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const empresaNombre = getNombreTiendaCompleto();
   const empresaLogo = store.getConfig('empresaLogo') || './img/logo.png';
   const fechaTexto = `${Utils.formatDate(range.inicio)} al ${Utils.formatDate(range.fin)}`;
   const currentTasa = store.getConfig('tasaCambio') || 40.00;
@@ -1416,7 +1417,7 @@ function getConsolidatedReportHTML(range, periodoLabel) {
 }
 
 function exportConsolidatedCSV(range, periodoLabel) {
-  const empresaNombre = store.getConfig('empresaNombre') || 'Tu Empresa';
+  const empresaNombre = getNombreTiendaCompleto();
   const fechaTexto = `${Utils.formatDate(range.inicio)} al ${Utils.formatDate(range.fin)}`;
   const currentTasa = store.getConfig('tasaCambio') || 40.00;
 
