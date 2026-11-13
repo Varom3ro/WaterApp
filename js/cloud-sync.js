@@ -429,6 +429,7 @@ export async function syncToCloud(isManual = false) {
       turnosLocales = JSON.parse(localStorage.getItem('tuempresa_turnos_caja') || '[]');
     } catch(e) {}
 
+    const hoy = hoyLocalStr;
     const arqHoy = arqueosLocales.find(a => (a.fecha || '').trim() === hoy);
     const turnosHoy = turnosLocales.filter(t => (t.fecha || '').trim() === hoy);
     const ultimoTurno = turnosHoy.length > 0 ? turnosHoy[turnosHoy.length - 1] : null;
