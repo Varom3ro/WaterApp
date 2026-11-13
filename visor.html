@@ -3835,7 +3835,23 @@ function cambiarTab(tabName) {
                 precio: parseFloat(p.precio) || 0
               }));
             if (prodsCat.length > 0) {
-              storeData.stock_productos = prodsCat;
+              // 🛡️ Blindaje de Inventario: Preservar el stock físico real reportado por la tienda
+              const stockRealMap = {};
+              if (Array.isArray(storeData.stock_productos)) {
+                storeData.stock_productos.forEach(sp => {
+                  if (sp && sp.nombre) {
+                    stockRealMap[sp.nombre.toLowerCase().trim()] = sp.stock;
+                  }
+                });
+              }
+              storeData.stock_productos = prodsCat.map(p => {
+                const normName = (p.nombre || '').toLowerCase().trim();
+                const realStock = stockRealMap[normName];
+                return {
+                  ...p,
+                  stock: (realStock !== undefined && realStock !== null) ? realStock : (p.stock || 0)
+                };
+              });
             }
           }
         }

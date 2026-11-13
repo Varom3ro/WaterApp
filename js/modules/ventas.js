@@ -2572,8 +2572,7 @@ export function renderNuevaVentaForm(container) {
         if (card.classList.contains('is-agotado')) {
           const tiposBotellon = store.getConfig('tiposBotellon') || [];
           const t = tiposBotellon.find(item => String(item.id) === String(id));
-          showToast(`El producto "${t?.nombre || 'seleccionado'}" está agotado y no tiene stock disponible`, 'warning');
-          return;
+          showToast(`⚠️ Aviso: "${t?.nombre || 'Producto'}" figura con stock 0 (se agrega al pedido)`, 'warning');
         }
         agregarItemPorFicha(id, 1);
       });

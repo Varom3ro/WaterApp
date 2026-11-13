@@ -168,6 +168,32 @@ export const Licencia = {
     }
   },
 
+  async sincronizarCatalogoLocalHaciaNube(nuevoCatalogo) {
+    const licenciaLocal = localStorage.getItem('licencia_usuario');
+    if (!licenciaLocal) return;
+    try {
+      const user = JSON.parse(licenciaLocal);
+      if (!user.email) return;
+
+      localStorage.setItem('catalogo_remoto_aplicado', JSON.stringify(nuevoCatalogo));
+      user.catalogo_inicial = nuevoCatalogo;
+      localStorage.setItem('licencia_usuario', JSON.stringify(user));
+
+      await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(user.email)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ catalogo_inicial: nuevoCatalogo })
+      });
+      console.log('[Licencia] ✅ Catálogo local sincronizado con Supabase');
+    } catch (e) {
+      console.warn('[Licencia] Error al sincronizar catálogo local con Supabase:', e);
+    }
+  },
+
   aplicarCatalogoRemotoSiExiste(storeInstance = null) {
     const licenciaLocal = localStorage.getItem('licencia_usuario');
     if (!licenciaLocal) return;
@@ -175,15 +201,40 @@ export const Licencia = {
       const user = JSON.parse(licenciaLocal);
       const s = storeInstance || (window.__app_store || null);
 
-      // Inyección automática de Catálogo Remoto
+      // Inyección automática de Catálogo Remoto (Preservando Stock Físico Local)
       if (user.catalogo_inicial && Array.isArray(user.catalogo_inicial) && user.catalogo_inicial.length > 0) {
         const versionAplicada = localStorage.getItem('catalogo_remoto_aplicado');
         const hashActual = JSON.stringify(user.catalogo_inicial);
         if (versionAplicada !== hashActual) {
           if (s) {
-            s.setConfig('tiposBotellon', user.catalogo_inicial);
+            // Mapear stock local actual para no borrar las existencias de la tienda
+            const currentTipos = s.getConfig('tiposBotellon') || [];
+            const stockMap = {};
+            currentTipos.forEach(it => {
+              if (it && it.id !== undefined && it.stock !== undefined && it.stock !== null) {
+                stockMap[String(it.id)] = it.stock;
+              }
+              if (it && it.nombre && it.stock !== undefined && it.stock !== null) {
+                stockMap[it.nombre.toLowerCase().trim()] = it.stock;
+              }
+            });
+
+            const merged = user.catalogo_inicial.map(rem => {
+              const byId = stockMap[String(rem.id)];
+              const byName = stockMap[(rem.nombre || '').toLowerCase().trim()];
+              const localStock = byId !== undefined ? byId : byName;
+              return {
+                ...rem,
+                // Si la tienda local tiene existencias físicas registradas, preservarlas
+                stock: (localStock !== undefined && localStock !== null && localStock > 0)
+                  ? localStock
+                  : (parseInt(rem.stock) || 0)
+              };
+            });
+
+            s.setConfig('tiposBotellon', merged);
             localStorage.setItem('catalogo_remoto_aplicado', hashActual);
-            console.log('[Licencia] Catálogo remoto inyectado exitosamente');
+            console.log('[Licencia] Catálogo remoto inyectado preservando stock local');
           }
         }
       }
