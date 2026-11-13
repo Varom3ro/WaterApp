@@ -4,6 +4,7 @@ import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js';
 import { renderSidebar } from '../components/sidebar.js';
+import { Licencia } from '../licencia.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
@@ -1010,8 +1011,12 @@ export function renderConfiguracion(container) {
         content: `¿Estás seguro de que deseas eliminar el tipo <strong>"${t?.nombre}"</strong>? Esta acción no se puede deshacer.`,
         saveLabel: 'Eliminar',
         onSave: () => {
-          const nuevosTipos = store.getConfig('tiposBotellon').filter(x => x.id !== id);
+          const nuevosTipos = store.getConfig('tiposBotellon').filter(x => String(x.id) !== String(id));
           store.setConfig('tiposBotellon', nuevosTipos);
+          if (typeof Licencia !== 'undefined' && Licencia.sincronizarCatalogoLocalHaciaNube) {
+            Licencia.sincronizarCatalogoLocalHaciaNube(nuevosTipos);
+          }
+          syncToCloud();
           closeModal();
           renderConfiguracion(container);
           showToast('Eliminado correctamente', 'success');
@@ -1407,7 +1412,7 @@ function openTipoModal(id = null) {
         </div>
         <div class="form-group" style="flex: 1;">
           <label class="form-label" id="label-precio-venta">Precio de Venta (${currentMoneda === 'VES' || currentMoneda === 'Bs' ? 'Bs.' : '$'})</label>
-          <input type="number" class="form-control" name="precio" id="input-precio-venta" value="${tipo.precio !== undefined ? tipo.precio : 1.50}" step="0.01" min="0" required/>
+          <input type="text" inputmode="decimal" class="form-control" name="precio" id="input-precio-venta" value="${tipo.precio !== undefined ? tipo.precio : '1.50'}" placeholder="0.00" required/>
         </div>
       </div>
     </form>
@@ -1444,27 +1449,44 @@ function openTipoModal(id = null) {
       const form = overlay.querySelector('#form-tipo');
       const fd = new FormData(form);
       const categoria = fd.get('categoria');
-      const nombre = fd.get('nombre').trim();
+      const nombre = (fd.get('nombre') || '').trim();
       const litros = categoria === 'producto' ? 0 : (parseInt(fd.get('litros')) || 20);
       const stock = categoria === 'producto' ? (parseInt(fd.get('stock')) || 0) : 0;
       const moneda = fd.get('moneda') || 'USD';
-      const precio = parseFloat(fd.get('precio'));
+      
+      // Permitir coma o punto para precio en tablets y móviles
+      const rawPrecio = String(fd.get('precio') || '').trim().replace(',', '.');
+      const precio = parseFloat(rawPrecio);
 
-      if (!nombre || isNaN(precio)) {
-        showToast('Por favor complete los campos obligatorios', 'warning');
+      if (!nombre || isNaN(precio) || precio < 0) {
+        showToast('Por favor ingrese un nombre y un precio válido', 'warning');
         return;
       }
 
       if (isEdit) {
-        const idx = tipos.findIndex(t => t.id === id);
-        tipos[idx] = { ...tipos[idx], categoria, nombre, litros, stock, moneda, precio };
+        const idx = tipos.findIndex(t => String(t.id) === String(id));
+        if (idx !== -1) {
+          tipos[idx] = { ...tipos[idx], categoria, nombre, litros, stock, moneda, precio };
+        } else {
+          tipos.push({ id, categoria, nombre, litros, stock, moneda, precio });
+        }
       } else {
         tipos.push({ id: Utils.generateId(), categoria, nombre, litros, stock, moneda, precio });
       }
 
       store.setConfig('tiposBotellon', tipos);
+
+      // Sincronizar catálogo a Supabase para que la nube no lo anule
+      if (typeof Licencia !== 'undefined' && Licencia.sincronizarCatalogoLocalHaciaNube) {
+        Licencia.sincronizarCatalogoLocalHaciaNube(tipos);
+      }
+      syncToCloud();
+
       closeModal();
-      renderConfiguracion(document.querySelector('.main-content'));
+      const targetContainer = document.querySelector('.main-content') || document.querySelector('#app-content');
+      if (targetContainer) {
+        renderConfiguracion(targetContainer);
+      }
       showToast('Guardado correctamente', 'success');
     }
   });

@@ -1973,7 +1973,7 @@
 
     prod.stock = nuevoStock;
 
-    await guardarCatalogoEnSupabase(currentCatalogo, [currentStoreEmail]);
+    await guardarCatalogoEnSupabase(currentCatalogo, [currentStoreEmail], true);
     cerrarModales();
     renderizarStockFisico(currentCatalogo);
     renderizarCatalogo(currentCatalogo);
@@ -2076,7 +2076,7 @@
     alert(`✅ Ítem guardado correctamente${replicarGrupo ? ' en todas las sedes asignadas' : ''}.`);
   });
 
-  async function guardarCatalogoEnSupabase(nuevoCatalogo, listaSedes) {
+  async function guardarCatalogoEnSupabase(nuevoCatalogo, listaSedes, esAjusteStock = false) {
     try {
       const prodsFisicos = nuevoCatalogo
         .filter(item => item.categoria === 'producto')
@@ -2100,19 +2100,60 @@
           })
         });
 
-        // 2. Guardar en tienda_sync_cloud (para que el Visor del Dueño lo vea de inmediato)
-        await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            stock_productos: prodsFisicos,
-            ultima_actualizacion: new Date().toISOString()
-          })
-        });
+        // 2. Guardar en tienda_sync_cloud
+        // Si es replicación de grupo (listaSedes > 1), NO debemos pisar los stocks físicos
+        // de las demás tiendas. Preservamos las cantidades reales existentes de cada tienda.
+        if (listaSedes.length === 1 || esAjusteStock) {
+          await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              stock_productos: prodsFisicos,
+              ultima_actualizacion: new Date().toISOString()
+            })
+          });
+        } else {
+          try {
+            const resSede = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}&select=stock_productos`, {
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            });
+            if (resSede.ok) {
+              const rows = await resSede.json();
+              const stockExistenteMap = {};
+              if (rows && rows.length > 0 && Array.isArray(rows[0].stock_productos)) {
+                rows[0].stock_productos.forEach(sp => {
+                  if (sp && sp.nombre) stockExistenteMap[sp.nombre.toLowerCase().trim()] = sp.stock;
+                });
+              }
+              const prodsFusionados = prodsFisicos.map(p => {
+                const norm = (p.nombre || '').toLowerCase().trim();
+                const realStock = stockExistenteMap[norm];
+                return {
+                  ...p,
+                  stock: (realStock !== undefined && realStock !== null) ? realStock : (p.stock || 0)
+                };
+              });
+              await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}`, {
+                method: 'PATCH',
+                headers: {
+                  'apikey': SUPABASE_KEY,
+                  'Authorization': `Bearer ${SUPABASE_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  stock_productos: prodsFusionados,
+                  ultima_actualizacion: new Date().toISOString()
+                })
+              });
+            }
+          } catch (eMerge) {
+            console.warn('Error fusionando stock en replicación:', eMerge);
+          }
+        }
       }
     } catch (e) {
       console.warn('Error guardando catálogo:', e);
