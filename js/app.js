@@ -86,6 +86,19 @@ class App {
             syncToCloud();
         });
         this.updateActiveLink();
+
+        // 💓 Latido y Sincronización en Vivo Periódica (cada 60 segundos si hay conexión)
+        setInterval(() => {
+            if (navigator.onLine && sessionStorage.getItem('isAuthenticated')) {
+                syncToCloud();
+            }
+        }, 60000);
+
+        // 🌐 Reintento automático de sincronización inmediata al recuperar conexión a Internet
+        window.addEventListener('online', () => {
+            console.log('[WaterApp] Conexión a Internet reestablecida. Sincronizando con la nube...');
+            syncToCloud();
+        });
     }
 
     renderLogin() {
