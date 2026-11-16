@@ -3891,28 +3891,54 @@ function cambiarTab(tabName) {
 
     const customMethodsOrder = [];
 
-    // Registrar métodos personalizados de la configuración del respaldo si existen (ej. Zelle, Binance)
-    if (backup && Array.isArray(backup.configuracion)) {
-      const customConf = backup.configuracion.find(c => c.id === 'metodosPagoPersonalizados');
-      if (customConf && Array.isArray(customConf.value)) {
-        customConf.value.forEach(cm => {
-          if (!metodosMap[cm.id]) {
-            const item = {
-              id: cm.id,
-              label: cm.label || 'Personalizado',
-              icon: cm.icon || '💳',
-              color: cm.color || '#2D6A4F',
-              moneda: cm.moneda || 'USD',
-              totalUSD: 0,
-              totalBs: 0,
-              sub: cm.moneda === 'Bs' ? '' : 'En USD'
-            };
-            metodosMap[cm.id] = item;
-            customMethodsOrder.push(cm.id);
-          }
-        });
-      }
+    // Fallback de nombres comerciales de métodos personalizados conocidos
+    const fallbackCustomMap = {
+      'custom_mtnch9cks990': { label: 'Punto de Venta (B)', icon: '💳', color: '#3B82F6', moneda: 'Bs' },
+      'custom_mw0uyde7bdas': { label: 'Punto de Venta (B)', icon: '💳', color: '#3B82F6', moneda: 'Bs' },
+      'custom_mvwf8mbn1jio': { label: 'Punto fiscal', icon: '💳', color: '#3B82F6', moneda: 'Bs' },
+      'custom_mw0v6kozkqrv': { label: 'Zelle', icon: '💳', color: '#2D6A4F', moneda: 'USD' }
+    };
+
+    // Registrar métodos personalizados de la configuración del respaldo si existen (ej. Zelle, Binance, Punto B)
+    const customConfList = Array.isArray(backup?.configuracion)
+      ? ((backup.configuracion.find(c => c && c.id === 'metodosPagoPersonalizados') || {}).value || [])
+      : (backup?.configuracion?.metodosPagoPersonalizados || []);
+
+    if (Array.isArray(customConfList)) {
+      customConfList.forEach(cm => {
+        if (cm && cm.id && !metodosMap[cm.id]) {
+          const item = {
+            id: cm.id,
+            label: cm.label || 'Punto de Venta (B)',
+            icon: cm.icon || '💳',
+            color: cm.color || '#3B82F6',
+            moneda: cm.moneda || 'Bs',
+            totalUSD: 0,
+            totalBs: 0,
+            sub: cm.moneda === 'Bs' ? '' : 'En USD'
+          };
+          metodosMap[cm.id] = item;
+          customMethodsOrder.push(cm.id);
+        }
+      });
     }
+
+    // Registrar en metodosMap cualquier método personalizado conocido que aún no esté
+    Object.keys(fallbackCustomMap).forEach(fId => {
+      if (!metodosMap[fId]) {
+        const item = fallbackCustomMap[fId];
+        metodosMap[fId] = {
+          id: fId,
+          label: item.label,
+          icon: item.icon,
+          color: item.color,
+          moneda: item.moneda,
+          totalUSD: 0,
+          totalBs: 0,
+          sub: item.moneda === 'Bs' ? '' : 'En USD'
+        };
+      }
+    });
 
     // Si viene desglose_metodos precalculado en resumen_hoy, cargar valores
     if (r.desglose_metodos && Array.isArray(r.desglose_metodos)) {
@@ -3967,15 +3993,17 @@ function cambiarTab(tabName) {
                 const mBs = p.montoBs ? parseFloat(p.montoBs) : (m * (parseFloat(p.tasa) || tasa));
 
                 if (!metodosMap[mId]) {
+                  const fb = fallbackCustomMap[mId] || {};
+                  const isBs = fb.moneda === 'Bs' || mId.startsWith('custom_');
                   metodosMap[mId] = {
                     id: mId,
-                    label: p.metodoNombre || mId,
-                    icon: '💳',
-                    color: '#3B82F6',
-                    moneda: 'USD',
+                    label: p.metodoNombre || fb.label || (mId.startsWith('custom_') ? 'Punto de Venta (B)' : mId),
+                    icon: fb.icon || '💳',
+                    color: fb.color || '#3B82F6',
+                    moneda: fb.moneda || (isBs ? 'Bs' : 'USD'),
                     totalUSD: 0,
                     totalBs: 0,
-                    sub: 'En USD'
+                    sub: isBs ? '' : 'En USD'
                   };
                   customMethodsOrder.push(mId);
                 }
@@ -3986,7 +4014,17 @@ function cambiarTab(tabName) {
               let mId = v.metodoPago || 'efectivo_usd';
               if (mId === 'punto_venta') mId = 'punto';
               if (!metodosMap[mId]) {
-                metodosMap[mId] = { id: mId, label: mId, icon: '💳', color: '#3B82F6', moneda: 'USD', totalUSD: 0, totalBs: 0 };
+                const fb = fallbackCustomMap[mId] || {};
+                const isBs = fb.moneda === 'Bs' || mId.startsWith('custom_');
+                metodosMap[mId] = {
+                  id: mId,
+                  label: fb.label || (mId.startsWith('custom_') ? 'Punto de Venta (B)' : mId),
+                  icon: fb.icon || '💳',
+                  color: fb.color || '#3B82F6',
+                  moneda: fb.moneda || (isBs ? 'Bs' : 'USD'),
+                  totalUSD: 0,
+                  totalBs: 0
+                };
                 customMethodsOrder.push(mId);
               }
               metodosMap[mId].totalUSD += vTot;
@@ -4155,6 +4193,43 @@ function cambiarTab(tabName) {
       const clientesMap = {};
       backupClientes.forEach(c => { if (c && c.id) clientesMap[c.id] = c.nombre; });
 
+      // Mapeo exhaustivo de métodos de pago personalizados para mostrar nombres comerciales limpios
+      const rawCustomMetodos = Array.isArray(rawCfg)
+        ? ((rawCfg.find(c => c && c.id === 'metodosPagoPersonalizados') || {}).value || [])
+        : (rawCfg?.metodosPagoPersonalizados || []);
+      const metodosCustomMap = {
+        'custom_mtnch9cks990': 'Punto de Venta (B)',
+        'custom_mw0uyde7bdas': 'Punto de Venta (B)',
+        'custom_mvwf8mbn1jio': 'Punto fiscal',
+        'custom_mw0v6kozkqrv': 'Zelle'
+      };
+      if (Array.isArray(rawCustomMetodos)) {
+        rawCustomMetodos.forEach(cm => {
+          if (cm && cm.id) {
+            metodosCustomMap[cm.id] = cm.label || 'Punto de Venta (B)';
+          }
+        });
+      }
+
+      const resolverMetodoLabel = (metodoStr) => {
+        if (!metodoStr) return 'Punto de Venta';
+        const str = String(metodoStr).trim();
+        const cleanId = str.replace(/^[^\w]+/, '').trim();
+        if (metodosCustomMap[cleanId]) return metodosCustomMap[cleanId];
+        if (metodosCustomMap[str]) return metodosCustomMap[str];
+        const pm = str.toLowerCase();
+        if (pm.includes('punto') && (pm.includes('(b)') || pm.includes(' b'))) return 'Punto de Venta (B)';
+        if (pm.includes('punto')) return 'Punto de Venta';
+        if (pm.includes('pago_movil') || pm.includes('pago móvil')) return 'Pago Móvil';
+        if (pm.includes('efectivo') && pm.includes('usd')) return 'Efectivo USD';
+        if (pm.includes('efectivo')) return 'Efectivo Bs';
+        if (pm.includes('transferencia')) return 'Transferencia';
+        if (pm.includes('zelle')) return 'Zelle';
+        if (pm.includes('fiscal')) return 'Punto fiscal';
+        if (pm.includes('custom_')) return 'Punto de Venta (B)';
+        return str;
+      };
+
       // Mapa para unificar movimientos sin duplicados
       const movsMap = new Map();
       const seenFechas = new Set();
@@ -4174,13 +4249,7 @@ function cambiarTab(tabName) {
           if (v.tipo === 'credito') {
             metodoLabel = 'Crédito';
           } else if (v.pagos && v.pagos[0]) {
-            const pm = (v.pagos[0].metodo || '').toLowerCase();
-            if (pm.includes('punto')) metodoLabel = 'Punto de Venta';
-            else if (pm.includes('pago_movil')) metodoLabel = 'Pago Móvil';
-            else if (pm.includes('efectivo') && pm.includes('usd')) metodoLabel = 'Efectivo USD';
-            else if (pm.includes('efectivo')) metodoLabel = 'Efectivo Bs';
-            else if (pm.includes('transferencia')) metodoLabel = 'Transferencia';
-            else metodoLabel = v.pagos[0].metodo || 'Pagado';
+            metodoLabel = resolverMetodoLabel(v.pagos[0].metodo);
           }
 
           let horaStr = '';
@@ -4214,7 +4283,11 @@ function cambiarTab(tabName) {
         const key = m.fecha;
         if (!seenFechas.has(key)) {
           seenFechas.add(key);
-          movsMap.set(key, m);
+          const movItem = { ...m };
+          if (movItem.metodo) {
+            movItem.metodo = resolverMetodoLabel(movItem.metodo);
+          }
+          movsMap.set(key, movItem);
         }
       });
       const todosMovs = Array.from(movsMap.values());
