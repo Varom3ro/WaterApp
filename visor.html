@@ -4246,10 +4246,18 @@ function cambiarTab(tabName) {
           seenFechas.add(vKey);
 
           let metodoLabel = 'Punto de Venta';
-          if (v.tipo === 'credito') {
+          if (v.tipo === 'cortesia') {
+            metodoLabel = '🎁 Cortesía';
+          } else if (v.tipo === 'garantia') {
+            metodoLabel = '🛡️ Garantía';
+          } else if (v.tipo === 'convenio') {
+            metodoLabel = '🤝 Convenio';
+          } else if (v.tipo === 'credito') {
             metodoLabel = 'Crédito';
           } else if (v.pagos && v.pagos[0]) {
             metodoLabel = resolverMetodoLabel(v.pagos[0].metodo);
+          } else if (v.total === 0) {
+            metodoLabel = '🎁 Cortesía';
           }
 
           let horaStr = '';

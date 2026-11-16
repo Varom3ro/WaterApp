@@ -238,6 +238,10 @@ export async function syncToCloud(isManual = false) {
     ventasCronologicas.slice(0, 60).forEach(v => {
       let metodoLabel = '💵 Pagado';
       if (v.tipo === 'credito') metodoLabel = '📋 Crédito';
+      else if (v.tipo === 'cortesia') metodoLabel = '🎁 Cortesía';
+      else if (v.tipo === 'garantia') metodoLabel = '🛡️ Garantía';
+      else if (v.tipo === 'convenio') metodoLabel = '🤝 Convenio';
+      else if (v.total === 0) metodoLabel = '🎁 Cortesía';
       else if (v.pagos && v.pagos[0]) {
         const m = v.pagos[0].metodo;
         const allM = store.getMetodosPago(false);
