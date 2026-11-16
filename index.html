@@ -13,11 +13,26 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png" />
   <link rel="apple-touch-icon" href="img/icon-192.png" />
-  <title>Tu Empresa - Gestión de Agua v2.8.56</title>
+  <title>Tu Empresa - Gestión de Agua v2.8.67</title>
   <link rel="stylesheet" href="css/styles.css?v=2.8.56" />
 </head>
 
 <body>
+  <script>
+    // En localhost desregistrar Service Worker y vaciar cache para reflejar cambios de desarrollo en tiempo real
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for (let reg of regs) reg.unregister();
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(keys => {
+          for (let key of keys) caches.delete(key);
+        });
+      }
+    }
+  </script>
   <div id="app"></div>
   <script>
     window.addEventListener('error', function(e) {
@@ -36,7 +51,7 @@
   </script>
   <script src="js/qrcode.min.js"></script>
   <script src="js/html2pdf.bundle.min.js"></script>
-  <script type="module" src="js/app.js?v=2.8.56"></script>
+  <script type="module" src="js/app.js?v=2.8.67"></script>
 </body>
 
 </html>

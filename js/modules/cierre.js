@@ -803,13 +803,17 @@ function renderConsolidadoZ(turnos, fecha, methods) {
                 const horaStr = new Date(a.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
                 const foundMethod = methods.find(m => m.key === a.metodo);
                 const metodoStr = foundMethod ? `${foundMethod.icon} ${foundMethod.label}` : a.metodo;
+                const refParts = [];
+                if (a.referencia) refParts.push(`Ref: ${a.referencia}`);
+                if (a.telefono) refParts.push(`Tel: ${a.telefono}`);
+                const refDisplay = refParts.length > 0 ? refParts.join(' | ') : '-';
                 return `
                   <tr>
                     <td class="text-muted">${horaStr}</td>
                     <td class="font-semibold">${Utils.escapeHtml(nombreCliente)}</td>
                     <td class="font-bold text-success">${Utils.formatCurrency(a.monto)}</td>
                     <td>${metodoStr}</td>
-                    <td class="text-muted">${Utils.escapeHtml(a.referencia || '-')}</td>
+                    <td class="font-semibold" style="font-size: 11.5px; color: #1E40AF;">${Utils.escapeHtml(refDisplay)}</td>
                     <td style="text-align: center;">
                       <button class="btn btn-sm btn-danger btn-delete-abono" data-id="${a.id}" data-monto="${a.monto}" data-cliente="${Utils.escapeHtml(nombreCliente)}" title="Anular este abono" style="padding: 2px 7px; font-size: 11px;">🗑️</button>
                     </td>
@@ -880,6 +884,59 @@ function renderConsolidadoZ(turnos, fecha, methods) {
         </div>
       ` : '<div class="empty-state" style="padding: 20px; text-align: center; color: var(--color-text-muted);">No se registraron propinas por punto o banco en esta fecha.</div>'}
     </div>
+
+    <!-- Resumen de Caja Chica del Día -->
+    ${(() => {
+      const cc = store.getCajaChica ? store.getCajaChica(fecha) : null;
+      const iniUSD = cc?.inicio ? (cc.inicio.montoUSD || 0) : 0;
+      const iniBs = cc?.inicio ? (cc.inicio.montoBs || 0) : 0;
+      const rets = Array.isArray(cc?.retiros) ? cc.retiros : [];
+      const totRetUSD = rets.filter(r => r.moneda !== 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+      const totRetBs = rets.filter(r => r.moneda === 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+      const espUSD = iniUSD - totRetUSD;
+      const espBs = iniBs - totRetBs;
+      return `
+        <div class="card" style="margin-bottom: 20px; border-left: 4px solid #10B981;">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h3 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+              <span>💰</span> Caja Chica del Día
+            </h3>
+            <span class="text-muted" style="font-size: 12px;">
+              Inicio: <strong>${cc?.inicio ? `${Utils.formatCurrency(iniUSD)} · Bs ${Utils.formatNumber(iniBs, true)}` : 'Sin registrar'}</strong> |
+              Cierre: <strong>${cc?.cierre ? `${Utils.formatCurrency(cc.cierre.montoUSD || 0)} · Bs ${Utils.formatNumber(cc.cierre.montoBs || 0, true)}` : 'Pendiente'}</strong>
+            </span>
+          </div>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px;">
+            <div>Total Retiros (${rets.length}): <strong style="color: #B45309;">- ${Utils.formatCurrency(totRetUSD)} · - Bs ${Utils.formatNumber(totRetBs, true)}</strong></div>
+            <div>Saldo Esperado: <strong style="color: #059669;">${Utils.formatCurrency(espUSD)} · Bs ${Utils.formatNumber(espBs, true)}</strong></div>
+          </div>
+          ${rets.length > 0 ? `
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Responsable</th>
+                    <th>Motivo</th>
+                    <th style="text-align: right;">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rets.map(r => `
+                    <tr>
+                      <td class="text-muted">${Utils.formatDate(r.fecha || fecha)} ${r.hora || ''}</td>
+                      <td class="font-semibold">${Utils.escapeHtml(r.responsable || '-')}</td>
+                      <td class="text-muted">${Utils.escapeHtml(r.motivo || '-')}</td>
+                      <td style="text-align: right; font-weight: bold; color: #B45309;">${r.moneda === 'Bs' ? `Bs ${Utils.formatNumber(r.monto, true)}` : Utils.formatCurrency(r.monto)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : '<div class="empty-state" style="padding: 15px; text-align: center; color: var(--color-text-muted);">No hay retiros de caja chica registrados para esta fecha.</div>'}
+        </div>
+      `;
+    })()}
   `;
 }
 
@@ -1365,10 +1422,10 @@ export function getReporteTxtString(fecha) {
   lines.push(sepDouble);
   lines.push("2. RESUMEN DE FLUJO DE CAJA");
   lines.push(sepDouble);
-  lines.push(`${padRight('Ingreso Real en Caja (Contado + Abonos):', 48)} ${padLeft('$ ' + (cierre.totalVentasUSD || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('Total Ventas Registradas (Valor):', 48)} ${padLeft('$ ' + (cierre.totalVentasUSD || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('(-) Crédito Otorgado Hoy (Deuda Nueva):', 48)} ${padLeft('- $ ' + (cierre.creditoUSD || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('(+) Crédito Cobrado Hoy (Abonos Recibidos):', 48)} ${padLeft('+ $ ' + (cierre.abonosUSD || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('Ingreso Real en Caja (Contado + Abonos):', 48)} ${padLeft('$ ' + (cierre.real_ingresado || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('Total Ventas Registradas (Valor):', 48)} ${padLeft('$ ' + (cierre.total || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('(-) Crédito Otorgado Hoy (Deuda Nueva):', 48)} ${padLeft('- $ ' + (cierre.credito || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('(+) Crédito Cobrado Hoy (Abonos Recibidos):', 48)} ${padLeft('+ $ ' + (cierre.cobros_credito || 0).toFixed(2), 23)}`);
   lines.push(sepSingle);
   lines.push(`Total Botellones Despachados: ${totalUnidadesVendidas + totalUnidadesSinCobro} unidades`);
   lines.push(`Total Agua Purificada Despachada: ${Math.round(totalLitrosVendidos).toLocaleString('es-VE')} Litros`);
@@ -1389,7 +1446,7 @@ export function getReporteTxtString(fecha) {
   });
 
   lines.push(sepSingle);
-  lines.push(`${padRight('TOTAL RECAUDADO EN CAJA', 32)} ${padLeft('$ ' + (cierre.totalVentasUSD || 0).toFixed(2), 18)}`);
+  lines.push(`${padRight('TOTAL RECAUDADO EN CAJA', 32)} ${padLeft('$ ' + (cierre.real_ingresado || 0).toFixed(2), 18)}`);
   lines.push("");
 
   // 3. DESGLOSE DE TURNOS DE CAJA
@@ -1472,6 +1529,57 @@ export function getReporteTxtString(fecha) {
     const diffAgua = Math.round((lecturaCaud.litrosReloj - totalJustificado) * 10) / 10;
     lines.push(sepSingle);
     lines.push(`${padRight('Diferencia de Auditoría (Faltante / Desviación):', 42)} ${padLeft((diffAgua > 0 ? '+' : '') + diffAgua.toLocaleString('es-VE') + ' L', 29)}`);
+    lines.push("");
+  }
+
+  // CAJA CHICA (INICIO, RETIROS Y CIERRE)
+  const cajaChica = store.getCajaChica ? store.getCajaChica(fecha) : null;
+  if (cajaChica && (cajaChica.inicio || (cajaChica.retiros && cajaChica.retiros.length > 0) || cajaChica.cierre)) {
+    const iniUSD = cajaChica.inicio ? (cajaChica.inicio.montoUSD || 0) : 0;
+    const iniBs = cajaChica.inicio ? (cajaChica.inicio.montoBs || 0) : 0;
+    const retirosCC = Array.isArray(cajaChica.retiros) ? cajaChica.retiros : [];
+    const totRetUSD = retirosCC.filter(r => r.moneda !== 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+    const totRetBs = retirosCC.filter(r => r.moneda === 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+    const espUSD = iniUSD - totRetUSD;
+    const espBs = iniBs - totRetBs;
+
+    lines.push(sepDouble);
+    lines.push("CAJA CHICA (INICIO, RETIROS Y CIERRE)");
+    lines.push(sepDouble);
+    if (cajaChica.inicio) {
+      const iniLabel = `Inicio de Caja Chica (${cajaChica.inicio.hora || ''}):`;
+      const iniVal = `$ ${iniUSD.toFixed(2)} | Bs ${Utils.formatNumber(iniBs, true)}`;
+      lines.push(`${padRight(iniLabel, 38)} ${padLeft(iniVal, 33)}`);
+      if (cajaChica.inicio.nota) lines.push(`  Nota inicio: ${cajaChica.inicio.nota}`);
+    } else {
+      lines.push("Inicio de Caja Chica: Sin registrar");
+    }
+
+    lines.push(sepSingle);
+    if (retirosCC.length > 0) {
+      lines.push(`RETIROS REGISTRADOS (${retirosCC.length}):`);
+      retirosCC.forEach(r => {
+        const fStr = r.fecha ? Utils.formatDate(r.fecha) : Utils.formatDate(fecha);
+        const mStr = r.moneda === 'Bs' ? `Bs ${Utils.formatNumber(r.monto, true)}` : `$ ${Number(r.monto).toFixed(2)}`;
+        const desc = `${fStr} | ${r.responsable}${r.motivo ? ' (' + r.motivo + ')' : ''}`;
+        lines.push(`${padRight(desc.slice(0, 52), 53)} ${padLeft('- ' + mStr, 18)}`);
+      });
+      lines.push(sepSingle);
+      lines.push(`${padRight('Total Retiros:', 38)} ${padLeft(`- $ ${totRetUSD.toFixed(2)} | - Bs ${Utils.formatNumber(totRetBs, true)}`, 33)}`);
+    } else {
+      lines.push("Retiros de Caja Chica: Ninguno registrado");
+    }
+
+    lines.push(sepSingle);
+    lines.push(`${padRight('Saldo Esperado en Caja Chica:', 38)} ${padLeft(`$ ${espUSD.toFixed(2)} | Bs ${Utils.formatNumber(espBs, true)}`, 33)}`);
+    if (cajaChica.cierre) {
+      const cieLabel = `Cierre de Caja Chica (${cajaChica.cierre.hora || ''}):`;
+      const cieVal = `$ ${(cajaChica.cierre.montoUSD || 0).toFixed(2)} | Bs ${Utils.formatNumber(cajaChica.cierre.montoBs || 0, true)}`;
+      lines.push(`${padRight(cieLabel, 38)} ${padLeft(cieVal, 33)}`);
+      if (cajaChica.cierre.nota) lines.push(`  Obs. cierre: ${cajaChica.cierre.nota}`);
+    } else {
+      lines.push("Cierre de Caja Chica: Pendiente por registrar");
+    }
     lines.push("");
   }
 
@@ -1772,13 +1880,17 @@ export function getMatricialReportHTML(fecha) {
                 const horaStr = new Date(a.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
                 const foundMethod = methods.find(m => m.key === a.metodo);
                 const metodoStr = foundMethod ? foundMethod.label.toUpperCase() : a.metodo.toUpperCase();
+                const refParts = [];
+                if (a.referencia) refParts.push(`REF: ${a.referencia}`);
+                if (a.telefono) refParts.push(`TEL: ${a.telefono}`);
+                const refDisplay = refParts.length > 0 ? refParts.join(' | ') : '-';
                 return `
                   <tr>
                     <td style="padding: 5px 0; color:#333;">${horaStr}</td>
                     <td style="padding: 5px 0; font-weight: bold;">${nombreCliente.toUpperCase()}</td>
                     <td style="padding: 5px 0; text-align: right; font-weight: bold; color: var(--color-success);">${Utils.formatCurrency(a.monto)}</td>
                     <td style="padding: 5px 0; padding-left: 15px;">${metodoStr}</td>
-                    <td style="padding: 5px 0; color:#555;">${(a.referencia || '-').toUpperCase()}</td>
+                    <td style="padding: 5px 0; color:#333; font-weight: bold;">${refDisplay.toUpperCase()}</td>
                   </tr>
                 `;
               }).join('')}
@@ -1831,6 +1943,65 @@ export function getMatricialReportHTML(fecha) {
         <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
       </div>
       ` : ''}
+
+      <!-- Caja Chica (Inicio, Retiros y Cierre) -->
+      ${(() => {
+        const cc = store.getCajaChica ? store.getCajaChica(fecha) : null;
+        if (!cc || (!cc.inicio && (!cc.retiros || cc.retiros.length === 0) && !cc.cierre)) return '';
+        const iniUSD = cc.inicio ? (cc.inicio.montoUSD || 0) : 0;
+        const iniBs = cc.inicio ? (cc.inicio.montoBs || 0) : 0;
+        const rets = Array.isArray(cc.retiros) ? cc.retiros : [];
+        const totRetUSD = rets.filter(r => r.moneda !== 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+        const totRetBs = rets.filter(r => r.moneda === 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+        const espUSD = iniUSD - totRetUSD;
+        const espBs = iniBs - totRetBs;
+        return `
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ CAJA CHICA (INICIO, RETIROS Y CIERRE) ]</div>
+            <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px; margin-bottom: 8px;">
+              <tr>
+                <td style="padding: 3px 0;">INICIO DE CAJA CHICA ${cc.inicio ? `(${cc.inicio.hora || ''})` : ''}:</td>
+                <td style="padding: 3px 0; text-align: right; font-weight: bold;">${cc.inicio ? `${Utils.formatCurrency(iniUSD)} | Bs ${Utils.formatNumber(iniBs, true)}` : 'SIN REGISTRAR'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 3px 0;">TOTAL RETIROS (${rets.length}):</td>
+                <td style="padding: 3px 0; text-align: right; font-weight: bold; color: #B45309;">- ${Utils.formatCurrency(totRetUSD)} | - Bs ${Utils.formatNumber(totRetBs, true)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 3px 0;">SALDO ESPERADO:</td>
+                <td style="padding: 3px 0; text-align: right; font-weight: bold;">${Utils.formatCurrency(espUSD)} | Bs ${Utils.formatNumber(espBs, true)}</td>
+              </tr>
+              <tr style="border-top: 1px solid #000;">
+                <td style="padding: 4px 0; font-weight: bold;">CIERRE DE CAJA CHICA ${cc.cierre ? `(${cc.cierre.hora || ''})` : ''}:</td>
+                <td style="padding: 4px 0; text-align: right; font-weight: bold;">${cc.cierre ? `${Utils.formatCurrency(cc.cierre.montoUSD || 0)} | Bs ${Utils.formatNumber(cc.cierre.montoBs || 0, true)}` : 'PENDIENTE'}</td>
+              </tr>
+            </table>
+            ${rets.length > 0 ? `
+              <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 10.5px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid #000;">
+                    <th style="text-align: left; padding: 4px 0;">FECHA</th>
+                    <th style="text-align: left; padding: 4px 0;">RESPONSABLE</th>
+                    <th style="text-align: left; padding: 4px 0;">MOTIVO</th>
+                    <th style="text-align: right; padding: 4px 0;">MONTO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rets.map(r => `
+                    <tr>
+                      <td style="padding: 3px 0;">${Utils.formatDate(r.fecha || fecha)}</td>
+                      <td style="padding: 3px 0; font-weight: bold;">${Utils.escapeHtml((r.responsable || '').toUpperCase())}</td>
+                      <td style="padding: 3px 0; color: #555;">${Utils.escapeHtml((r.motivo || '-').toUpperCase())}</td>
+                      <td style="padding: 3px 0; text-align: right; font-weight: bold;">${r.moneda === 'Bs' ? `Bs ${Utils.formatNumber(r.monto, true)}` : Utils.formatCurrency(r.monto)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : ''}
+            <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
+          </div>
+        `;
+      })()}
 
       <div style="text-align: center; font-size: 10px; margin-top: 15px; color: #555; letter-spacing: 1px;">
         *** FIN DEL REPORTE Z - IMPRESO DESDE SISTEMA LOCAL ***
