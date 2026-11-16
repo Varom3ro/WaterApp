@@ -33630,7 +33630,7 @@
           "litros": 0,
           "moneda": "USD",
           "nombre": "Balancín C/Casillero SA",
-          "precio": 0,
+          "precio": 95.0,
           "categoria": "producto"
         },
         {
@@ -33883,6 +33883,15 @@
           "moneda": "USD",
           "nombre": "Tobito SA",
           "precio": 14,
+          "categoria": "producto"
+        },
+        {
+          "id": "mv1a5chf9h8frnolh",
+          "stock": 0,
+          "litros": 0,
+          "moneda": "USD",
+          "nombre": "Forro Botellón protección solar",
+          "precio": 8.0,
           "categoria": "producto"
         }
       ],

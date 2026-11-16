@@ -15615,7 +15615,7 @@
           "litros": 0,
           "moneda": "USD",
           "nombre": "Balancín C/Casillero SA",
-          "precio": 0,
+          "precio": 95.0,
           "categoria": "producto"
         },
         {
@@ -15786,7 +15786,7 @@
           "litros": 0,
           "moneda": "USD",
           "nombre": "Forro Botellón protección solar",
-          "precio": 8,
+          "precio": 8.0,
           "categoria": "producto"
         },
         {

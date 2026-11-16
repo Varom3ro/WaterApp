@@ -248,6 +248,11 @@ export async function syncToCloud(isManual = false) {
         else if (m === 'punto_venta' || m === 'punto') metodoLabel = '💳 Punto Venta';
         else if (m === 'transferencia') metodoLabel = '🏦 Transferencia';
         else if (m === 'efectivo_usd') metodoLabel = '💵 Efectivo $';
+        else if (typeof m === 'string' && (m.startsWith('custom_') || m.includes('custom_'))) {
+          if (m === 'custom_mvwf8mbn1jio') metodoLabel = '💳 Punto fiscal';
+          else if (m === 'custom_mw0v6kozkqrv') metodoLabel = '💳 Zelle';
+          else metodoLabel = '💳 Punto de Venta (B)';
+        }
       }
 
       const horaStr = (typeof Utils.formatTime === 'function')
