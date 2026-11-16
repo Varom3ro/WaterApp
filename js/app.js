@@ -4,28 +4,31 @@
 
 import { router } from './router.js';
 import { store } from './store.js';
-import { Utils } from './utils.js';
-import { renderSidebar } from './components/sidebar.js';
+import { Utils } from './utils.js?v=2.8.67';
+import { renderSidebar } from './components/sidebar.js?v=2.8.67';
 import { renderHeader } from './components/header.js';
 import { Licencia } from './licencia.js';
 import { syncToCloud } from './cloud-sync.js';
 
 // Import modules
 import { renderDashboard } from './modules/dashboard.js';
-import { renderClientes } from './modules/clientes.js';
-import { renderVentas } from './modules/ventas.js';
-import { renderInventario } from './modules/inventario.js';
+import { renderClientes } from './modules/clientes.js?v=2.8.67';
+import { renderVentas } from './modules/ventas.js?v=2.8.67';
+import { renderInventario } from './modules/inventario.js?v=2.8.67';
 import { renderReportes } from './modules/reportes.js';
 import { renderConfiguracion } from './modules/configuracion.js';
-import { renderCierreCaja } from './modules/cierre.js?v=2.8.54';
+import { renderCierreCaja } from './modules/cierre.js?v=2.8.67';
 
 // 🛡️ Blindaje global contra cierre de ventana en PWA de escritorio Windows al presionar F5 o Ctrl+R:
-// Se captura a nivel de captura global inmediatamente al iniciar el script.
+// Permite hard-refresh (Ctrl+Shift+R o Shift+F5) normalmente.
 window.addEventListener('keydown', (e) => {
+    if (e.shiftKey) return; // Permitir recarga forzada nativa del navegador
     if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
-        e.preventDefault();
-        e.stopPropagation();
-        window.location.reload();
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.reload();
+        }
     }
 }, true);
 

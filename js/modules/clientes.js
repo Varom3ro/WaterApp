@@ -6,6 +6,7 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { syncToCloud } from '../cloud-sync.js';
 
 export function renderClientes(container) {
   const clientes = store.getAll('clientes');
@@ -570,6 +571,12 @@ export function openAbonoClienteDirecto(clienteId = null, onSaved = null) {
   let selectedId = clienteId || allClientes[0].id;
   let cliente = store.getById('clientes', selectedId);
   const isSpecific = !!clienteId;
+  const tasaActual = store.getConfig('tasaCambio') || 40.00;
+
+  const isUsdMethod = (metodoId) => {
+    const found = store.getMetodosPago(false).find(m => m.id === metodoId);
+    return found ? (found.moneda === 'USD') : (metodoId === 'efectivo_usd');
+  };
 
   const getBannerHTML = (cid) => {
     const cObj = store.getById('clientes', cid);
@@ -578,18 +585,60 @@ export function openAbonoClienteDirecto(clienteId = null, onSaved = null) {
     const d = Math.max(0, sNeto);
     const sf = sNeto < 0 ? Math.abs(sNeto) : 0;
     if (d > 0) {
-      return `<div class="alert-panel warning mb-md">⚠️ Deuda pendiente de <strong>${Utils.escapeHtml(cObj.nombre)}</strong>: <strong style="font-size:16px;">${Utils.formatCurrency(d)}</strong></div>`;
+      const dBs = d * tasaActual;
+      return `
+        <div class="alert-panel warning mb-md" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #F59E0B; background: #FFFBEB;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+            <div>
+              ⚠️ Deuda pendiente de <strong>${Utils.escapeHtml(cObj.nombre)}</strong>: 
+              <strong style="font-size:17px; color: #DC2626;">${Utils.formatCurrency(d)}</strong>
+            </div>
+            <div style="font-size: 12.5px; font-weight: 700; color: #64748B;">
+              (Bs ${Utils.formatNumber(dBs, true)} · Tasa: Bs ${Utils.formatNumber(tasaActual, true)})
+            </div>
+          </div>
+        </div>
+      `;
     } else if (sf > 0) {
-      return `<div class="alert-panel success mb-md">💰 Saldo a favor actual de <strong>${Utils.escapeHtml(cObj.nombre)}</strong>: <strong style="font-size:16px;">+${Utils.formatCurrency(sf)}</strong> (el nuevo abono se sumará a favor)</div>`;
+      const sfBs = sf * tasaActual;
+      return `
+        <div class="alert-panel success mb-md" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #10B981; background: #ECFDF5;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+            <div>
+              💰 Saldo a favor de <strong>${Utils.escapeHtml(cObj.nombre)}</strong>: 
+              <strong style="font-size:17px; color: #059669;">+${Utils.formatCurrency(sf)}</strong>
+            </div>
+            <div style="font-size: 12.5px; font-weight: 700; color: #64748B;">
+              (+Bs ${Utils.formatNumber(sfBs, true)})
+            </div>
+          </div>
+          <div style="font-size: 11.5px; color: #047857; margin-top: 4px;">El nuevo abono se sumará a su saldo a favor por adelantado.</div>
+        </div>
+      `;
     } else {
-      return `<div class="alert-panel info mb-md">ℹ️ <strong>${Utils.escapeHtml(cObj.nombre)}</strong> está al día ($0.00). El monto ingresado quedará guardado como <strong>saldo a favor por adelantado</strong>.</div>`;
+      return `
+        <div class="alert-panel info mb-md" style="padding: 12px 14px; border-radius: 8px; border-left: 4px solid #3B82F6; background: #EFF6FF;">
+          ℹ️ <strong>${Utils.escapeHtml(cObj.nombre)}</strong> está al día ($0.00). El monto ingresado quedará guardado como <strong>saldo a favor por adelantado</strong>.
+        </div>
+      `;
     }
   };
 
-  const getSuggestedAmount = (cid) => {
+  const getSuggestedAmount = (cid, metodoId) => {
     const sNeto = store.getSaldoNetoCliente ? store.getSaldoNetoCliente(cid) : (store.getDeudaCliente(cid) || 0);
-    return sNeto > 0 ? sNeto.toFixed(2) : '';
+    const d = Math.max(0, sNeto);
+    if (d <= 0) return '';
+    const isUsd = isUsdMethod(metodoId);
+    if (isUsd) {
+      return d.toFixed(2);
+    } else {
+      return (d * tasaActual).toFixed(2);
+    }
   };
+
+  const metodosActivos = store.getMetodosPago(true);
+  const initialMetodoId = metodosActivos.length > 0 ? (metodosActivos.find(m => m.id === 'punto')?.id || metodosActivos[0].id) : 'punto';
+  const initialIsUsd = isUsdMethod(initialMetodoId);
 
   const content = `
     <form id="form-abono-directo">
@@ -614,24 +663,36 @@ export function openAbonoClienteDirecto(clienteId = null, onSaved = null) {
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" style="font-weight:700;">Monto a Abonar / Cobrar *</label>
-          <input type="number" class="form-control" name="monto" id="input-monto-abono" step="0.01" min="0.01" value="${getSuggestedAmount(selectedId)}" required placeholder="0.00" style="font-size:16px; font-weight:700;"/>
+          <label class="form-label" id="label-monto-abono" style="font-weight:700;">
+            ${initialIsUsd ? 'Monto a Abonar (USD $) *' : 'Monto a Abonar (Bs) *'}
+          </label>
+          <input type="number" class="form-control" name="monto" id="input-monto-abono" step="0.01" min="0.01" value="${getSuggestedAmount(selectedId, initialMetodoId)}" required placeholder="0.00" style="font-size:16px; font-weight:700;"/>
+          <div id="abono-equivalencia-txt" style="font-size: 11.5px; margin-top: 4px; font-weight: 600; color: #475569;"></div>
         </div>
         <div class="form-group">
           <label class="form-label" style="font-weight:700;">Método de Pago</label>
-          <select class="form-control" name="metodo" style="font-size:14px; font-weight:600; height:38px;">
-            ${store.getMetodosPago(true).map(m => {
+          <select class="form-control" name="metodo" id="select-abono-metodo" style="font-size:14px; font-weight:600; height:38px;">
+            ${metodosActivos.map(m => {
               const hasCurrency = /\((usd|bs|\$)\)/i.test(m.label);
               const displayLabel = hasCurrency ? m.label : `${m.label} (${m.moneda || 'Bs'})`;
-              return `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${m.icon || '💳'} ${displayLabel}</option>`;
+              return `<option value="${m.id}" ${m.id === initialMetodoId ? 'selected' : ''}>${m.icon || '💳'} ${displayLabel}</option>`;
             }).join('')}
           </select>
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Referencia (opcional)</label>
-        <input type="text" class="form-control" name="referencia" placeholder="Nro. de referencia o nota"/>
+      <!-- Contenedor dinámico de Referencia y Teléfono (dividido en 2 columnas para Pago Móvil) -->
+      <div id="container-referencia-abono" style="margin-top: 8px;">
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <div style="flex: 1; min-width: 0;">
+            <label class="form-label" style="font-size: 12px; margin-bottom: 2px;">Nº de Referencia (opcional)</label>
+            <input type="text" class="form-control" name="referencia" id="input-abono-referencia" placeholder="Nº de referencia o nota" style="height: 34px; font-size: 12px;"/>
+          </div>
+          <div id="wrapper-abono-telefono" style="flex: 1; min-width: 0; display: ${initialMetodoId === 'pago_movil' ? 'block' : 'none'};">
+            <label class="form-label" style="font-size: 12px; margin-bottom: 2px;">Nº de Teléfono</label>
+            <input type="text" class="form-control" name="telefono" id="input-abono-telefono" placeholder="Teléfono del pagador" style="height: 34px; font-size: 12px;"/>
+          </div>
+        </div>
       </div>
     </form>
   `;
@@ -642,43 +703,113 @@ export function openAbonoClienteDirecto(clienteId = null, onSaved = null) {
     saveLabel: 'Registrar Abono',
     onOpen: (overlay) => {
       const selectCli = overlay.querySelector('#select-abono-cliente');
+      const selectMetodo = overlay.querySelector('#select-abono-metodo');
+      const inputMonto = overlay.querySelector('#input-monto-abono');
+      const labelMonto = overlay.querySelector('#label-monto-abono');
+      const equivTxt = overlay.querySelector('#abono-equivalencia-txt');
+      const bannerContainer = overlay.querySelector('#container-banner-abono');
+      const wrapperTel = overlay.querySelector('#wrapper-abono-telefono');
+
+      function updateEquivalencia() {
+        if (!inputMonto || !equivTxt) return;
+        const val = parseFloat(inputMonto.value) || 0;
+        const metodo = selectMetodo ? selectMetodo.value : initialMetodoId;
+        const isUsd = isUsdMethod(metodo);
+        if (val <= 0) {
+          equivTxt.textContent = `Tasa del día: Bs ${Utils.formatNumber(tasaActual, true)}`;
+          return;
+        }
+        if (isUsd) {
+          const bsEquiv = val * tasaActual;
+          equivTxt.innerHTML = `≈ <strong>Bs ${Utils.formatNumber(bsEquiv, true)}</strong> (Tasa: Bs ${Utils.formatNumber(tasaActual, true)})`;
+        } else {
+          const usdEquiv = tasaActual > 0 ? (val / tasaActual) : 0;
+          equivTxt.innerHTML = `≈ <strong>${Utils.formatCurrency(usdEquiv)}</strong> (Tasa: Bs ${Utils.formatNumber(tasaActual, true)})`;
+        }
+      }
+
+      function updateForMetodo(nuevoMetodo, preservarValor = false) {
+        const isUsd = isUsdMethod(nuevoMetodo);
+        const cid = selectCli ? selectCli.value : selectedId;
+        
+        if (labelMonto) {
+          labelMonto.textContent = isUsd ? 'Monto a Abonar (USD $) *' : 'Monto a Abonar (Bs) *';
+        }
+
+        if (wrapperTel) {
+          wrapperTel.style.display = (nuevoMetodo === 'pago_movil') ? 'block' : 'none';
+        }
+
+        if (inputMonto && !preservarValor) {
+          inputMonto.value = getSuggestedAmount(cid, nuevoMetodo);
+        }
+        updateEquivalencia();
+      }
+
       if (selectCli) {
         selectCli.addEventListener('change', (e) => {
           const cid = e.target.value;
-          const bannerContainer = overlay.querySelector('#container-banner-abono');
-          const inputMonto = overlay.querySelector('#input-monto-abono');
+          selectedId = cid;
           if (bannerContainer) bannerContainer.innerHTML = getBannerHTML(cid);
-          if (inputMonto) inputMonto.value = getSuggestedAmount(cid);
+          updateForMetodo(selectMetodo ? selectMetodo.value : initialMetodoId, false);
         });
       }
+
+      if (selectMetodo) {
+        selectMetodo.addEventListener('change', (e) => {
+          updateForMetodo(e.target.value, false);
+        });
+      }
+
+      if (inputMonto) {
+        inputMonto.addEventListener('input', updateEquivalencia);
+      }
+
+      updateEquivalencia();
     },
     onSave: (overlay) => {
       const form = overlay.querySelector('#form-abono-directo');
       const fd = new FormData(form);
       const cid = fd.get('clienteId');
-      const monto = parseFloat(fd.get('monto'));
+      const metodo = fd.get('metodo');
+      const rawMonto = fd.get('monto') || '0';
+      const inputMonto = parseFloat(String(rawMonto).replace(',', '.')) || 0;
 
       if (!cid) {
         showToast('Debe seleccionar un cliente', 'error');
         return;
       }
 
-      if (!monto || monto <= 0) {
-        showToast('Monto inválido', 'error');
+      if (!inputMonto || inputMonto <= 0) {
+        showToast('Ingrese un monto válido', 'error');
         return;
       }
+
+      const isUsd = isUsdMethod(metodo);
+      const montoUSD = isUsd ? inputMonto : (tasaActual > 0 ? (inputMonto / tasaActual) : 0);
+      const montoBs = isUsd ? (inputMonto * tasaActual) : inputMonto;
+
+      const refVal = fd.get('referencia')?.trim() || '';
+      const telVal = fd.get('telefono')?.trim() || '';
 
       const abono = {
         id: Utils.generateId(),
         clienteId: cid,
-        monto,
-        metodo: fd.get('metodo'),
-        referencia: fd.get('referencia')?.trim() || '',
+        monto: Math.round(montoUSD * 100) / 100, // En dólares para la cuenta de crédito del cliente
+        montoBs: Math.round(montoBs * 100) / 100,
+        tasa: tasaActual,
+        metodo: metodo,
+        referencia: refVal,
+        telefono: telVal || null,
         fecha: Utils.nowISO()
       };
 
       store.save('abonos', abono);
-      showToast(`Abono de ${Utils.formatCurrency(monto)} registrado correctamente`, 'success');
+      if (isUsd) {
+        showToast(`Abono de ${Utils.formatCurrency(montoUSD)} registrado correctamente`, 'success');
+      } else {
+        showToast(`Abono de Bs ${Utils.formatNumber(montoBs, true)} ($${montoUSD.toFixed(2)} USD) registrado correctamente`, 'success');
+      }
       closeModal();
       
       if (typeof syncToCloud === 'function') syncToCloud();

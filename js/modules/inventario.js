@@ -9,6 +9,7 @@ import { showToast } from '../components/toast.js';
 import { syncToCloud } from '../cloud-sync.js';
 
 export function renderInventario(container) {
+  const isOp = store.isOperario();
   const inventario = store.getInventarioActual();
   const cisternas = store.getAll('cisternas').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   const mermas = store.getAll('mermas').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -36,25 +37,28 @@ export function renderInventario(container) {
   container.innerHTML = `
     <div class="page-header">
       <div>
-        <h1 class="page-title">Control de Inventario</h1>
-        <p class="page-subtitle">Nivel de tanque de agua, cisternas y stock de productos físicos</p>
+        <h1 class="page-title">${isOp ? 'Tanque de Agua' : 'Control de Inventario'}</h1>
+        <p class="page-subtitle">${isOp ? 'Nivel del tanque y recepción de cisternas' : 'Nivel de tanque de agua, cisternas y stock de productos físicos'}</p>
       </div>
       <div class="page-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-primary" id="btn-nueva-cisterna">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Registrar Cisterna
         </button>
-        <button class="btn btn-secondary" id="btn-registrar-merma">
-          🧹 Registrar Merma
-        </button>
-        ${productosFisicos.length > 0 ? `
-          <button class="btn btn-secondary" id="btn-entrada-stock-general" style="background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE; font-weight:600;">
-            📦 + Entrada de Mercancía
+        ${!isOp ? `
+          <button class="btn btn-secondary" id="btn-registrar-merma">
+            🧹 Registrar Merma
           </button>
+          ${productosFisicos.length > 0 ? `
+            <button class="btn btn-secondary" id="btn-entrada-stock-general" style="background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE; font-weight:600;">
+              📦 + Entrada de Mercancía
+            </button>
+          ` : ''}
         ` : ''}
       </div>
     </div>
 
+    ${!isOp ? `
     <!-- Metrics -->
     <div class="metrics-grid" style="grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))">
       <div class="metric-card accent">
@@ -151,13 +155,14 @@ export function renderInventario(container) {
         </div>
       `}
     </div>
+    ` : ''}
 
     <div class="dashboard-grid">
       <!-- Tanque Visual -->
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">Nivel del Tanque</h3>
-          ${!store.isOperario() ? '<button class="btn btn-sm btn-secondary" id="btn-config-tanque">⚙️ Configurar</button>' : ''}
+          ${!isOp ? '<button class="btn btn-sm btn-secondary" id="btn-config-tanque">⚙️ Configurar</button>' : ''}
         </div>
         ${nivelPct <= 10 ? '<div class="alert-panel danger mb-md">⚠️ ¡Nivel crítico! Solicitar cisterna urgente.</div>' : ''}
         ${nivelPct > 10 && nivelPct <= 30 ? '<div class="alert-panel warning mb-md">⚡ Nivel bajo. Considere solicitar cisterna.</div>' : ''}
@@ -178,25 +183,30 @@ export function renderInventario(container) {
 
       <!-- Historial Cisternas -->
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
           <h3 class="card-title">Historial de Cisternas</h3>
+          <button class="btn btn-sm btn-primary" id="btn-nueva-cisterna-card" style="font-weight:600;">
+            🚚 + Registrar Cisterna
+          </button>
         </div>
         ${cisternas.length > 0 ? `
           <div class="table-container">
             <table class="table">
-              <thead><tr><th>Fecha</th><th>Capacidad</th><th>Nota</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Capacidad</th><th>Nota</th>${!isOp ? '<th>Acciones</th>' : ''}</tr></thead>
               <tbody>
                 ${cisternas.map(c => `
                   <tr>
                     <td>${Utils.formatDateTime(c.fecha)}</td>
                     <td class="font-semibold">${Utils.formatNumber(c.capacidad)} L</td>
                     <td class="text-muted">${Utils.escapeHtml(c.nota || '-')}</td>
+                    ${!isOp ? `
                     <td>
                       <div class="flex gap-sm">
                         <button class="btn btn-sm btn-secondary btn-edit-cisterna" data-id="${c.id}">✏️ Editar</button>
                         <button class="btn btn-sm btn-secondary btn-delete-cisterna" data-id="${c.id}">🗑️</button>
                       </div>
                     </td>
+                    ` : ''}
                   </tr>
                 `).join('')}
               </tbody>
@@ -205,6 +215,7 @@ export function renderInventario(container) {
         ` : '<div class="empty-state"><span class="empty-state-icon">🚚</span><span class="empty-state-text">No hay cisternas registradas</span></div>'}
       </div>
 
+      ${!isOp ? `
       <!-- Historial Mermas -->
       <div class="card">
         <div class="card-header">
@@ -233,12 +244,14 @@ export function renderInventario(container) {
           </div>
         ` : '<div class="empty-state"><span class="empty-state-icon">🧹</span><span class="empty-state-text">No hay mermas registradas</span></div>'}
       </div>
+      ` : ''}
     </div>
   `;
 
   // Events
-  container.querySelector('#btn-nueva-cisterna').addEventListener('click', () => openCisternaModal());
-  container.querySelector('#btn-registrar-merma').addEventListener('click', () => openMermaModal());
+  container.querySelector('#btn-nueva-cisterna')?.addEventListener('click', () => openCisternaModal(null, () => renderInventario(container)));
+  container.querySelector('#btn-nueva-cisterna-card')?.addEventListener('click', () => openCisternaModal(null, () => renderInventario(container)));
+  container.querySelector('#btn-registrar-merma')?.addEventListener('click', () => openMermaModal());
   const btnConfigTanque = container.querySelector('#btn-config-tanque');
   if (btnConfigTanque) {
     btnConfigTanque.addEventListener('click', openConfigTanqueModal);
@@ -255,7 +268,7 @@ export function renderInventario(container) {
 
   // Edit/Delete Cisternas
   container.querySelectorAll('.btn-edit-cisterna').forEach(btn => {
-    btn.addEventListener('click', () => openCisternaModal(btn.dataset.id));
+    btn.addEventListener('click', () => openCisternaModal(btn.dataset.id, () => renderInventario(container)));
   });
   container.querySelectorAll('.btn-delete-cisterna').forEach(btn => {
     btn.addEventListener('click', () => deleteCisterna(btn.dataset.id, container));

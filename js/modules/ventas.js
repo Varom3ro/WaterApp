@@ -154,11 +154,13 @@ function renderVentasTable() {
   let rawAbonos = store.getAll('abonos').map(a => ({
     id: a.id,
     clienteId: a.clienteId,
+    ventaId: a.ventaId || null,
     fecha: a.fecha,
     total: parseFloat(a.monto) || 0,
     tipo: 'abono',
     metodo: a.metodo || 'efectivo_usd',
     referencia: a.referencia || '',
+    telefono: a.telefono || '',
     esAbono: true,
     estadoEntrega: 'no_aplica',
     detalles: []
@@ -184,7 +186,16 @@ function renderVentasTable() {
     items = items.filter(v => {
       const cliente = store.getById('clientes', v.clienteId);
       const nombre = cliente ? cliente.nombre.toLowerCase() : 'general';
-      return nombre.includes(search);
+      if (nombre.includes(search)) return true;
+      if (v.referencia && String(v.referencia).toLowerCase().includes(search)) return true;
+      if (v.telefono && String(v.telefono).toLowerCase().includes(search)) return true;
+      if (v.pagos && Array.isArray(v.pagos)) {
+        return v.pagos.some(p => 
+          (p.referencia && String(p.referencia).toLowerCase().includes(search)) ||
+          (p.telefono && String(p.telefono).toLowerCase().includes(search))
+        );
+      }
+      return false;
     });
   }
 
@@ -410,13 +421,42 @@ function renderVentasTable() {
     const nombre = cliente ? cliente.nombre : 'Cliente General';
     const allMetodos = store.getMetodosPago(false);
 
+    const renderRefBadge = (ref, tel) => {
+      const parts = [];
+      if (ref && String(ref).trim()) {
+        parts.push(`<span style="display:inline-flex; align-items:center; gap:3px;"><strong style="color:#1E40AF;">Ref:</strong> <span style="font-family:ui-monospace, monospace; font-weight:600; color:#0F172A;">${Utils.escapeHtml(String(ref).trim())}</span></span>`);
+      }
+      if (tel && String(tel).trim()) {
+        parts.push(`<span style="display:inline-flex; align-items:center; gap:3px;"><strong style="color:#065F46;">📱</strong> <span style="font-family:ui-monospace, monospace; font-weight:600; color:#0F172A;">${Utils.escapeHtml(String(tel).trim())}</span></span>`);
+      }
+      if (parts.length === 0) return '';
+      return `<div style="margin-top: 3px; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 11px; line-height: 1.2;">${parts.join('<span style="color:#94A3B8;">|</span>')}</div>`;
+    };
+
     if (v.esAbono) {
       const metObj = allMetodos.find(m => m.id === v.metodo);
       const icon = metObj ? metObj.icon : '💵';
       const labelMetodo = metObj ? metObj.label : v.metodo;
-      const refStr = v.referencia ? ` (Ref: ${Utils.escapeHtml(v.referencia)})` : '';
-      const pagosStr = `<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">${icon}</span> <span>${labelMetodo}: <b>${Utils.formatCurrency(v.total)}</b>${refStr}</span></div>`;
-      const detallesHTML = `<div style="font-size: 0.9em;">Abono a cuenta / saldo a favor</div>`;
+      const refBadgeHTML = renderRefBadge(v.referencia, v.telefono);
+      const pagosStr = `
+        <div style="font-size: 0.85em; line-height: 1.3;">
+          <div style="white-space: nowrap; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);">
+            <span style="font-size: 14px;">${icon}</span>
+            <span>${labelMetodo}: <b>${Utils.formatCurrency(v.total)}</b></span>
+          </div>
+          ${refBadgeHTML}
+        </div>
+      `;
+      
+      let detallesHTML = `<div style="font-size: 0.9em; color: var(--color-text-secondary);">Abono a cuenta / saldo a favor</div>`;
+      if (v.ventaId) {
+        const vAsoc = store.getById('ventas', v.ventaId);
+        const totalVentaAsoc = vAsoc ? ` (Venta de ${Utils.formatCurrency(vAsoc.total)})` : '';
+        detallesHTML = `<div style="font-size: 0.9em; font-weight: 600; color: #166534;">💰 Abono Inicial de Venta${totalVentaAsoc}</div>`;
+      } else if (v.referencia && v.referencia.toLowerCase().includes('abono inicial')) {
+        detallesHTML = `<div style="font-size: 0.9em; font-weight: 600; color: #166534;">💰 Abono Inicial vinculado a Venta a Crédito</div>`;
+      }
+
       const totalDisplayHTML = `${Utils.formatCurrency(v.total)}`;
       const tipoBadgeHTML = `<span class="badge" style="background:#DCFCE7; color:#166534; border:1px solid #BBF7D0;">Abono</span>`;
       const entregaHTML = `<span class="badge" style="background: #F1F5F9; color: #64748B;">— No aplica —</span>`;
@@ -441,7 +481,36 @@ function renderVentasTable() {
 
     let pagosStr = '-';
     if (v.tipo === 'credito') {
-      pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">📋</span> <span>A Crédito</span></div>';
+      const sumaPagado = (v.pagos && Array.isArray(v.pagos)) ? v.pagos.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0) : 0;
+      if (sumaPagado > 0) {
+        const restaCredito = Math.max(0, (v.total || 0) - sumaPagado);
+        const pagosDesc = v.pagos.map(p => {
+          const mObj = allMetodos.find(m => m.id === p.metodo);
+          const icon = mObj ? mObj.icon : '💳';
+          const label = mObj ? mObj.label : p.metodo;
+          const refBadgeHTML = renderRefBadge(p.referencia, p.telefono);
+          return `
+            <div style="margin-bottom: 3px;">
+              <div style="display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <span style="font-size: 13px;">${icon}</span>
+                <span>${label}: <b>${Utils.formatCurrency(p.monto)}</b></span>
+              </div>
+              ${refBadgeHTML}
+            </div>
+          `;
+        }).join('');
+        pagosStr = `
+          <div style="font-size: 0.85em; line-height: 1.35;">
+            <div style="color: #166534; font-weight: 600;">
+              ${pagosDesc}
+              <div style="margin-top: 2px;"><span style="font-size: 10px; background: #DCFCE7; color: #15803D; padding: 1px 5px; border-radius: 4px; font-weight: 700;">Abonado Hoy</span></div>
+            </div>
+            <div style="color: #DC2626; font-weight: 700; margin-top: 3px;">📋 Resta a Crédito: ${Utils.formatCurrency(restaCredito)}</div>
+          </div>
+        `;
+      } else {
+        pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">📋</span> <span>A Crédito (100%)</span></div>';
+      }
     } else if (v.tipo === 'convenio') {
       pagosStr = '<div style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">🤝</span> <span>Convenio</span></div>';
     } else if (v.tipo === 'garantia') {
@@ -453,9 +522,31 @@ function renderVentasTable() {
         const method = allMetodos.find(m => m.id === p.metodo);
         const icon = method ? method.icon : '';
         const name = method ? method.label : p.metodo;
-        const title = p.referencia ? ` title="Ref: ${p.referencia}" style="cursor:help;"` : '';
-        return `<div${title} style="font-size: 0.85em; white-space: nowrap; line-height: 1.2; display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A);"><span style="font-size: 14px;">${icon}</span> <span>${name}: <b>${Utils.formatCurrency(p.monto)}</b></span></div>`;
+        const refBadgeHTML = renderRefBadge(p.referencia, p.telefono);
+        return `
+          <div style="font-size: 0.85em; line-height: 1.3; margin-bottom: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A); white-space: nowrap;">
+              <span style="font-size: 14px;">${icon}</span>
+              <span>${name}: <b>${Utils.formatCurrency(p.monto)}</b></span>
+            </div>
+            ${refBadgeHTML}
+          </div>
+        `;
       }).join('');
+    } else if (v.metodo) {
+      const method = allMetodos.find(m => m.id === v.metodo);
+      const icon = method ? method.icon : '';
+      const name = method ? method.label : v.metodo;
+      const refBadgeHTML = renderRefBadge(v.referencia, v.telefono);
+      pagosStr = `
+        <div style="font-size: 0.85em; line-height: 1.3;">
+          <div style="display: flex; align-items: center; gap: 6px; color: var(--color-text-primary, #0F172A); white-space: nowrap;">
+            <span style="font-size: 14px;">${icon}</span>
+            <span>${name}: <b>${Utils.formatCurrency(v.total)}</b></span>
+          </div>
+          ${refBadgeHTML}
+        </div>
+      `;
     }
 
     // Generar detalles del producto
@@ -501,7 +592,9 @@ function renderVentasTable() {
       : `${Utils.formatCurrency(v.total)}${v.tasa ? `<br><small style="font-size: 0.8em; color: var(--color-text-secondary);">Bs ${Utils.formatNumber(v.total * v.tasa, true)}</small>` : ''}`;
 
     const tipoBadgeHTML = v.tipo === 'credito' 
-      ? '<span class="badge badge-warning">Crédito</span>'
+      ? ((v.pagos && Array.isArray(v.pagos) && v.pagos.some(p => p.monto > 0))
+          ? '<span class="badge" style="background:#FEF3C7; color:#92400E; border:1px solid #F59E0B;" title="Venta a crédito con abono inicial">Crédito Parcial</span>'
+          : '<span class="badge badge-warning">Crédito (100%)</span>')
       : v.tipo === 'convenio' 
         ? '<span class="badge badge-info">Convenio</span>'
         : v.tipo === 'garantia' 
@@ -1249,7 +1342,14 @@ export function renderNuevaVentaForm(container) {
                   </div>
                   <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta" style="font-size: 12px; font-weight: 700; height: 34px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;" title="Añadir otro método de pago">+ Añadir</button>
                   <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11.5px;"/>
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                      <div style="flex: 1; min-width: 0;">
+                        <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11.5px; width: 100%;"/>
+                      </div>
+                      <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
+                        <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11.5px; width: 100%;"/>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1309,9 +1409,7 @@ export function renderNuevaVentaForm(container) {
     <div style="padding: 0 0 8px 0;">
       <form id="form-venta">
         <div class="page-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <div>
-            <h1 class="page-title" style="margin-bottom: 0;">Punto de Venta</h1>
-          </div>
+          <div></div>
           
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <!-- Tasa de Cambio -->
@@ -1332,9 +1430,10 @@ export function renderNuevaVentaForm(container) {
               <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(inventario.litros)} L</strong>
             </div>
 
-            <!-- Botón Ingreso de Cisterna (Solo ícono) -->
-            <button type="button" id="btn-ingreso-cisterna-pv" class="btn btn-secondary" style="width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; border-radius: 8px; background: #ECFDF5; border: 1.5px solid #10B981; color: #047857; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" title="Registrar llegada de cisterna (llenar tanque)">
-              🚚
+            <!-- Botón Caja Chica (Inicio, Retiros y Cierre) -->
+            <button type="button" id="btn-caja-chica-pv" class="btn" style="height: 42px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; border-radius: 8px; background: #FFFBEB; border: 1.5px solid #F59E0B; color: #92400E; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" title="Registrar inicio de caja chica, retiros y cierre">
+              <span style="font-size: 18px; line-height: 1;">💰</span>
+              <span>Caja Chica</span>
             </button>
 
             <!-- Botón Reloj Medidor (Solo ícono) -->
@@ -1438,12 +1537,11 @@ export function renderNuevaVentaForm(container) {
     });
   }
 
-  const btnCisternaPV = modal.querySelector('#btn-ingreso-cisterna-pv');
-  if (btnCisternaPV) {
-    btnCisternaPV.addEventListener('click', () => {
-      openCisternaModal(null, () => {
-        renderNuevaVentaForm(container);
-      });
+  const btnCajaChicaPV = modal.querySelector('#btn-caja-chica-pv');
+  if (btnCajaChicaPV) {
+    btnCajaChicaPV.addEventListener('click', () => {
+      const fechaSel = modal.querySelector('#input-fecha')?.value || todayStr;
+      openModalCajaChica(fechaSel);
     });
   }
 
@@ -1525,6 +1623,221 @@ export function renderNuevaVentaForm(container) {
     });
   }
   
+  function abrirModalPagoIncompleto({
+    totalUSD,
+    totalBs,
+    totalPagadoUSD,
+    totalPagadoBs,
+    faltaUSD,
+    faltaBs,
+    clienteIdActual,
+    pagos,
+    onConfirmarCredito
+  }) {
+    let currentCid = clienteIdActual || null;
+    let currentCliente = currentCid ? store.getById('clientes', currentCid) : null;
+
+    function renderModalBody() {
+      return `
+        <div style="font-family: inherit; color: var(--color-text-main, #0F172A);">
+          <div style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">⚠️</span>
+            <div style="font-size: 13px; color: #991B1B; line-height: 1.35;">
+              <strong>El pago ingresado no cubre el total de la venta.</strong><br/>
+              Puedes enviar la diferencia a <strong>Crédito</strong> asignando un cliente para su posterior abono, o cancelar el registro.
+            </div>
+          </div>
+
+          <!-- Tarjetas de resumen de montos -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px;">
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Total Venta</div>
+              <div style="font-size: 15.5px; font-weight: 800; color: #0F172A; margin-top: 2px;">${Utils.formatCurrency(totalUSD)}</div>
+              <div style="font-size: 10px; color: #64748B;">Bs ${Utils.formatNumber(totalBs, true)}</div>
+            </div>
+            <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10.5px; font-weight: 700; color: #166534; text-transform: uppercase;">Abonado Hoy</div>
+              <div style="font-size: 15.5px; font-weight: 800; color: #15803D; margin-top: 2px;">${Utils.formatCurrency(totalPagadoUSD)}</div>
+              <div style="font-size: 10px; color: #166534;">Bs ${Utils.formatNumber(totalPagadoBs, true)}</div>
+            </div>
+            <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10.5px; font-weight: 700; color: #991B1B; text-transform: uppercase;">Resta (A Crédito)</div>
+              <div style="font-size: 15.5px; font-weight: 800; color: #DC2626; margin-top: 2px;">${Utils.formatCurrency(faltaUSD)}</div>
+              <div style="font-size: 10px; color: #DC2626; font-weight: 700;">Bs ${Utils.formatNumber(faltaBs, true)}</div>
+            </div>
+          </div>
+
+          <!-- Área dinámica de Selección de Cliente -->
+          <div id="pago-incompleto-cliente-area">
+            ${currentCliente ? `
+              <div style="background: #EFF6FF; border: 1.5px solid #93C5FD; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="font-size: 11px; font-weight: 700; color: #1E40AF; text-transform: uppercase;">👤 Cliente Asignado</span>
+                  <button type="button" id="btn-cambiar-cliente-inc" class="btn btn-sm btn-outline" style="font-size: 11px; padding: 2px 7px;">
+                    🔄 Cambiar Cliente
+                  </button>
+                </div>
+                <div style="font-size: 15px; font-weight: 800; color: #1E293B;">
+                  ${Utils.escapeHtml(currentCliente.nombre)}
+                </div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">
+                  ${currentCliente.telefono ? `📞 ${Utils.escapeHtml(currentCliente.telefono)}` : ''} 
+                  ${currentCliente.rif ? `| RIF: ${Utils.escapeHtml(currentCliente.rif)}` : ''}
+                </div>
+                <div style="margin-top: 10px; font-size: 12px; color: #1E3A8A; background: #DBEAFE; border-radius: 6px; padding: 8px 10px; line-height: 1.4;">
+                  ℹ️ Se registrará el cobro de <strong>${Utils.formatCurrency(totalPagadoUSD)}</strong> en caja y la diferencia de <strong style="color: #DC2626;">${Utils.formatCurrency(faltaUSD)}</strong> (Bs ${Utils.formatNumber(faltaBs, true)}) quedará en la cuenta de crédito de este cliente.
+                </div>
+              </div>
+            ` : `
+              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 8px;">
+                  👤 Para registrar la diferencia a Crédito, debes asignar un cliente:
+                </div>
+                
+                <div style="position: relative; margin-bottom: 12px;">
+                  <input type="text" id="input-buscar-cliente-inc" class="form-control" placeholder="🔍 Escribe para buscar cliente (nombre, teléfono o RIF)..." style="width: 100%; height: 38px; font-size: 12.5px;" autocomplete="off" />
+                  <div id="dropdown-clientes-inc" style="display: none; position: absolute; top: 40px; left: 0; right: 0; background: #ffffff; border: 1.5px solid var(--color-primary, #2D6A4F); border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 1050; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0;">
+                  <div style="flex: 1; height: 1px; background: #CBD5E1;"></div>
+                  <span style="font-size: 10.5px; color: #64748B; font-weight: 700;">O REGISTRA UNO NUEVO</span>
+                  <div style="flex: 1; height: 1px; background: #CBD5E1;"></div>
+                </div>
+
+                <button type="button" id="btn-crear-cliente-inc" class="btn btn-outline" style="width: 100%; font-size: 12.5px; font-weight: 700; padding: 7px; display: flex; align-items: center; justify-content: center; gap: 6px; border-color: var(--color-primary, #2D6A4F); color: var(--color-primary, #2D6A4F);">
+                  <span style="font-size: 15px;">➕</span> Crear Ficha de (+Nuevo Cliente)
+                </button>
+              </div>
+            `}
+          </div>
+
+          <!-- Botones de Acción -->
+          <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; border-top: 1px solid var(--color-border); padding-top: 14px; margin-top: 10px;">
+            <button type="button" id="btn-cancelar-inc" class="btn btn-secondary" style="font-size: 13px;">
+              Cancelar Registro
+            </button>
+            <button type="button" id="btn-confirmar-credito-inc" class="btn btn-success" ${!currentCliente ? 'disabled style="font-size: 13px; font-weight: 700; opacity: 0.5; cursor: not-allowed;"' : 'style="font-size: 13px; font-weight: 700;"'}>
+              ✅ Enviar ${Utils.formatCurrency(faltaUSD)} a Crédito
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    openModal({
+      title: '⚠️ Pago Incompleto - Enviar a Crédito',
+      content: renderModalBody(),
+      showFooter: false
+    });
+
+    const overlayModal = document.querySelector('.modal-overlay.active') || document.body;
+    attachEvents(overlayModal);
+
+    function attachEvents(root) {
+      const btnCancel = root.querySelector('#btn-cancelar-inc');
+      if (btnCancel) {
+        btnCancel.addEventListener('click', () => {
+          closeModal();
+        });
+      }
+
+      const btnConfirmar = root.querySelector('#btn-confirmar-credito-inc');
+      if (btnConfirmar && currentCliente) {
+        btnConfirmar.addEventListener('click', () => {
+          const cidToConfirm = currentCliente.id;
+          closeModal();
+          if (typeof onConfirmarCredito === 'function') {
+            onConfirmarCredito(cidToConfirm);
+          }
+        });
+      }
+
+      const btnCambiar = root.querySelector('#btn-cambiar-cliente-inc');
+      if (btnCambiar) {
+        btnCambiar.addEventListener('click', () => {
+          currentCid = null;
+          currentCliente = null;
+          refreshView();
+        });
+      }
+
+      const btnCrear = root.querySelector('#btn-crear-cliente-inc');
+      if (btnCrear) {
+        btnCrear.addEventListener('click', () => {
+          openClienteModal(null, (nuevo) => {
+            if (nuevo && nuevo.id) {
+              abrirModalPagoIncompleto({
+                totalUSD,
+                totalBs,
+                totalPagadoUSD,
+                totalPagadoBs,
+                faltaUSD,
+                faltaBs,
+                clienteIdActual: nuevo.id,
+                pagos,
+                onConfirmarCredito
+              });
+            }
+          });
+        });
+      }
+
+      const inputBuscar = root.querySelector('#input-buscar-cliente-inc');
+      const dropdownResultados = root.querySelector('#dropdown-clientes-inc');
+      if (inputBuscar && dropdownResultados) {
+        inputBuscar.addEventListener('input', () => {
+          const val = inputBuscar.value.toLowerCase().trim();
+          if (!val) {
+            dropdownResultados.style.display = 'none';
+            dropdownResultados.innerHTML = '';
+            return;
+          }
+          const allClis = store.getAll('clientes') || [];
+          const matches = allClis.filter(c => 
+            (c.nombre && c.nombre.toLowerCase().includes(val)) ||
+            (c.telefono && c.telefono.toLowerCase().includes(val)) ||
+            (c.rif && c.rif.toLowerCase().includes(val))
+          ).slice(0, 10);
+
+          if (matches.length === 0) {
+            dropdownResultados.style.display = 'block';
+            dropdownResultados.innerHTML = '<div style="padding: 10px; font-size: 12px; color: #64748B; text-align: center;">No se encontraron clientes coincidentes</div>';
+            return;
+          }
+
+          dropdownResultados.style.display = 'block';
+          dropdownResultados.innerHTML = matches.map(c => `
+            <div class="opcion-cliente-inc" data-id="${c.id}" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #F1F5F9; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='white'">
+              <div>
+                <strong style="font-size: 12.5px; color: #1E293B;">${Utils.escapeHtml(c.nombre)}</strong>
+                <div style="font-size: 11px; color: #64748B;">${c.telefono || c.rif || 'Sin teléfono'}</div>
+              </div>
+              <span style="font-size: 11px; font-weight: 700; color: var(--color-primary, #2D6A4F);">Seleccionar 👉</span>
+            </div>
+          `).join('');
+
+          dropdownResultados.querySelectorAll('.opcion-cliente-inc').forEach(item => {
+            item.addEventListener('click', () => {
+              const cid = item.dataset.id;
+              currentCid = cid;
+              currentCliente = store.getById('clientes', cid);
+              refreshView();
+            });
+          });
+        });
+      }
+    }
+
+    function refreshView() {
+      const body = document.querySelector('.modal-body');
+      if (body) {
+        body.innerHTML = renderModalBody();
+        attachEvents(body);
+      }
+    }
+  }
+
   modal.querySelector('#btn-save-venta-home').addEventListener('click', () => {
     const overlay = modal;
     const checkDeliv = modal.querySelector('#check-delivery');
@@ -1630,10 +1943,14 @@ export function renderNuevaVentaForm(container) {
           }
 
           const refEl = row.querySelector('.pago-referencia');
+          const telEl = row.querySelector('.pago-telefono');
           const referencia = refEl && refEl.value ? refEl.value.trim() : null;
+          const telefono = telEl && telEl.value ? telEl.value.trim() : null;
           
           if (montoUSD > 0) {
-            pagos.push({ metodo, monto: montoUSD, referencia });
+            const pagoItem = { metodo, monto: montoUSD, referencia };
+            if (telefono) pagoItem.telefono = telefono;
+            pagos.push(pagoItem);
             totalPagadoUSD += montoUSD;
             totalPagadoBs += montoBs;
           }
@@ -1656,192 +1973,267 @@ export function renderNuevaVentaForm(container) {
         const faltaUSD = totalUSD - totalPagadoUSD;
         const faltaBs = totalBs - totalPagadoBs;
         if (faltaUSD > 0.03 && faltaBs > 1.00) {
-            showToast('El pago ingresado no cubre el total de la venta', 'error');
-            return;
+          abrirModalPagoIncompleto({
+            totalUSD,
+            totalBs,
+            totalPagadoUSD,
+            totalPagadoBs,
+            faltaUSD,
+            faltaBs,
+            clienteIdActual: clienteId,
+            pagos,
+            onConfirmarCredito: (cidConfirmado) => {
+              const cliObj = store.getById('clientes', cidConfirmado);
+              if (cliObj) {
+                const sInp = modal.querySelector('#search-cliente-input');
+                const hInp = modal.querySelector('#hidden-cliente-id');
+                if (sInp) {
+                  sInp.value = cliObj.nombre;
+                  sInp.dataset.id = cliObj.id;
+                }
+                if (hInp) hInp.value = cliObj.id;
+                actualizarBalanceBadge();
+              }
+              ejecutarRegistroVenta({
+                tipoFinal: 'credito',
+                clienteIdFinal: cidConfirmado,
+                pagosFinales: pagos,
+                totalPagadoUSDFinal: totalPagadoUSD,
+                faltaUSDFinal: faltaUSD
+              });
+            }
+          });
+          return;
         }
       }
 
-      const inputFecha = fd.get('fecha');
-      let fechaRegistro = Utils.nowISO();
-      if (inputFecha !== Utils.todayISO()) {
-          fechaRegistro = new Date(inputFecha + 'T12:00:00').toISOString();
-      }
-      
-      let repartidorId = null;
-      let repartidorNombre = null;
-      if (isDelivActive && repDeliv && repDeliv.value) {
-        repartidorId = repDeliv.value;
-        const repObj = (store.getConfig('repartidores') || []).find(r => r.id === repartidorId);
-        if (repObj) repartidorNombre = repObj.nombre;
-      }
-
-      const checkPendiente = modal.querySelector('#check-pendiente-entrega');
-      const isPendiente = !!(checkPendiente && checkPendiente.checked);
-      const estadoEntrega = isPendiente ? 'pendiente' : 'entregado';
-      
-      const tasaCambio = getTasaActual();
-      store.setConfig('tasaCambio', tasaCambio); // memorizar
-
-      let detallesFinales = [];
-      if (isSoloDelivery) {
-        const tipoLabel = deliveryTipoNombre ? ` - ${deliveryTipoNombre}` : '';
-        detallesFinales = [{
-          id: 'delivery_servicio',
-          tipoBotellonId: 'delivery',
-          nombre: `Servicio de Delivery${tipoLabel} (${cantValue} viaje${cantValue > 1 ? 's' : ''})`,
-          cantidad: cantValue,
-          precioUnitario: isSinCobro ? 0 : delivValue,
-          subtotal: isSinCobro ? 0 : montoDelivery,
-          categoria: 'servicio',
-          litros: 0
-        }];
-      } else {
-        detallesFinales = carrito.map(it => ({
-          ...it,
-          precioUnitario: isSinCobro ? 0 : it.precioUnitario,
-          subtotal: isSinCobro ? 0 : it.subtotal
-        }));
-      }
-
-      const venta = {
-        id: Utils.generateId(),
-        tasa: tasaCambio,
-        clienteId,
-        detalles: detallesFinales,
-        botellones: totalBotellones,
-        litrosTotales: totalLitros,
-        litrosMermaLavado,
-        litrosSalidaTanque: totalSalidaAgua,
-        delivery: isSinCobro ? 0 : montoDelivery,
-        deliveryCant: isDelivActive && !isSinCobro ? cantValue : 0,
-        deliveryTipo: isDelivActive && !isSinCobro ? deliveryTipo : null,
-        deliveryTipoNombre: isDelivActive && !isSinCobro ? deliveryTipoNombre : null,
-        repartidorId: isSinCobro ? null : repartidorId,
-        repartidorNombre: isSinCobro ? null : repartidorNombre,
-        estadoEntrega,
-        fechaEntrega: isPendiente ? null : Utils.nowISO(),
-        total: totalVenta,
-        tipo,
-        pagos: isSinCobro ? [] : pagos,
-        fecha: fechaRegistro
-      };
-
-      store.save('ventas', venta);
-      
-      // Descontar inventario de agua (agua despachada + merma de lavado)
-      const inv = store.getInventarioActual();
-      inv.litros = Math.max(0, inv.litros - totalSalidaAgua);
-      store.setConfig('inventario', inv);
-
-      // Descontar inventario de productos físicos
-      const allTipos = store.getConfig('tiposBotellon') || [];
-      let tiposActualizados = false;
-      carrito.forEach(item => {
-        if (item.categoria === 'producto' && item.tipoBotellonId) {
-          const pIdx = allTipos.findIndex(p => p.id === item.tipoBotellonId);
-          if (pIdx !== -1) {
-            allTipos[pIdx].stock = Math.max(0, (allTipos[pIdx].stock || 0) - item.cantidad);
-            tiposActualizados = true;
-          }
-        }
+      ejecutarRegistroVenta({
+        tipoFinal: tipo,
+        clienteIdFinal: clienteId,
+        pagosFinales: pagos,
+        totalPagadoUSDFinal: totalPagadoUSD,
+        faltaUSDFinal: 0
       });
-      if (tiposActualizados) {
-        store.setConfig('tiposBotellon', allTipos);
-      }
 
-      if (tipo === 'convenio') {
-        showToast('Convenio registrado con éxito ($0.00)', 'success');
-      } else if (tipo === 'garantia') {
-        showToast('Garantía por reposición registrada ($0.00)', 'success');
-      } else if (tipo === 'cortesia') {
-        showToast('Cortesía registrada con éxito ($0.00)', 'success');
-      } else if (clienteId && totalPagadoUSD > totalVenta) {
-        const excedente = totalPagadoUSD - totalVenta;
-        if (excedente >= 0.01) {
-          const abono = {
-            id: Utils.generateId(),
-            ventaId: venta.id,
-            clienteId,
-            monto: Math.round(excedente * 100) / 100,
-            metodo: pagos[0]?.metodo || 'efectivo_usd',
-            tasa: tasaCambio,
-            referencia: 'Excedente de venta',
-            fecha: Utils.nowISO()
-          };
-          store.save('abonos', abono);
-          showToast(`Venta registrada y abono de ${Utils.formatCurrency(excedente)} acreditado`, 'success');
+      function ejecutarRegistroVenta({
+        tipoFinal,
+        clienteIdFinal,
+        pagosFinales,
+        totalPagadoUSDFinal,
+        faltaUSDFinal
+      }) {
+        const inputFecha = fd.get('fecha');
+        let fechaRegistro = Utils.nowISO();
+        if (inputFecha !== Utils.todayISO()) {
+            fechaRegistro = new Date(inputFecha + 'T12:00:00').toISOString();
+        }
+        
+        let repartidorId = null;
+        let repartidorNombre = null;
+        if (isDelivActive && repDeliv && repDeliv.value) {
+          repartidorId = repDeliv.value;
+          const repObj = (store.getConfig('repartidores') || []).find(r => r.id === repartidorId);
+          if (repObj) repartidorNombre = repObj.nombre;
+        }
+
+        const checkPendiente = modal.querySelector('#check-pendiente-entrega');
+        const isPendiente = !!(checkPendiente && checkPendiente.checked);
+        const estadoEntrega = isPendiente ? 'pendiente' : 'entregado';
+        
+        const tasaCambio = getTasaActual();
+        store.setConfig('tasaCambio', tasaCambio); // memorizar
+
+        const isSinCobroFinal = isTipoSinCobro(tipoFinal);
+        const totalVenta = isSinCobroFinal ? 0 : totalUSD;
+
+        let detallesFinales = [];
+        if (isSoloDelivery) {
+          const tipoLabel = deliveryTipoNombre ? ` - ${deliveryTipoNombre}` : '';
+          detallesFinales = [{
+            id: 'delivery_servicio',
+            tipoBotellonId: 'delivery',
+            nombre: `Servicio de Delivery${tipoLabel} (${cantValue} viaje${cantValue > 1 ? 's' : ''})`,
+            cantidad: cantValue,
+            precioUnitario: isSinCobroFinal ? 0 : delivValue,
+            subtotal: isSinCobroFinal ? 0 : montoDelivery,
+            categoria: 'servicio',
+            litros: 0
+          }];
+        } else {
+          detallesFinales = carrito.map(it => ({
+            ...it,
+            precioUnitario: isSinCobroFinal ? 0 : it.precioUnitario,
+            subtotal: isSinCobroFinal ? 0 : it.subtotal
+          }));
+        }
+
+        const venta = {
+          id: Utils.generateId(),
+          tasa: tasaCambio,
+          clienteId: clienteIdFinal,
+          detalles: detallesFinales,
+          botellones: totalBotellones,
+          litrosTotales: totalLitros,
+          litrosMermaLavado,
+          litrosSalidaTanque: totalSalidaAgua,
+          delivery: isSinCobroFinal ? 0 : montoDelivery,
+          deliveryCant: isDelivActive && !isSinCobroFinal ? cantValue : 0,
+          deliveryTipo: isDelivActive && !isSinCobroFinal ? deliveryTipo : null,
+          deliveryTipoNombre: isDelivActive && !isSinCobroFinal ? deliveryTipoNombre : null,
+          repartidorId: isSinCobroFinal ? null : repartidorId,
+          repartidorNombre: isSinCobroFinal ? null : repartidorNombre,
+          estadoEntrega,
+          fechaEntrega: isPendiente ? null : Utils.nowISO(),
+          total: totalVenta,
+          tipo: tipoFinal,
+          pagos: isSinCobroFinal ? [] : pagosFinales,
+          fecha: fechaRegistro
+        };
+
+        store.save('ventas', venta);
+        
+        // Descontar inventario de agua (agua despachada + merma de lavado)
+        const inv = store.getInventarioActual();
+        inv.litros = Math.max(0, inv.litros - totalSalidaAgua);
+        store.setConfig('inventario', inv);
+
+        // Descontar inventario de productos físicos
+        const allTipos = store.getConfig('tiposBotellon') || [];
+        let tiposActualizados = false;
+        carrito.forEach(item => {
+          if (item.categoria === 'producto' && item.tipoBotellonId) {
+            const pIdx = allTipos.findIndex(p => p.id === item.tipoBotellonId);
+            if (pIdx !== -1) {
+              allTipos[pIdx].stock = Math.max(0, (allTipos[pIdx].stock || 0) - item.cantidad);
+              tiposActualizados = true;
+            }
+          }
+        });
+        if (tiposActualizados) {
+          store.setConfig('tiposBotellon', allTipos);
+        }
+
+        if (tipoFinal === 'convenio') {
+          showToast('Convenio registrado con éxito ($0.00)', 'success');
+        } else if (tipoFinal === 'garantia') {
+          showToast('Garantía por reposición registrada ($0.00)', 'success');
+        } else if (tipoFinal === 'cortesia') {
+          showToast('Cortesía registrada con éxito ($0.00)', 'success');
+        } else if (tipoFinal === 'credito') {
+          // Si hubo pago inicial parcial hoy, registrar los abonos correspondientes para la caja
+          if (totalPagadoUSDFinal > 0 && pagosFinales && pagosFinales.length > 0) {
+            pagosFinales.forEach(p => {
+              const pMonto = parseFloat(p.monto) || 0;
+              if (pMonto > 0) {
+                const abonoItem = {
+                  id: Utils.generateId(),
+                  ventaId: venta.id,
+                  clienteId: clienteIdFinal,
+                  monto: Math.round(pMonto * 100) / 100,
+                  metodo: p.metodo || 'pago_movil',
+                  tasa: tasaCambio,
+                  referencia: p.referencia || 'Abono inicial de venta a crédito',
+                  telefono: p.telefono || null,
+                  fecha: fechaRegistro
+                };
+                store.save('abonos', abonoItem);
+              }
+            });
+            const cliNom = store.getById('clientes', clienteIdFinal)?.nombre || 'el cliente';
+            showToast(`✅ Venta a crédito registrada: ${Utils.formatCurrency(totalPagadoUSDFinal)} cobrado en caja y ${Utils.formatCurrency(faltaUSDFinal)} pendiente de ${cliNom}`, 'success');
+          } else {
+            showToast('📋 Venta a crédito registrada con éxito', 'success');
+          }
+        } else if (clienteIdFinal && totalPagadoUSDFinal > totalVenta) {
+          const excedente = totalPagadoUSDFinal - totalVenta;
+          if (excedente >= 0.01) {
+            const abono = {
+              id: Utils.generateId(),
+              ventaId: venta.id,
+              clienteId: clienteIdFinal,
+              monto: Math.round(excedente * 100) / 100,
+              metodo: pagosFinales[0]?.metodo || 'efectivo_usd',
+              tasa: tasaCambio,
+              referencia: 'Excedente de venta',
+              telefono: pagosFinales[0]?.telefono || null,
+              fecha: Utils.nowISO()
+            };
+            store.save('abonos', abono);
+            showToast(`Venta registrada y abono de ${Utils.formatCurrency(excedente)} acreditado`, 'success');
+          } else {
+            showToast(isSoloDelivery ? '🛵 Servicio de Delivery registrado con éxito' : 'Venta registrada con éxito', 'success');
+          }
         } else {
           showToast(isSoloDelivery ? '🛵 Servicio de Delivery registrado con éxito' : 'Venta registrada con éxito', 'success');
         }
-      } else {
-        showToast(isSoloDelivery ? '🛵 Servicio de Delivery registrado con éxito' : 'Venta registrada con éxito', 'success');
-      }
 
-      syncToCloud();
+        syncToCloud();
 
-      // Reset delivery FIRST before clearing cart
-      const checkDelivery = modal.querySelector('#check-delivery');
-      if (checkDelivery) {
-        checkDelivery.checked = false;
-        const contDeliv = modal.querySelector('#container-monto-delivery');
-        if (contDeliv) contDeliv.style.display = 'none';
-        const inputDeliv = modal.querySelector('#monto-delivery');
-        if (inputDeliv) inputDeliv.value = '0.00';
-        const cDeliv = modal.querySelector('#cant-delivery');
-        if (cDeliv) cDeliv.value = '1';
-        const rDeliv = modal.querySelector('#repartidor-delivery');
-        if (rDeliv) rDeliv.value = '';
-        const cPend = modal.querySelector('#check-pendiente-entrega');
-        if (cPend) cPend.checked = false;
-        const selTarifa = modal.querySelector('#tipo-tarifa-delivery');
-        if (selTarifa) selTarifa.selectedIndex = 0;
-      }
+        // Reset delivery FIRST before clearing cart
+        const checkDelivery = modal.querySelector('#check-delivery');
+        if (checkDelivery) {
+          checkDelivery.checked = false;
+          const contDeliv = modal.querySelector('#container-monto-delivery');
+          if (contDeliv) contDeliv.style.display = 'none';
+          const inputDeliv = modal.querySelector('#monto-delivery');
+          if (inputDeliv) inputDeliv.value = '0.00';
+          const cDeliv = modal.querySelector('#cant-delivery');
+          if (cDeliv) cDeliv.value = '1';
+          const rDeliv = modal.querySelector('#repartidor-delivery');
+          if (rDeliv) rDeliv.value = '';
+          const cPend = modal.querySelector('#check-pendiente-entrega');
+          if (cPend) cPend.checked = false;
+          const selTarifa = modal.querySelector('#tipo-tarifa-delivery');
+          if (selTarifa) selTarifa.selectedIndex = 0;
+        }
 
-      // Reset form for continuous selling
-      carrito.length = 0;
-      renderCarrito();
+        // Reset form for continuous selling
+        carrito.length = 0;
+        renderCarrito();
 
-      // Reset client search and badges
-      modal.querySelector('#search-cliente-input').value = '';
-      modal.querySelector('#search-cliente-input').dataset.id = '';
-      const hId = modal.querySelector('#hidden-cliente-id');
-      if (hId) hId.value = '';
-      actualizarBalanceBadge();
+        // Reset client search and badges
+        modal.querySelector('#search-cliente-input').value = '';
+        modal.querySelector('#search-cliente-input').dataset.id = '';
+        const hId = modal.querySelector('#hidden-cliente-id');
+        if (hId) hId.value = '';
+        actualizarBalanceBadge();
 
-      // Reset fichas y badges
-      if (typeof actualizarBadgesFichas === 'function') {
-        actualizarBadgesFichas();
-      }
+        // Reset fichas y badges
+        if (typeof actualizarBadgesFichas === 'function') {
+          actualizarBadgesFichas();
+        }
 
-      // Reset condition to Contado and clear credit banner
-      modal.querySelector('input[name="tipo"][value="contado"]').checked = true;
-      modal.querySelector('#seccion-pagos').style.display = 'block';
-      const seccionInfoCreditoEl = modal.querySelector('#seccion-info-credito');
-      if (seccionInfoCreditoEl) {
-        seccionInfoCreditoEl.style.display = 'none';
-        seccionInfoCreditoEl.innerHTML = '';
-      }
+        // Reset condition to Contado and clear credit banner
+        modal.querySelector('input[name="tipo"][value="contado"]').checked = true;
+        modal.querySelector('#seccion-pagos').style.display = 'block';
+        const seccionInfoCreditoEl = modal.querySelector('#seccion-info-credito');
+        if (seccionInfoCreditoEl) {
+          seccionInfoCreditoEl.style.display = 'none';
+          seccionInfoCreditoEl.innerHTML = '';
+        }
 
-      // Reset payment rows & reference inputs
-      const extraPagos = modal.querySelectorAll('.pago-row:not(:first-child)');
-      extraPagos.forEach(r => r.remove());
+        // Reset payment rows & reference inputs
+        const extraPagos = modal.querySelectorAll('.pago-row:not(:first-child)');
+        extraPagos.forEach(r => r.remove());
 
-      const firstMetodo = modal.querySelector('.pago-metodo');
-      if (firstMetodo) firstMetodo.value = 'punto';
-      const firstMonto = modal.querySelector('.pago-monto');
-      if (firstMonto) firstMonto.value = '0.00';
+        const firstMetodo = modal.querySelector('.pago-metodo');
+        if (firstMetodo) firstMetodo.value = 'punto';
+        const firstMonto = modal.querySelector('.pago-monto');
+        if (firstMonto) firstMonto.value = '0.00';
 
-      modal.querySelectorAll('.pago-referencia').forEach(input => { input.value = ''; });
-      modal.querySelectorAll('.pago-ref-container').forEach(cont => { cont.style.display = 'none'; });
+        modal.querySelectorAll('.pago-referencia').forEach(input => { input.value = ''; });
+        modal.querySelectorAll('.pago-telefono').forEach(input => { input.value = ''; });
+        modal.querySelectorAll('.pago-ref-container').forEach(cont => { cont.style.display = 'none'; });
 
-      actualizarPagosAutom(0, 0);
-      if (typeof actualizarInfoCredito === 'function') {
-        actualizarInfoCredito();
-      }
+        actualizarPagosAutom(0, 0);
+        if (typeof actualizarInfoCredito === 'function') {
+          actualizarInfoCredito();
+        }
 
-      // Refrescar historial
-      if (typeof renderVentasTable === 'function') {
-        renderVentasTable();
+        // Refrescar historial
+        if (typeof renderVentasTable === 'function') {
+          renderVentasTable();
+        }
       }
     });
 
@@ -2715,7 +3107,14 @@ export function renderNuevaVentaForm(container) {
               </div>
               <div style="width: 32px; flex-shrink: 0;"></div>
               <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                  <div style="flex: 1; min-width: 0;">
+                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px; width: 100%;"/>
+                  </div>
+                  <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
+                    <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11px; width: 100%;"/>
+                  </div>
+                </div>
               </div>
             `;
             pagosList.appendChild(row1);
@@ -2740,7 +3139,14 @@ export function renderNuevaVentaForm(container) {
               </div>
               <button type="button" class="btn btn-danger btn-remove-pago" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;">✕</button>
               <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                  <div style="flex: 1; min-width: 0;">
+                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px; width: 100%;"/>
+                  </div>
+                  <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
+                    <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11px; width: 100%;"/>
+                  </div>
+                </div>
               </div>
             `;
             pagosList.appendChild(row2);
@@ -2773,7 +3179,14 @@ export function renderNuevaVentaForm(container) {
               </div>
               <div style="width: 32px; flex-shrink: 0;"></div>
               <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-                <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                  <div style="flex: 1; min-width: 0;">
+                    <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px; width: 100%;"/>
+                  </div>
+                  <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
+                    <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11px; width: 100%;"/>
+                  </div>
+                </div>
               </div>
             `;
             pagosList.appendChild(row1);
@@ -2876,7 +3289,14 @@ export function renderNuevaVentaForm(container) {
       <button type="button" class="btn btn-danger btn-remove-pago" style="height: 32px; width: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;" title="Quitar pago">✕</button>
       
       <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-        <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px;"/>
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <div style="flex: 1; min-width: 0;">
+            <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11px; width: 100%;"/>
+          </div>
+          <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
+            <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11px; width: 100%;"/>
+          </div>
+        </div>
       </div>
     `;
     modal.querySelector('#pagos-list').appendChild(row);
@@ -3068,19 +3488,37 @@ export function renderNuevaVentaForm(container) {
     }
   }
   
-  // Listener para mostrar u ocultar referencia
+  // Helper para visibilidad de referencia y teléfono
+  function updateRefContainerVisibility(row) {
+    if (!row) return;
+    const metodoSelect = row.querySelector('.pago-metodo');
+    const refContainer = row.querySelector('.pago-ref-container');
+    if (!metodoSelect || !refContainer) return;
+    
+    const telWrapper = refContainer.querySelector('.pago-telefono-wrapper');
+    const refInput = refContainer.querySelector('.pago-referencia');
+    const telInput = refContainer.querySelector('.pago-telefono');
+    const val = metodoSelect.value;
+    
+    if (val === 'pago_movil') {
+      refContainer.style.display = 'block';
+      if (telWrapper) telWrapper.style.display = 'block';
+    } else if (val === 'transferencia') {
+      refContainer.style.display = 'block';
+      if (telWrapper) telWrapper.style.display = 'none';
+      if (telInput) telInput.value = '';
+    } else {
+      refContainer.style.display = 'none';
+      if (refInput) refInput.value = '';
+      if (telInput) telInput.value = '';
+    }
+  }
+
+  // Listener para mostrar u ocultar referencia y teléfono
   modal.addEventListener('change', (e) => {
     if (e.target.classList.contains('pago-metodo')) {
       const row = e.target.closest('.pago-row');
-      const refContainer = row.querySelector('.pago-ref-container');
-      if (refContainer) {
-        if (e.target.value === 'pago_movil' || e.target.value === 'transferencia') {
-          refContainer.style.display = 'block';
-        } else {
-          refContainer.style.display = 'none';
-          refContainer.querySelector('.pago-referencia').value = '';
-        }
-      }
+      updateRefContainerVisibility(row);
     }
   });
 
@@ -3672,4 +4110,233 @@ export function openModalDetallePropinas(fecha, onUpdate) {
       });
     });
   }, 100);
+}
+
+export function openModalCajaChica(fechaInicial = null, onUpdate = null) {
+  let targetFecha = fechaInicial || Utils.todayISO();
+
+  const renderModalContent = (overlay) => {
+    const data = store.getCajaChica(targetFecha);
+    const iniUSD = data.inicio ? (data.inicio.montoUSD || 0) : 0;
+    const iniBs = data.inicio ? (data.inicio.montoBs || 0) : 0;
+    const retiros = Array.isArray(data.retiros) ? data.retiros : [];
+    const totRetUSD = retiros.filter(r => r.moneda !== 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+    const totRetBs = retiros.filter(r => r.moneda === 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+    const espUSD = Math.round((iniUSD - totRetUSD) * 100) / 100;
+    const espBs = Math.round((iniBs - totRetBs) * 100) / 100;
+
+    const body = overlay.querySelector('.modal-body');
+    if (!body) return;
+
+    body.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Selector de Fecha y Resumen -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="font-size:12.5px; font-weight:700; color:#334155; margin:0;">📅 Fecha de Caja Chica:</label>
+            <input type="date" id="cc-fecha-selector" class="form-control" value="${targetFecha}" style="height:32px; font-size:13px; font-weight:600; width:145px; padding:2px 8px;" />
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px;">
+            <div><span style="color:#64748B;">Saldo Esperado ($):</span> <strong style="color:${espUSD < 0 ? '#DC2626' : '#059669'};">${Utils.formatCurrency(espUSD)}</strong></div>
+            <div><span style="color:#64748B;">Saldo Esperado (Bs):</span> <strong style="color:${espBs < 0 ? '#DC2626' : '#2563EB'};">Bs ${Utils.formatNumber(espBs, true)}</strong></div>
+          </div>
+        </div>
+
+        <!-- 1. INICIO DE CAJA CHICA -->
+        <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-left:4px solid #10B981; border-radius:8px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <strong style="font-size:13.5px; color:#065F46;">🟢 1. Inicio de Caja Chica (Apertura)</strong>
+            ${data.inicio ? `<span class="badge badge-success" style="font-size:11px;">Registrado (${data.inicio.hora})</span>` : `<span class="badge" style="background:#FEF3C7; color:#92400E; font-size:11px;">Pendiente</span>`}
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap:8px; align-items:end;">
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Monto Inicial ($)</label>
+              <input type="number" step="0.01" min="0" id="cc-inicio-usd" class="form-control" value="${data.inicio ? iniUSD : ''}" placeholder="0.00" style="height:34px; font-size:13px; font-weight:600;" />
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Monto Inicial (Bs)</label>
+              <input type="number" step="0.01" min="0" id="cc-inicio-bs" class="form-control" value="${data.inicio ? iniBs : ''}" placeholder="0.00" style="height:34px; font-size:13px; font-weight:600;" />
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Nota (opcional)</label>
+              <input type="text" id="cc-inicio-nota" class="form-control" value="${Utils.escapeHtml(data.inicio?.nota || '')}" placeholder="Ej: Fondo fijo diario" style="height:34px; font-size:12.5px;" />
+            </div>
+            <button type="button" id="btn-cc-save-inicio" class="btn btn-primary" style="height:34px; font-size:12.5px; white-space:nowrap;">💾 Guardar Inicio</button>
+          </div>
+        </div>
+
+        <!-- 2. CIERRE DE CAJA CHICA -->
+        <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-left:4px solid #2563EB; border-radius:8px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <strong style="font-size:13.5px; color:#1E40AF;">🔵 2. Cierre de Caja Chica</strong>
+            ${data.cierre ? `<span class="badge badge-success" style="font-size:11px;">Cerrado (${data.cierre.hora})</span>` : `<span class="badge" style="background:#F1F5F9; color:#475569; font-size:11px;">Sin cerrar</span>`}
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap:8px; align-items:end;">
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Monto Cierre ($)</label>
+              <input type="number" step="0.01" min="0" id="cc-cierre-usd" class="form-control" value="${data.cierre ? (data.cierre.montoUSD ?? '') : espUSD.toFixed(2)}" placeholder="0.00" style="height:34px; font-size:13px; font-weight:600;" />
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Monto Cierre (Bs)</label>
+              <input type="number" step="0.01" min="0" id="cc-cierre-bs" class="form-control" value="${data.cierre ? (data.cierre.montoBs ?? '') : espBs.toFixed(2)}" placeholder="0.00" style="height:34px; font-size:13px; font-weight:600;" />
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Observación (opcional)</label>
+              <input type="text" id="cc-cierre-nota" class="form-control" value="${Utils.escapeHtml(data.cierre?.nota || '')}" placeholder="Ej: Cuadre conforme" style="height:34px; font-size:12.5px;" />
+            </div>
+            <button type="button" id="btn-cc-save-cierre" class="btn btn-primary" style="height:34px; background:#2563EB; border-color:#2563EB; font-size:12.5px; white-space:nowrap;">🔒 Guardar Cierre</button>
+          </div>
+        </div>
+
+        <!-- RETIROS DE CAJA CHICA (Opcional) -->
+        <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-left:4px solid #F59E0B; border-radius:8px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <strong style="font-size:13.5px; color:#92400E;">💸 Retiros de Caja Chica (${retiros.length})</strong>
+            <span style="font-size:12px; font-weight:700; color:#B45309;">Total Retirado: ${Utils.formatCurrency(totRetUSD)} · Bs ${Utils.formatNumber(totRetBs, true)}</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 0.9fr 0.7fr 1.1fr 1.2fr; gap:8px; margin-bottom:8px;">
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Monto *</label>
+              <input type="number" step="0.01" min="0.01" id="cc-retiro-monto" class="form-control" placeholder="0.00" style="height:34px; font-size:13px; font-weight:600;" />
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Moneda</label>
+              <select id="cc-retiro-moneda" class="form-control" style="height:34px; font-size:12.5px; font-weight:600;">
+                <option value="USD">$ USD</option>
+                <option value="Bs">Bs</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Fecha del Retiro *</label>
+              <input type="date" id="cc-retiro-fecha" class="form-control" value="${targetFecha}" style="height:34px; font-size:12.5px;" />
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:#475569;">Responsable del Retiro *</label>
+              <input type="text" id="cc-retiro-responsable" class="form-control" placeholder="Nombre y apellido" style="height:34px; font-size:12.5px;" />
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; align-items:end; margin-bottom:10px;">
+            <div style="flex:1;">
+              <label style="font-size:11px; font-weight:600; color:#475569;">Motivo / Concepto (opcional)</label>
+              <input type="text" id="cc-retiro-motivo" class="form-control" placeholder="Ej: Compra de bolsas, hielo, pasaje, insumos..." style="height:34px; font-size:12.5px;" />
+            </div>
+            <button type="button" id="btn-cc-add-retiro" class="btn" style="height:34px; background:#F59E0B; color:#fff; font-weight:700; font-size:12.5px; white-space:nowrap;">➕ Registrar Retiro</button>
+          </div>
+
+          ${retiros.length > 0 ? `
+            <div style="max-height:170px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:6px;">
+              <table class="table" style="font-size:12px; margin:0;">
+                <thead>
+                  <tr style="background:#F8FAFC;">
+                    <th style="padding:6px 8px;">Fecha</th>
+                    <th style="padding:6px 8px;">Responsable</th>
+                    <th style="padding:6px 8px;">Motivo</th>
+                    <th style="padding:6px 8px; text-align:right;">Monto</th>
+                    <th style="padding:6px 8px; text-align:center; width:46px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${retiros.map(r => `
+                    <tr>
+                      <td style="padding:5px 8px; white-space:nowrap;">${Utils.formatDate(r.fecha)} <span style="color:#64748B; font-size:10.5px;">${r.hora || ''}</span></td>
+                      <td style="padding:5px 8px; font-weight:600;">${Utils.escapeHtml(r.responsable)}</td>
+                      <td style="padding:5px 8px; color:#64748B;">${Utils.escapeHtml(r.motivo || '-')}</td>
+                      <td style="padding:5px 8px; text-align:right; font-weight:700; color:#B45309; white-space:nowrap;">
+                        ${r.moneda === 'Bs' ? `Bs ${Utils.formatNumber(r.monto, true)}` : Utils.formatCurrency(r.monto)}
+                      </td>
+                      <td style="padding:5px 8px; text-align:center;">
+                        <button type="button" class="btn btn-xs btn-danger btn-cc-del-retiro" data-id="${r.id}" style="padding:2px 6px; font-size:11px;" title="Eliminar retiro">🗑️</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : '<div style="font-size:12px; color:#64748B; text-align:center; padding:8px; background:#F8FAFC; border-radius:6px;">Sin retiros registrados en esta fecha.</div>'}
+        </div>
+      </div>
+    `;
+
+    // Bind events inside modal body
+    body.querySelector('#cc-fecha-selector')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        targetFecha = e.target.value;
+        renderModalContent(overlay);
+      }
+    });
+
+    body.querySelector('#btn-cc-save-inicio')?.addEventListener('click', () => {
+      const montoUSD = body.querySelector('#cc-inicio-usd')?.value || 0;
+      const montoBs = body.querySelector('#cc-inicio-bs')?.value || 0;
+      const nota = body.querySelector('#cc-inicio-nota')?.value || '';
+      store.saveCajaChicaInicio(targetFecha, { montoUSD, montoBs, nota });
+      syncToCloud();
+      showToast('✅ Inicio de Caja Chica guardado', 'success');
+      renderModalContent(overlay);
+      if (typeof onUpdate === 'function') onUpdate();
+    });
+
+    body.querySelector('#btn-cc-add-retiro')?.addEventListener('click', () => {
+      const monto = parseFloat(body.querySelector('#cc-retiro-monto')?.value) || 0;
+      const moneda = body.querySelector('#cc-retiro-moneda')?.value || 'USD';
+      const fechaRetiro = body.querySelector('#cc-retiro-fecha')?.value || targetFecha;
+      const responsable = (body.querySelector('#cc-retiro-responsable')?.value || '').trim();
+      const motivo = (body.querySelector('#cc-retiro-motivo')?.value || '').trim();
+
+      if (monto <= 0) {
+        showToast('Ingrese un monto válido mayor a 0 para el retiro', 'warning');
+        return;
+      }
+      if (!responsable) {
+        showToast('Ingrese el nombre del responsable del retiro', 'warning');
+        body.querySelector('#cc-retiro-responsable')?.focus();
+        return;
+      }
+      if (!fechaRetiro) {
+        showToast('Seleccione la fecha del retiro', 'warning');
+        return;
+      }
+
+      store.addCajaChicaRetiro(targetFecha, { monto, moneda, responsable, fechaRetiro, motivo });
+      syncToCloud();
+      showToast('✅ Retiro registrado en Caja Chica', 'success');
+      renderModalContent(overlay);
+      if (typeof onUpdate === 'function') onUpdate();
+    });
+
+    body.querySelectorAll('.btn-cc-del-retiro').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        store.deleteCajaChicaRetiro(targetFecha, id);
+        syncToCloud();
+        showToast('Retiro eliminado de Caja Chica', 'info');
+        renderModalContent(overlay);
+        if (typeof onUpdate === 'function') onUpdate();
+      });
+    });
+
+    body.querySelector('#btn-cc-save-cierre')?.addEventListener('click', () => {
+      const montoUSD = body.querySelector('#cc-cierre-usd')?.value || 0;
+      const montoBs = body.querySelector('#cc-cierre-bs')?.value || 0;
+      const nota = body.querySelector('#cc-cierre-nota')?.value || '';
+      store.saveCajaChicaCierre(targetFecha, { montoUSD, montoBs, nota });
+      syncToCloud();
+      showToast('✅ Cierre de Caja Chica guardado', 'success');
+      renderModalContent(overlay);
+      if (typeof onUpdate === 'function') onUpdate();
+    });
+  };
+
+  openModal({
+    title: '💰 Control de Caja Chica (Inicio, Retiros y Cierre)',
+    content: '<div>Cargando...</div>',
+    size: 'lg',
+    showSave: false,
+    cancelLabel: 'Cerrar',
+    onOpen: (overlay) => {
+      renderModalContent(overlay);
+    }
+  });
 }

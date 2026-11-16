@@ -1180,6 +1180,69 @@ class Store {
         return updated;
     }
 
+    // ---- Caja Chica (Inicio, Retiros y Cierre) ----
+
+    getCajaChica(fecha) {
+        const key = `caja_chica_${fecha}`;
+        return this.getConfig(key) || {
+            fecha,
+            inicio: null,
+            retiros: [],
+            cierre: null
+        };
+    }
+
+    saveCajaChicaInicio(fecha, { montoUSD = 0, montoBs = 0, nota = '' }) {
+        const current = this.getCajaChica(fecha);
+        current.inicio = {
+            montoUSD: Math.round((parseFloat(montoUSD) || 0) * 100) / 100,
+            montoBs: Math.round((parseFloat(montoBs) || 0) * 100) / 100,
+            hora: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            nota: (nota || '').trim(),
+            updatedAt: new Date().toISOString()
+        };
+        this.setConfig(`caja_chica_${fecha}`, current);
+        return current;
+    }
+
+    addCajaChicaRetiro(fecha, { monto, moneda = 'USD', responsable, fechaRetiro, motivo = '' }) {
+        const current = this.getCajaChica(fecha);
+        if (!Array.isArray(current.retiros)) current.retiros = [];
+        current.retiros.push({
+            id: Utils.generateId(),
+            monto: Math.round((parseFloat(monto) || 0) * 100) / 100,
+            moneda: moneda === 'Bs' ? 'Bs' : 'USD',
+            responsable: (responsable || '').trim(),
+            fecha: fechaRetiro || fecha,
+            hora: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            motivo: (motivo || '').trim(),
+            createdAt: new Date().toISOString()
+        });
+        this.setConfig(`caja_chica_${fecha}`, current);
+        return current;
+    }
+
+    deleteCajaChicaRetiro(fecha, retiroId) {
+        const current = this.getCajaChica(fecha);
+        if (!Array.isArray(current.retiros)) return current;
+        current.retiros = current.retiros.filter(r => r.id !== retiroId);
+        this.setConfig(`caja_chica_${fecha}`, current);
+        return current;
+    }
+
+    saveCajaChicaCierre(fecha, { montoUSD = 0, montoBs = 0, nota = '' }) {
+        const current = this.getCajaChica(fecha);
+        current.cierre = {
+            montoUSD: Math.round((parseFloat(montoUSD) || 0) * 100) / 100,
+            montoBs: Math.round((parseFloat(montoBs) || 0) * 100) / 100,
+            hora: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            nota: (nota || '').trim(),
+            updatedAt: new Date().toISOString()
+        };
+        this.setConfig(`caja_chica_${fecha}`, current);
+        return current;
+    }
+
     // ---- Defaults ----
 
     _initDefaults() {

@@ -131,7 +131,7 @@ export function renderSidebar() {
               <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
           </span>
-          Punto de Venta
+          Caja
         </a>
         <a class="sidebar-nav-item" data-route="/ventas" href="#/ventas">
           <span class="nav-icon">
@@ -170,7 +170,7 @@ export function renderSidebar() {
               <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
             </svg>
           </span>
-          Inventario y Tanque
+          ${isOperario ? 'Tanque' : 'Inventario y Tanque'}
         </a>
         ${!isOperario ? `
         <a class="sidebar-nav-item" data-route="/reportes" href="#/reportes">
