@@ -33598,6 +33598,15 @@
           "categoria": "relleno"
         },
         {
+          "id": "5l_usd",
+          "stock": 0,
+          "litros": 5,
+          "moneda": "USD",
+          "nombre": "Recarga 5 Lts $ USD",
+          "precio": 1.0,
+          "categoria": "relleno"
+        },
+        {
           "id": "mun3xfsm9ic08npww",
           "stock": 0,
           "litros": 5,
