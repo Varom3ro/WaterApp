@@ -1503,12 +1503,20 @@
         }
       });
 
+      let liveStockMap = {};
       if (resSync.ok) {
         const list = await resSync.json();
         if (list && list.length > 0) {
           const storeData = list[0];
           cacheGlobalTiendas[currentStoreEmail] = storeData;
           renderizarDatosOperativos(storeData);
+          if (Array.isArray(storeData.stock_productos)) {
+            storeData.stock_productos.forEach(sp => {
+              if (sp && sp.nombre) {
+                liveStockMap[sp.nombre.toLowerCase().trim()] = parseInt(sp.stock) || 0;
+              }
+            });
+          }
         }
       }
 
@@ -1525,7 +1533,18 @@
         if (licList && licList.length > 0) {
           const lData = licList[0];
           if (Array.isArray(lData.catalogo_inicial)) {
-            currentCatalogo = lData.catalogo_inicial;
+            // 🛡️ Fusionar con el stock en tiempo real reportado por el punto de venta en tienda_sync_cloud
+            currentCatalogo = lData.catalogo_inicial.map(item => {
+              if (item.categoria === 'producto') {
+                const norm = (item.nombre || '').toLowerCase().trim();
+                const realStock = liveStockMap[norm];
+                return {
+                  ...item,
+                  stock: (realStock !== undefined && realStock !== null) ? realStock : (parseInt(item.stock) || 0)
+                };
+              }
+              return item;
+            });
             renderizarCatalogo(currentCatalogo);
             renderizarStockFisico(currentCatalogo);
           }
