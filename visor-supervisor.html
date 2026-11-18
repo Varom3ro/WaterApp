@@ -2135,6 +2135,52 @@
               ultima_actualizacion: new Date().toISOString()
             })
           });
+
+          // 3. 📡 Registrar comando de ajuste remoto de stock para que la tablet de la tienda lo absorba y no lo pise
+          if (esAjusteStock) {
+            try {
+              const resAct = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}&select=id,visor_actividad`, {
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+              });
+              if (resAct.ok) {
+                const rowsAct = await resAct.json();
+                if (rowsAct && rowsAct.length > 0) {
+                  const c = rowsAct[0];
+                  const act = c.visor_actividad || {};
+                  const prevAjustes = act.ajustes_remotos || {};
+                  const stockMapAjustes = {};
+                  prodsFisicos.forEach(p => {
+                    stockMapAjustes[(p.nombre || '').toLowerCase().trim()] = p.stock;
+                  });
+                  const ts = Date.now();
+                  const nuevosAjustes = {
+                    ...act,
+                    ajustes_remotos: {
+                      ...prevAjustes,
+                      stock: {
+                        stocks: stockMapAjustes,
+                        supervisor: supervisorSession?.nombre || 'Supervisor',
+                        timestamp: ts
+                      },
+                      timestamp: ts
+                    }
+                  };
+                  await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'apikey': SUPABASE_KEY,
+                      'Authorization': `Bearer ${SUPABASE_KEY}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ visor_actividad: nuevosAjustes })
+                  });
+                  console.log('[Supervisor] 📡 Comando de ajuste remoto de stock emitido hacia la tablet:', sedeEmail);
+                }
+              }
+            } catch (eAct) {
+              console.warn('[Supervisor] Error registrando comando remoto de stock:', eAct);
+            }
+          }
         } else {
           try {
             const resSede = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}&select=stock_productos`, {
