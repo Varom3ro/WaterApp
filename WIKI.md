@@ -3,7 +3,7 @@
 **Última actualización:** 2026-11-07 22:45  
 **Ruta del Sistema:** `D:\Recarga de agua\WaterApp`  
 **Repositorio GitHub:** [Varom3ro/WaterApp](https://github.com/Varom3ro/WaterApp)  
-**Versión de Producción:** `v2.8.54`  
+**Versión de Producción:** `v2.8.68`  
 **Stack Tecnológico:** HTML5, CSS3 Moderno, JavaScript Vanilla (ES Modules), Supabase Cloud (`tienda_sync_cloud`), Service Workers (PWA Offline-First), html2pdf.js, QRCode.js.
 
 ---

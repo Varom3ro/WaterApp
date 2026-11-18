@@ -319,25 +319,98 @@ export const Licencia = {
         }
       }
 
-      // Inyección automática de Ajustes Remotos del Supervisor (Tanque y Calibraciones)
+      // Inyección automática de Ajustes Remotos del Supervisor (Tanque y Stock)
       const ajustesRemotos = user.visor_actividad && user.visor_actividad.ajustes_remotos;
-      if (ajustesRemotos && typeof ajustesRemotos === 'object' && s) {
-        const lastAjusteTs = ajustesRemotos.timestamp || 0;
-        const localAjusteTs = parseInt(localStorage.getItem('ultimo_ajuste_remoto_aplicado') || '0');
-        if (lastAjusteTs > localAjusteTs) {
-          if (ajustesRemotos.tanque && typeof ajustesRemotos.tanque === 'object') {
-            const { litros, capacidadTanque } = ajustesRemotos.tanque;
-            if (litros !== undefined && capacidadTanque !== undefined) {
-              s.setConfig('inventario', { litros, capacidadTanque });
-              console.log('[Licencia] Ajuste remoto de tanque inyectado desde Visor Supervisor:', litros, capacidadTanque);
-            }
-          }
-          localStorage.setItem('ultimo_ajuste_remoto_aplicado', String(lastAjusteTs));
-        }
+      if (ajustesRemotos) {
+        this.aplicarAjustesRemotosEnMemoria(ajustesRemotos, s);
       }
     } catch (e) {
       console.warn('[Licencia] Error al aplicar catálogo/logo remoto:', e);
     }
+  },
+
+  aplicarAjustesRemotosEnMemoria(ajustesRemotos, storeInstance = null) {
+    if (!ajustesRemotos || typeof ajustesRemotos !== 'object') return false;
+    const s = storeInstance || (typeof store !== 'undefined' ? store : window.__app_store);
+    if (!s) return false;
+
+    const lastAjusteTs = ajustesRemotos.timestamp || 0;
+    const localAjusteTs = parseInt(localStorage.getItem('ultimo_ajuste_remoto_aplicado') || '0');
+
+    if (lastAjusteTs > localAjusteTs) {
+      let huboCambios = false;
+
+      // 1. Tanque de agua
+      if (ajustesRemotos.tanque && typeof ajustesRemotos.tanque === 'object') {
+        const { litros, capacidadTanque } = ajustesRemotos.tanque;
+        if (litros !== undefined && capacidadTanque !== undefined) {
+          s.setConfig('inventario', { litros, capacidadTanque });
+          console.log('[Licencia] 💧 Ajuste remoto de tanque inyectado desde Visor Supervisor:', litros, capacidadTanque);
+          huboCambios = true;
+        }
+      }
+
+      // 2. Stock físico de productos
+      if (ajustesRemotos.stock && typeof ajustesRemotos.stock === 'object') {
+        const remoteStocks = ajustesRemotos.stock.stocks || {};
+        const currentTipos = s.getConfig('tiposBotellon') || [];
+        let modificado = false;
+
+        const updatedTipos = currentTipos.map(item => {
+          if (item.categoria === 'producto') {
+            const norm = (item.nombre || '').toLowerCase().trim();
+            if (remoteStocks[norm] !== undefined) {
+              const nuevoVal = parseInt(remoteStocks[norm]);
+              if (!isNaN(nuevoVal) && item.stock !== nuevoVal) {
+                console.log(`[Licencia] 📦 Ajuste remoto de stock aplicado a ${item.nombre}: ${item.stock} -> ${nuevoVal}`);
+                modificado = true;
+                return { ...item, stock: nuevoVal };
+              }
+            }
+          }
+          return item;
+        });
+
+        if (modificado) {
+          s.setConfig('tiposBotellon', updatedTipos);
+          huboCambios = true;
+        }
+      }
+
+      localStorage.setItem('ultimo_ajuste_remoto_aplicado', String(lastAjusteTs));
+      if (huboCambios && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('stock-remoto-actualizado'));
+      }
+      return huboCambios;
+    }
+    return false;
+  },
+
+  async verificarAjustesRemotosEnCaliente(storeInstance = null) {
+    const licenciaLocal = localStorage.getItem('licencia_usuario');
+    if (!licenciaLocal) return false;
+    try {
+      const user = JSON.parse(licenciaLocal);
+      if (!user.email) return false;
+
+      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(user.email)}&select=visor_actividad`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data || data.length === 0) return false;
+
+      const remoteAct = data[0].visor_actividad;
+      if (remoteAct && remoteAct.ajustes_remotos) {
+        return this.aplicarAjustesRemotosEnMemoria(remoteAct.ajustes_remotos, storeInstance);
+      }
+    } catch (e) {
+      console.warn('[Licencia] Error verificando ajustes remotos en caliente:', e);
+    }
+    return false;
   },
 
   mostrarRegistro() {
@@ -686,3 +759,7 @@ export const Licencia = {
     }
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.Licencia = Licencia;
+}

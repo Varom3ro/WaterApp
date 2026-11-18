@@ -12,6 +12,15 @@ export async function syncToCloud(isManual = false) {
   const licenciaLocal = localStorage.getItem('licencia_usuario');
   if (!licenciaLocal) return;
 
+  // 📡 1. Verificar y absorber ajustes remotos emitidos por el Supervisor en caliente (Stock y Tanque)
+  try {
+    if (typeof window !== 'undefined' && window.Licencia && typeof window.Licencia.verificarAjustesRemotosEnCaliente === 'function') {
+      await window.Licencia.verificarAjustesRemotosEnCaliente(store);
+    }
+  } catch (eRem) {
+    console.warn('[CloudSync] Error verificando ajustes remotos:', eRem);
+  }
+
   try {
     const user = JSON.parse(licenciaLocal);
     const email = user.email;
