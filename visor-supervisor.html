@@ -2289,7 +2289,6 @@
       console.warn('Error guardando catálogo:', e);
     }
   }
-  }
 
   // =========================================================================
   // CONTROL DE PESTAÑAS
@@ -2318,12 +2317,18 @@
     setTimeout(() => { btn.style.transform = 'rotate(0deg)'; }, 300);
   });
 
-  // Cerrar Sesión
+  // Cerrar Sesión / Salir
   document.getElementById('btn-logout').addEventListener('click', () => {
+    const esDueno = (supervisorSession && supervisorSession.is_owner_admin) || !!localStorage.getItem('visor_owner_email');
+    if (esDueno) {
+      window.volverAModoDueno();
+      return;
+    }
     localStorage.removeItem('visor_sup_session');
     localStorage.removeItem('visor_sup_selected_sede');
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    location.reload();
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'block';
   });
 
   // Volver a Modo Dueño
@@ -2332,7 +2337,7 @@
       localStorage.setItem('visor_refill_selected_sede', currentStoreEmail);
     }
     localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
-    window.location.href = './visor.html';
+    window.location.href = './visor.html?v=1.0.20';
   };
 
   // =========================================================================
