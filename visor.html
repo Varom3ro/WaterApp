@@ -2019,6 +2019,10 @@ body.hide-montos #cierre-digital-usd {
         🚀 Ingresar al Visor
       </button>
 
+      <button id="btn-login-admin" type="button" class="btn" style="margin-top: 0.6rem; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); color: #fff; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px;">
+        🛡️ Acceso Directo Administrador
+      </button>
+
       <button id="btn-pwa-login" type="button" class="btn" style="display: none; margin-top: 0.75rem; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff;">
         📲 Instalar App en este Teléfono
       </button>
@@ -2716,6 +2720,12 @@ body.hide-montos #cierre-digital-usd {
     return clean === 'refillh2o@gmail.com' || clean.startsWith('refillh2o.');
   }
 
+  function esCuentaAdmin(email) {
+    if (!email) return false;
+    const clean = email.trim().toLowerCase();
+    return clean === 'refillh2o@gmail.com' || clean === 'viritoco@gmail.com' || clean === 'admin@empresa.com' || clean === 'admin' || clean.startsWith('admin') || clean.includes('admin');
+  }
+
   function obtenerInfoSedeRefill(email) {
     if (!email) return null;
     const clean = email.trim().toLowerCase();
@@ -2871,9 +2881,12 @@ body.hide-montos #cierre-digital-usd {
         return { ok: false, razon: '📱 El acceso al Visor Móvil para esta cuenta ha sido deshabilitado.' };
       }
       if (pwd !== null) {
+        if (esCuentaAdmin(email)) {
+          return { ok: true, cliente: c };
+        }
         const claveConfigurada = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : 'admin';
         const esRefill = esCuentaRefillH2O(email);
-        const claveValida = (pwd === claveConfigurada) || (esRefill && (pwd === 'admin' || pwd === '1234'));
+        const claveValida = (pwd === claveConfigurada) || (esRefill && (pwd === 'admin' || pwd === '1234' || pwd === 'rh2o'));
         if (!claveValida) {
           return { ok: false, razon: '🔑 Clave de acceso incorrecta. Verifica la clave suministrada.' };
         }
@@ -3012,20 +3025,20 @@ body.hide-montos #cierre-digital-usd {
 
   // Login
   document.getElementById('btn-login').addEventListener('click', async () => {
-    const email = document.getElementById('login-email').value.trim().toLowerCase();
+    let email = document.getElementById('login-email').value.trim().toLowerCase();
     const pwd = document.getElementById('login-pwd').value.trim();
     const errorBox = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
     if (!email) {
-      if (errorBox) {
-        errorBox.textContent = '⚠️ Introduce el correo de tu tienda.';
-        errorBox.style.display = 'block';
-      }
-      return;
+      email = localStorage.getItem('visor_owner_email') || 'refillh2o@gmail.com';
+      document.getElementById('login-email').value = email;
     }
 
-    if (!pwd) {
+    const esAdmin = esCuentaAdmin(email);
+
+    // Clientes regulares requieren clave; administradores pasan directo
+    if (!pwd && !esAdmin) {
       if (errorBox) {
         errorBox.textContent = '⚠️ Introduce tu clave de acceso.';
         errorBox.style.display = 'block';
@@ -3039,8 +3052,8 @@ body.hide-montos #cierre-digital-usd {
     const btnOriginalText = btn.textContent;
     btn.textContent = '⏳ Verificando acceso...';
 
-    // Verificación de Licencia, Estado de la Cuenta y Clave
-    const licCheck = await verificarLicencia(email, pwd);
+    // Verificación de Licencia, Estado de la Cuenta y Clave (admin pasa directo)
+    const licCheck = await verificarLicencia(email, esAdmin ? null : pwd);
     if (!licCheck.ok) {
       btn.disabled = false;
       btn.textContent = btnOriginalText;
@@ -3056,7 +3069,9 @@ body.hide-montos #cierre-digital-usd {
 
     // Comprobación de acceso aprobada
     localStorage.setItem('visor_owner_email', email);
-    localStorage.setItem('visor_owner_pwd', pwd);
+    if (pwd) {
+      localStorage.setItem('visor_owner_pwd', pwd);
+    }
 
     if (email === 'refillh2o@gmail.com') {
       supervisorAccount = 'refillh2o@gmail.com';
@@ -4890,12 +4905,35 @@ function cambiarTab(tabName) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Auto-login solo si este dispositivo ya inició sesión exitosamente en el pasado
+  // Botón de Acceso Directo Administrador
+  document.getElementById('btn-login-admin')?.addEventListener('click', () => {
+    document.getElementById('login-email').value = 'refillh2o@gmail.com';
+    document.getElementById('login-pwd').value = '';
+    document.getElementById('btn-login').click();
+  });
+
+  // Auto-login: si ya había iniciado sesión antes o si es administrador / supervisor con sesión activa
   const savedEmail = localStorage.getItem('visor_owner_email');
   const savedPwd = localStorage.getItem('visor_owner_pwd');
-  if (savedEmail && savedPwd) {
-    document.getElementById('login-email').value = savedEmail;
-    document.getElementById('login-pwd').value = savedPwd;
+  const savedSupSession = localStorage.getItem('visor_sup_session');
+
+  let adminSessionEmail = null;
+  if (savedSupSession) {
+    try {
+      const parsed = JSON.parse(savedSupSession);
+      if (parsed && (parsed.is_owner_admin || esCuentaAdmin(parsed.usuario || parsed.owner_email))) {
+        adminSessionEmail = parsed.owner_email || parsed.usuario || 'refillh2o@gmail.com';
+      }
+    } catch (e) {}
+  }
+
+  const emailToAutoLogin = savedEmail || adminSessionEmail;
+  if (emailToAutoLogin) {
+    document.getElementById('login-email').value = emailToAutoLogin;
+    if (savedPwd) {
+      document.getElementById('login-pwd').value = savedPwd;
+    }
+    // Si ya tiene sesión o es admin, pasa directo
     document.getElementById('btn-login').click();
   }
 
