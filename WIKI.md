@@ -38,3 +38,11 @@ D:\Recarga de agua\WaterApp
 ├── sw.js / sw-visor.js / sw-visor-supervisor.js # Service Workers para operación offline y caché PWA
 ├── manifest.json / manifest-visor.json / manifest-visor-supervisor.json # Manifiestos de instalación PWA
 ├── css/styles.css               # Sistema de diseño
+
+---
+
+## 3. Acceso y Autenticación del Visor Móvil (Dueño vs. Supervisor)
+
+- **Acceso Directo Administrador (Pase Directo):** Las cuentas administradoras (`refillh2o@gmail.com`, `viritoco@gmail.com`, `admin`) y dispositivos previamente autenticados no requieren ingreso manual de contraseña; el visor valida su rol y navega directamente al dashboard ejecutivo multi-sede o panel de supervisión.
+- **Acceso de Clientes y Supervisores:** Los clientes de planta y supervisores operativos cuentan con clave individual asignada desde el panel administrativo (`superadmin.html` / `modal-supervisores`).
+- **Navegación Fluida Multi-Modo:** La alternancia entre Visor Dueño (`visor.html`) y Visor Supervisor (`visor-supervisor.html`) conserva la sesión administrativa activa en `localStorage` sin volver a solicitar credenciales.

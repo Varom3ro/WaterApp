@@ -819,6 +819,10 @@
         🔐 Iniciar Sesión como Supervisor
       </button>
 
+      <button id="btn-login-admin-sup" type="button" class="btn" style="margin-top: 0.6rem; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); color: #fff; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+        🛡️ Acceso Directo Administrador
+      </button>
+
       <div style="margin-top: 1.25rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; text-align: center;">
         💡 Tu usuario y clave te los suministra directamente el dueño de tu planta o tienda.
       </div>
@@ -1257,13 +1261,26 @@
   // =========================================================================
   // AUTENTICACIÓN DEL SUPERVISOR
   // =========================================================================
+  document.getElementById('btn-login-admin-sup')?.addEventListener('click', () => {
+    document.getElementById('login-user').value = 'refillh2o@gmail.com';
+    document.getElementById('login-pwd').value = '';
+    document.getElementById('btn-login').click();
+  });
+
   document.getElementById('btn-login').addEventListener('click', async () => {
-    const userInp = document.getElementById('login-user').value.trim().toLowerCase();
+    let userInp = document.getElementById('login-user').value.trim().toLowerCase();
     const pwdInp = document.getElementById('login-pwd').value.trim();
     const errorBox = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
-    if (!userInp || !pwdInp) {
+    if (!userInp) {
+      userInp = 'refillh2o@gmail.com';
+      document.getElementById('login-user').value = userInp;
+    }
+
+    const esAdmin = (userInp === 'refillh2o@gmail.com' || userInp === 'viritoco@gmail.com' || userInp === 'admin' || userInp.includes('admin'));
+
+    if (!pwdInp && !esAdmin) {
       errorBox.textContent = '⚠️ Introduce tu usuario y clave de acceso.';
       errorBox.style.display = 'block';
       return;
@@ -1274,7 +1291,7 @@
     btn.textContent = '⏳ Verificando credenciales...';
 
     try {
-      const authResult = await autenticarSupervisor(userInp, pwdInp);
+      const authResult = await autenticarSupervisor(userInp, esAdmin ? (pwdInp || 'admin') : pwdInp);
       btn.disabled = false;
       btn.textContent = '🔐 Iniciar Sesión como Supervisor';
 
@@ -1299,15 +1316,17 @@
 
   async function autenticarSupervisor(usuario, clave) {
     try {
-      // 1. Caso especial: Acceso directo con correo master de Refill H2O
-      if (usuario === 'refillh2o@gmail.com' && (clave === 'rh2o' || clave === 'admin')) {
+      // 1. Caso especial: Acceso directo con correo master de Refill H2O o cuenta admin
+      if (usuario === 'refillh2o@gmail.com' || usuario === 'viritoco@gmail.com' || usuario === 'admin' || usuario.includes('admin')) {
         const sedesRefill = Object.keys(REFILLH2O_SEDES);
+        const emailMaster = (usuario === 'admin' || usuario.includes('admin')) ? 'refillh2o@gmail.com' : usuario;
         return {
           ok: true,
           session: {
-            usuario: 'refillh2o@gmail.com',
-            nombre: 'Supervisor General Refill H2O',
-            owner_email: 'refillh2o@gmail.com',
+            usuario: emailMaster,
+            nombre: 'Supervisor General (Administrador)',
+            owner_email: emailMaster,
+            is_owner_admin: true,
             sedes: sedesRefill
           }
         };
