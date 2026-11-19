@@ -2,7 +2,7 @@
 // WaterApp - Service Worker Visor Supervisor Móvil
 // ============================================
 
-const CACHE_NAME = 'waterapp-visor-sup-v1.0.8';
+const CACHE_NAME = 'waterapp-visor-sup-v1.0.9';
 
 const ASSETS_TO_CACHE = [
   './visor-supervisor.html',
