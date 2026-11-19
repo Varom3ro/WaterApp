@@ -1988,7 +1988,7 @@ body.hide-montos #cierre-digital-usd {
 <div class="app-container">
   
   <!-- 1. Pantalla de Acceso para el Dueño -->
-  <div id="auth-screen">
+  <div id="auth-screen" style="display: none;">
     <div class="login-brand">
       <div class="brand-icon">💧</div>
       <h1 class="brand-title">WaterApp Visor</h1>
@@ -2019,18 +2019,14 @@ body.hide-montos #cierre-digital-usd {
         🚀 Ingresar al Visor
       </button>
 
-      <button id="btn-login-admin" type="button" class="btn" style="margin-top: 0.6rem; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); color: #fff; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px;">
-        🛡️ Acceso Directo Administrador
-      </button>
-
       <button id="btn-pwa-login" type="button" class="btn" style="display: none; margin-top: 0.75rem; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff;">
         📲 Instalar App en este Teléfono
       </button>
     </div>
   </div>
 
-  <!-- 2. Aplicación Principal del Dueño (Oculta hasta iniciar sesión) -->
-  <div id="main-app" style="display: none;">
+  <!-- 2. Aplicación Principal del Dueño -->
+  <div id="main-app" style="display: block;">
     
     <!-- Top Header Desahogado y Reorganizado -->
     <header class="top-header">
@@ -4905,13 +4901,6 @@ function cambiarTab(tabName) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Botón de Acceso Directo Administrador
-  document.getElementById('btn-login-admin')?.addEventListener('click', () => {
-    document.getElementById('login-email').value = 'refillh2o@gmail.com';
-    document.getElementById('login-pwd').value = '';
-    document.getElementById('btn-login').click();
-  });
-
   // Auto-login: si ya había iniciado sesión antes o si es administrador / supervisor con sesión activa
   const savedEmail = localStorage.getItem('visor_owner_email');
   const savedPwd = localStorage.getItem('visor_owner_pwd');
@@ -5039,7 +5028,7 @@ function cambiarTab(tabName) {
   }
 
   window.cambiarAModoSupervisor = function() {
-    const ownerEmail = getOwnerMasterEmail();
+    const ownerEmail = getOwnerMasterEmail() || 'refillh2o@gmail.com';
     const esRefill = esCuentaRefillH2O(ownerEmail);
     const sedesArr = esRefill ? Object.keys(REFILLH2O_SEDES) : [ownerEmail];
 
@@ -5052,9 +5041,10 @@ function cambiarTab(tabName) {
     };
 
     localStorage.setItem('visor_sup_session', JSON.stringify(supSession));
+    localStorage.setItem('visor_owner_email', ownerEmail);
     localStorage.setItem('visor_sup_selected_sede', currentStoreEmail || sedesArr[0]);
 
-    window.location.href = './visor-supervisor.html';
+    window.location.href = './visor-supervisor.html?t=' + Date.now();
   };
 
   window.abrirModalSupervisores = async function() {

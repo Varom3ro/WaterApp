@@ -788,9 +788,9 @@
 <div class="app-container">
 
   <!-- ========================================================================= -->
-  <!-- 1. PANTALLA DE LOGIN DEL SUPERVISOR                                       -->
+  <!-- 1. PANTALLA DE LOGIN DEL SUPERVISOR (Oculta por defecto en modo directo)    -->
   <!-- ========================================================================= -->
-  <div id="auth-screen">
+  <div id="auth-screen" style="display: none;">
     <div class="login-brand">
       <div class="brand-icon">🛡️</div>
       <h1 class="brand-title">WaterApp Supervisor</h1>
@@ -819,10 +819,6 @@
         🔐 Iniciar Sesión como Supervisor
       </button>
 
-      <button id="btn-login-admin-sup" type="button" class="btn" style="margin-top: 0.6rem; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); color: #fff; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-        🛡️ Acceso Directo Administrador
-      </button>
-
       <div style="margin-top: 1.25rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; text-align: center;">
         💡 Tu usuario y clave te los suministra directamente el dueño de tu planta o tienda.
       </div>
@@ -832,7 +828,7 @@
   <!-- ========================================================================= -->
   <!-- 2. APLICACIÓN PRINCIPAL DEL SUPERVISOR (OPERATIVA)                         -->
   <!-- ========================================================================= -->
-  <div id="main-app" style="display: none;">
+  <div id="main-app" style="display: block;">
     
     <!-- Top Header -->
     <header class="top-header">
@@ -1261,12 +1257,6 @@
   // =========================================================================
   // AUTENTICACIÓN DEL SUPERVISOR
   // =========================================================================
-  document.getElementById('btn-login-admin-sup')?.addEventListener('click', () => {
-    document.getElementById('login-user').value = 'refillh2o@gmail.com';
-    document.getElementById('login-pwd').value = '';
-    document.getElementById('btn-login').click();
-  });
-
   document.getElementById('btn-login').addEventListener('click', async () => {
     let userInp = document.getElementById('login-user').value.trim().toLowerCase();
     const pwdInp = document.getElementById('login-pwd').value.trim();
@@ -1411,10 +1401,24 @@
   // INICIO DE LA APLICACIÓN TRAS LOGIN
   // =========================================================================
   function iniciarAplicacionSupervisor() {
-    if (!supervisorSession) return;
+    if (!supervisorSession) {
+      const sedesRefill = Object.keys(REFILLH2O_SEDES);
+      const ownerEmail = localStorage.getItem('visor_owner_email') || 'refillh2o@gmail.com';
+      supervisorSession = {
+        usuario: ownerEmail,
+        nombre: 'Dueño (Refill H2O)',
+        owner_email: ownerEmail,
+        is_owner_admin: true,
+        sedes: sedesRefill
+      };
+      localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
+      localStorage.setItem('visor_owner_email', ownerEmail);
+    }
 
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('main-app').style.display = 'block';
+    const authScreen = document.getElementById('auth-screen');
+    const mainApp = document.getElementById('main-app');
+    if (authScreen) authScreen.style.display = 'none';
+    if (mainApp) mainApp.style.display = 'block';
 
     const esDueno = supervisorSession.is_owner_admin || !!localStorage.getItem('visor_owner_email');
     const wrapVolver = document.getElementById('wrap-volver-dueno');
