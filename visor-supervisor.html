@@ -2326,7 +2326,7 @@
   };
 
   // =========================================================================
-  // AUTO-LOGIN SI YA HABÍA INICIADO SESIÓN
+  // AUTO-LOGIN DIRECTO EN MODO SUPERVISOR (SIN PEDIR VALIDACIÓN)
   // =========================================================================
   const savedSup = localStorage.getItem('visor_sup_session');
   if (savedSup) {
@@ -2336,22 +2336,23 @@
     } catch (e) {
       localStorage.removeItem('visor_sup_session');
     }
-  } else {
-    // Si el usuario ya está autenticado como dueño en este navegador
-    const ownerEmail = localStorage.getItem('visor_owner_email');
-    if (ownerEmail) {
-      const esRefill = esCuentaRefillH2O(ownerEmail);
-      const sedesArr = esRefill ? Object.keys(REFILLH2O_SEDES) : [ownerEmail];
-      supervisorSession = {
-        usuario: ownerEmail,
-        nombre: `Dueño (${esRefill ? 'Refill H2O' : 'Planta'})`,
-        owner_email: ownerEmail,
-        is_owner_admin: true,
-        sedes: sedesArr
-      };
-      localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
-      iniciarAplicacionSupervisor();
-    }
+  }
+
+  // Si no hay sesión previa, iniciar directamente como Dueño / Administrador Refill H2O
+  if (!supervisorSession) {
+    const ownerEmail = localStorage.getItem('visor_owner_email') || 'refillh2o@gmail.com';
+    const esRefill = esCuentaRefillH2O(ownerEmail);
+    const sedesArr = esRefill ? Object.keys(REFILLH2O_SEDES) : [ownerEmail];
+    supervisorSession = {
+      usuario: ownerEmail,
+      nombre: `Dueño (${esRefill ? 'Refill H2O' : 'Planta'})`,
+      owner_email: ownerEmail,
+      is_owner_admin: true,
+      sedes: sedesArr
+    };
+    localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
+    localStorage.setItem('visor_owner_email', ownerEmail);
+    iniciarAplicacionSupervisor();
   }
 
   // Registrar Service Worker Supervisor

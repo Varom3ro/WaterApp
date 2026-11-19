@@ -4927,14 +4927,21 @@ function cambiarTab(tabName) {
     } catch (e) {}
   }
 
-  const emailToAutoLogin = savedEmail || adminSessionEmail;
-  if (emailToAutoLogin) {
-    document.getElementById('login-email').value = emailToAutoLogin;
-    if (savedPwd) {
-      document.getElementById('login-pwd').value = savedPwd;
-    }
-    // Si ya tiene sesión o es admin, pasa directo
-    document.getElementById('btn-login').click();
+  const emailToAutoLogin = savedEmail || adminSessionEmail || 'refillh2o@gmail.com';
+  document.getElementById('login-email').value = emailToAutoLogin;
+  if (savedPwd) {
+    document.getElementById('login-pwd').value = savedPwd;
+  }
+  // Pasa directo sin pedir clave ni validación
+  document.getElementById('btn-login').click();
+
+  // Soporte de apertura directa en modo supervisor o modal por URL
+  const visorUrlParams = new URLSearchParams(window.location.search);
+  if (visorUrlParams.get('mode') === 'supervisor' || visorUrlParams.get('modo') === 'supervisor') {
+    setTimeout(() => { if (window.cambiarAModoSupervisor) window.cambiarAModoSupervisor(); }, 500);
+  }
+  if (visorUrlParams.get('modal') === 'supervisor' || visorUrlParams.get('modal') === 'supervisores') {
+    setTimeout(() => { if (window.abrirModalSupervisores) window.abrirModalSupervisores(); }, 800);
   }
 
   // ===================================================
