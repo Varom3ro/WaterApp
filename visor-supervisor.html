@@ -1401,18 +1401,22 @@
   // INICIO DE LA APLICACIÓN TRAS LOGIN
   // =========================================================================
   function iniciarAplicacionSupervisor() {
+    const sedesRefill = Object.keys(REFILLH2O_SEDES);
     if (!supervisorSession) {
-      const sedesRefill = Object.keys(REFILLH2O_SEDES);
-      const ownerEmail = localStorage.getItem('visor_owner_email') || 'refillh2o@gmail.com';
       supervisorSession = {
-        usuario: ownerEmail,
-        nombre: 'Dueño (Refill H2O)',
-        owner_email: ownerEmail,
+        usuario: 'refillh2o@gmail.com',
+        nombre: 'Supervisor General Refill H2O',
+        owner_email: 'refillh2o@gmail.com',
         is_owner_admin: true,
         sedes: sedesRefill
       };
       localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
-      localStorage.setItem('visor_owner_email', ownerEmail);
+      localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
+    }
+
+    if (supervisorSession.is_owner_admin || supervisorSession.usuario === 'refillh2o@gmail.com' || supervisorSession.usuario === 'viritoco@gmail.com') {
+      supervisorSession.sedes = sedesRefill;
+      supervisorSession.is_owner_admin = true;
     }
 
     const authScreen = document.getElementById('auth-screen');
@@ -1438,15 +1442,16 @@
 
     document.getElementById('txt-supervisor-name').textContent = supervisorSession.nombre;
 
-    // Seleccionar primera sede asignada o última guardada
-    const savedSede = localStorage.getItem('visor_sup_selected_sede');
+    // Seleccionar sede: última seleccionada o La California Sur por defecto
+    const savedSede = localStorage.getItem('visor_sup_selected_sede') || localStorage.getItem('visor_refill_selected_sede');
     if (savedSede && supervisorSession.sedes.includes(savedSede)) {
       currentStoreEmail = savedSede;
     } else {
-      currentStoreEmail = supervisorSession.sedes[0] || supervisorSession.owner_email;
+      currentStoreEmail = 'refillh2o.lcf@gmail.com';
     }
+    localStorage.setItem('visor_sup_selected_sede', currentStoreEmail);
 
-    // Configurar barra de sedes si tiene más de 1 sede
+    // Configurar barra de sedes con todas las sedes
     actualizarBarraSedesSupervisor();
 
     // Cargar datos
@@ -2326,38 +2331,37 @@
     if (currentStoreEmail) {
       localStorage.setItem('visor_refill_selected_sede', currentStoreEmail);
     }
+    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
     window.location.href = './visor.html';
   };
 
   // =========================================================================
   // AUTO-LOGIN DIRECTO EN MODO SUPERVISOR (SIN PEDIR VALIDACIÓN)
   // =========================================================================
+  const sedesRefill = Object.keys(REFILLH2O_SEDES);
   const savedSup = localStorage.getItem('visor_sup_session');
   if (savedSup) {
     try {
       supervisorSession = JSON.parse(savedSup);
-      iniciarAplicacionSupervisor();
     } catch (e) {
-      localStorage.removeItem('visor_sup_session');
+      supervisorSession = null;
     }
   }
 
-  // Si no hay sesión previa, iniciar directamente como Dueño / Administrador Refill H2O
-  if (!supervisorSession) {
-    const ownerEmail = localStorage.getItem('visor_owner_email') || 'refillh2o@gmail.com';
-    const esRefill = esCuentaRefillH2O(ownerEmail);
-    const sedesArr = esRefill ? Object.keys(REFILLH2O_SEDES) : [ownerEmail];
+  // Garantizar sesión con todas las sedes de Refill H2O
+  if (!supervisorSession || supervisorSession.is_owner_admin || supervisorSession.usuario === 'refillh2o@gmail.com' || supervisorSession.usuario === 'viritoco@gmail.com' || !supervisorSession.sedes || supervisorSession.sedes.length <= 1) {
     supervisorSession = {
-      usuario: ownerEmail,
-      nombre: `Dueño (${esRefill ? 'Refill H2O' : 'Planta'})`,
-      owner_email: ownerEmail,
+      usuario: 'refillh2o@gmail.com',
+      nombre: 'Supervisor General Refill H2O',
+      owner_email: 'refillh2o@gmail.com',
       is_owner_admin: true,
-      sedes: sedesArr
+      sedes: sedesRefill
     };
     localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
-    localStorage.setItem('visor_owner_email', ownerEmail);
-    iniciarAplicacionSupervisor();
+    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
   }
+
+  iniciarAplicacionSupervisor();
 
   // Registrar Service Worker Supervisor
   if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
