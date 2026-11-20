@@ -1316,12 +1316,15 @@ export function getReporteTxtString(fecha) {
   // Consolidado de productos
   const productoResumen = {};
   let totalUnidadesVendidas = 0;
+  let totalUnidadesCredito = 0;
   let totalUnidadesSinCobro = 0;
   let totalLitrosVendidos = 0;
   let totalMontoProductos = 0;
+  let totalMontoCreditoProductos = 0;
 
   ventasDia.forEach(v => {
     const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+    const isCredito = (v.tipo === 'credito');
     if (v.detalles && Array.isArray(v.detalles) && v.detalles.length > 0) {
       v.detalles.forEach(d => {
         if (d.categoria === 'servicio') return;
@@ -1333,7 +1336,7 @@ export function getReporteTxtString(fecha) {
         const ltsItem = d.litros !== undefined ? d.litros : (cant * cap);
 
         if (!productoResumen[prodName]) {
-          productoResumen[prodName] = { facturado: 0, sinCobro: 0, litros: 0, monto: 0 };
+          productoResumen[prodName] = { facturado: 0, credito: 0, sinCobro: 0, litros: 0, monto: 0, montoCredito: 0 };
         }
         productoResumen[prodName].litros += ltsItem;
         totalLitrosVendidos += ltsItem;
@@ -1341,6 +1344,12 @@ export function getReporteTxtString(fecha) {
         if (itemSinCobro) {
           productoResumen[prodName].sinCobro += cant;
           totalUnidadesSinCobro += cant;
+        } else if (isCredito) {
+          productoResumen[prodName].credito += cant;
+          const sub = (d.subtotal || 0);
+          productoResumen[prodName].montoCredito += sub;
+          totalUnidadesCredito += cant;
+          totalMontoCreditoProductos += sub;
         } else {
           productoResumen[prodName].facturado += cant;
           const sub = (d.subtotal || 0);
@@ -1354,18 +1363,25 @@ export function getReporteTxtString(fecha) {
       const cant = parseInt(v.botellones) || 1;
       const ltsItem = cant * 20;
       if (!productoResumen[prodName]) {
-        productoResumen[prodName] = { facturado: 0, sinCobro: 0, litros: 0, monto: 0 };
+        productoResumen[prodName] = { facturado: 0, credito: 0, sinCobro: 0, litros: 0, monto: 0, montoCredito: 0 };
       }
-      productoResumen[prodName].facturado += cant;
       productoResumen[prodName].litros += ltsItem;
-      productoResumen[prodName].monto += (v.total || 0);
-      totalUnidadesVendidas += cant;
       totalLitrosVendidos += ltsItem;
-      totalMontoProductos += (v.total || 0);
+      if (isCredito) {
+        productoResumen[prodName].credito += cant;
+        productoResumen[prodName].montoCredito += (v.total || 0);
+        totalUnidadesCredito += cant;
+        totalMontoCreditoProductos += (v.total || 0);
+      } else {
+        productoResumen[prodName].facturado += cant;
+        productoResumen[prodName].monto += (v.total || 0);
+        totalUnidadesVendidas += cant;
+        totalMontoProductos += (v.total || 0);
+      }
     }
   });
 
-  const listProdResumen = Object.entries(productoResumen).sort((a, b) => b[1].facturado - a[1].facturado);
+  const listProdResumen = Object.entries(productoResumen).sort((a, b) => (b[1].facturado + b[1].credito) - (a[1].facturado + a[1].credito));
 
   // Formateador con padding para columnas monoespacio
   const padRight = (str, len) => String(str).padEnd(len).substring(0, len);
@@ -1389,45 +1405,55 @@ export function getReporteTxtString(fecha) {
   lines.push(`FECHA DEL REPORTE : ${fecha}`);
   lines.push(`FECHA DE EMISIÓN  : ${ahoraStr}`);
   lines.push(`TASA DE CAMBIO    : Bs ${Utils.formatNumber(tasaActual, true)} / USD`);
-  lines.push(`TOTAL OPERACIONES : ${ventasDia.length} ventas facturadas hoy`);
+  lines.push(`TOTAL OPERACIONES : ${ventasDia.length} operaciones (${ventasDia.filter(v => v.tipo !== 'credito').length} cobradas / ${ventasDia.filter(v => v.tipo === 'credito').length} a crédito)`);
   lines.push("");
 
-  // 1. RESUMEN DE VENTAS POR PRODUCTO
+  // 1. RESUMEN DE VENTAS POR PRODUCTO (SOLO DINERO COBRADO EN CAJA vs CRÉDITO)
   lines.push(sepDouble);
-  lines.push("1. RESUMEN DE VENTAS POR PRODUCTO");
+  lines.push("1. RESUMEN DE VENTAS POR PRODUCTO (DESGLOSE CONTADO vs CRÉDITO)");
   lines.push(sepDouble);
-  lines.push(`${padRight('PRODUCTO / SERVICIO', 30)} ${padLeft('FACTURADO', 10)} ${padLeft('SIN COBRO', 10)} ${padLeft('LITROS', 9)} ${padLeft('MONTO ($)', 10)}`);
+  lines.push(`${padRight('PRODUCTO / SERVICIO', 24)} ${padLeft('CONTADO', 9)} ${padLeft('CRÉDITO', 9)} ${padLeft('S/COBRO', 8)} ${padLeft('LITROS', 8)} ${padLeft('COBRADO($)', 10)}`);
   lines.push(sepSingle);
 
   if (listProdResumen.length === 0) {
     lines.push("No se registraron ventas en esta fecha.");
   } else {
     listProdResumen.forEach(([nombre, info]) => {
-      const factStr = info.facturado > 0 ? `${info.facturado} unid.` : '-';
-      const scStr = info.sinCobro > 0 ? `${info.sinCobro} unid.` : '-';
-      const ltsStr = `${Math.round(info.litros).toLocaleString('es-VE')} L`;
+      const factStr = info.facturado > 0 ? `${info.facturado} un.` : '-';
+      const credStr = info.credito > 0 ? `${info.credito} un.` : '-';
+      const scStr = info.sinCobro > 0 ? `${info.sinCobro} un.` : '-';
+      const ltsStr = `${Math.round(info.litros).toLocaleString('es-VE')}L`;
       const montoStr = `$ ${info.monto.toFixed(2)}`;
-      lines.push(`${padRight(nombre, 30)} ${padLeft(factStr, 10)} ${padLeft(scStr, 10)} ${padLeft(ltsStr, 9)} ${padLeft(montoStr, 10)}`);
+      lines.push(`${padRight(nombre, 24)} ${padLeft(factStr, 9)} ${padLeft(credStr, 9)} ${padLeft(scStr, 8)} ${padLeft(ltsStr, 8)} ${padLeft(montoStr, 10)}`);
     });
     lines.push(sepSingle);
-    const totFactStr = `${totalUnidadesVendidas} unid.`;
-    const totScStr = totalUnidadesSinCobro > 0 ? `${totalUnidadesSinCobro} unid.` : '-';
-    const totLtsStr = `${Math.round(totalLitrosVendidos).toLocaleString('es-VE')} L`;
+    const totFactStr = `${totalUnidadesVendidas} un.`;
+    const totCredStr = totalUnidadesCredito > 0 ? `${totalUnidadesCredito} un.` : '-';
+    const totScStr = totalUnidadesSinCobro > 0 ? `${totalUnidadesSinCobro} un.` : '-';
+    const totLtsStr = `${Math.round(totalLitrosVendidos).toLocaleString('es-VE')}L`;
     const totMontoStr = `$ ${totalMontoProductos.toFixed(2)}`;
-    lines.push(`${padRight('TOTALES GENERALES', 30)} ${padLeft(totFactStr, 10)} ${padLeft(totScStr, 10)} ${padLeft(totLtsStr, 9)} ${padLeft(totMontoStr, 10)}`);
+    lines.push(`${padRight('TOTAL COBRADO (CONTADO)', 24)} ${padLeft(totFactStr, 9)} ${padLeft(totCredStr, 9)} ${padLeft(totScStr, 8)} ${padLeft(totLtsStr, 8)} ${padLeft(totMontoStr, 10)}`);
+    if (totalMontoCreditoProductos > 0) {
+      lines.push(`${padRight('(*) DESPACHADO A CRÉDITO (NO INGRESÓ A CAJA HOY):', 58)} ${padLeft('$ ' + totalMontoCreditoProductos.toFixed(2), 13)}`);
+    }
   }
   lines.push("");
 
   // 2. RESUMEN DE FLUJO DE CAJA
   lines.push(sepDouble);
-  lines.push("2. RESUMEN DE FLUJO DE CAJA");
+  lines.push("2. RESUMEN DE FLUJO DE CAJA (DINERO REAL RECIBIDO)");
   lines.push(sepDouble);
-  lines.push(`${padRight('Ingreso Real en Caja (Contado + Abonos):', 48)} ${padLeft('$ ' + (cierre.real_ingresado || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('Total Ventas Registradas (Valor):', 48)} ${padLeft('$ ' + (cierre.total || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('(-) Crédito Otorgado Hoy (Deuda Nueva):', 48)} ${padLeft('- $ ' + (cierre.credito || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('(+) Crédito Cobrado Hoy (Abonos Recibidos):', 48)} ${padLeft('+ $ ' + (cierre.cobros_credito || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('INGRESO REAL EN CAJA (CONTADO + ABONOS):', 48)} ${padLeft('$ ' + (cierre.real_ingresado || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('  (+) Ventas Cobradas de Contado Hoy:', 48)} ${padLeft('$ ' + Math.max(0, (cierre.total || 0) - (cierre.credito || 0)).toFixed(2), 23)}`);
+  lines.push(`${padRight('  (+) Abonos / Cobros de Deudas Recibidos Hoy:', 48)} ${padLeft('+ $ ' + (cierre.cobros_credito || 0).toFixed(2), 23)}`);
+  if ((cierre.totalPropinasUSD || 0) > 0) {
+    lines.push(`${padRight('  (+) Propinas por Punto/Banco Recibidas Hoy:', 48)} ${padLeft('+ $ ' + (cierre.totalPropinasUSD || 0).toFixed(2), 23)}`);
+  }
   lines.push(sepSingle);
-  lines.push(`Total Botellones Despachados: ${totalUnidadesVendidas + totalUnidadesSinCobro} unidades`);
+  lines.push(`${padRight('Crédito Otorgado Hoy (Por Cobrar / NO en Caja):', 48)} ${padLeft('$ ' + (cierre.credito || 0).toFixed(2), 23)}`);
+  lines.push(`${padRight('Valor Total Despachado (Contado + Crédito):', 48)} ${padLeft('$ ' + (cierre.total || 0).toFixed(2), 23)}`);
+  lines.push(sepSingle);
+  lines.push(`Total Botellones Despachados: ${totalUnidadesVendidas + totalUnidadesCredito + totalUnidadesSinCobro} unidades (${totalUnidadesVendidas} contado / ${totalUnidadesCredito} crédito)`);
   lines.push(`Total Agua Purificada Despachada: ${Math.round(totalLitrosVendidos).toLocaleString('es-VE')} Litros`);
   lines.push(sepSingle);
   lines.push("DESGLOSE DE INGRESOS POR MÉTODO DE PAGO:");
@@ -1748,23 +1774,27 @@ export function getMatricialReportHTML(fecha) {
 
       <!-- Resumen de Flujo de Caja (Dinero Real) -->
       <div style="margin-bottom: 20px;">
-        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ RESUMEN DE FLUJO DE CAJA ]</div>
+        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ RESUMEN DE FLUJO DE CAJA (DINERO REAL RECIBIDO) ]</div>
         <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: inherit;">
           <tr>
-            <td style="padding: 4px 0;">INGRESO REAL EN CAJA (CONTADO + ABONOS):</td>
+            <td style="padding: 4px 0; font-weight: bold;">INGRESO REAL EN CAJA (CONTADO + ABONOS):</td>
             <td style="text-align: right; font-weight: bold; padding: 4px 0; font-size: 15px;">${Utils.formatCurrency(cierre.real_ingresado)}</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #333;">TOTAL VENTAS REGISTRADAS (VALOR):</td>
-            <td style="text-align: right; padding: 4px 0; color: #333;">${Utils.formatCurrency(cierre.total)}</td>
+            <td style="padding: 4px 0; color: #333;">(+) VENTAS COBRADAS DE CONTADO HOY:</td>
+            <td style="text-align: right; padding: 4px 0; color: #333;">${Utils.formatCurrency(Math.max(0, (cierre.total || 0) - (cierre.credito || 0)))}</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #666;">(-) CRÉDITO OTORGADO HOY (DEUDA NUEVA):</td>
-            <td style="text-align: right; padding: 4px 0; color: #666;">- ${Utils.formatCurrency(cierre.credito)}</td>
+            <td style="padding: 4px 0; color: #333;">(+) CRÉDITO COBRADO HOY (ABONOS RECIBIDOS):</td>
+            <td style="text-align: right; padding: 4px 0; color: #333;">+ ${Utils.formatCurrency(cierre.cobros_credito)}</td>
+          </tr>
+          <tr style="border-top: 1px dotted #999;">
+            <td style="padding: 4px 0; color: #666;">(*) CRÉDITO OTORGADO HOY (POR COBRAR / NO EN CAJA):</td>
+            <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.credito)}</td>
           </tr>
           <tr>
-            <td style="padding: 4px 0; color: #666;">(+) CRÉDITO COBRADO HOY (ABONOS RECIBIDOS):</td>
-            <td style="text-align: right; padding: 4px 0; color: #666;">+ ${Utils.formatCurrency(cierre.cobros_credito)}</td>
+            <td style="padding: 4px 0; color: #666;">VALOR TOTAL DESPACHADO (CONTADO + CRÉDITO):</td>
+            <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.total)}</td>
           </tr>
         </table>
         <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>

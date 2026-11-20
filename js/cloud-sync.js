@@ -45,7 +45,16 @@ export async function syncToCloud(isManual = false) {
       return d >= dayStart && d <= dayEnd;
     });
 
+    const abonos = store.getAll('abonos') || [];
+    const abonosHoy = abonos.filter(a => {
+      if (!a.fecha) return false;
+      const d = new Date(a.fecha);
+      return d >= dayStart && d <= dayEnd;
+    });
+
     let totalUSD = 0;
+    let totalFacturadoUSD = 0;
+    let cobrosCreditoUSD = 0;
     let botellones = 0;
     let litros = 0;
     let efectivoUSD = 0;
@@ -84,25 +93,56 @@ export async function syncToCloud(isManual = false) {
     });
 
     ventasHoy.forEach(v => {
-      const vTotal = parseFloat(v.total) || 0;
-      totalUSD += vTotal;
+      const isSinCobro = (v.tipo === 'convenio' || v.tipo === 'garantia' || v.tipo === 'cortesia');
+      const vTotal = isSinCobro ? 0 : (parseFloat(v.total) || 0);
+      totalFacturadoUSD += vTotal;
       botellones += (parseInt(v.botellones) || 0);
       litros += (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
 
       if (v.tipo === 'credito') {
         credito += vTotal;
-      } else if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
-        v.pagos.forEach(p => {
-          const m = parseFloat(p.monto) || 0;
-          const currentTasa = parseFloat(p.tasa) || tasa;
-          let metId = p.metodo || 'efectivo_usd';
+      } else if (!isSinCobro) {
+        totalUSD += vTotal;
+        if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
+          v.pagos.forEach(p => {
+            const m = parseFloat(p.monto) || 0;
+            const currentTasa = parseFloat(p.tasa) || tasa;
+            let metId = p.metodo || 'efectivo_usd';
+            if (metId === 'punto_venta') metId = 'punto';
+            const montoBs = p.montoBs ? parseFloat(p.montoBs) : (m * currentTasa);
+
+            if (!metodosMap[metId]) {
+              metodosMap[metId] = {
+                id: metId,
+                label: p.metodoNombre || metId,
+                icon: '💳',
+                moneda: 'Bs',
+                color: '#3B82F6',
+                totalUSD: 0,
+                totalBs: 0,
+                cantidadVentas: 0
+              };
+            }
+
+            metodosMap[metId].totalUSD += m;
+            metodosMap[metId].totalBs += montoBs;
+            metodosMap[metId].cantidadVentas += 1;
+
+            if (metId === 'efectivo_usd') efectivoUSD += m;
+            else if (metId === 'efectivo_bs') { efectivoBsUSD += m; efectivoBs += montoBs; }
+            else if (metId === 'pago_movil') { pagoMovil += m; pagoMovilBs += montoBs; }
+            else if (metId === 'punto') { punto += m; puntoBs += montoBs; }
+            else if (metId === 'transferencia') { transferencia += m; }
+          });
+        } else {
+          let metId = v.metodoPago || 'efectivo_usd';
           if (metId === 'punto_venta') metId = 'punto';
-          const montoBs = p.montoBs ? parseFloat(p.montoBs) : (m * currentTasa);
+          const montoBs = vTotal * tasa;
 
           if (!metodosMap[metId]) {
             metodosMap[metId] = {
               id: metId,
-              label: p.metodoNombre || metId,
+              label: metId,
               icon: '💳',
               moneda: 'Bs',
               color: '#3B82F6',
@@ -112,44 +152,53 @@ export async function syncToCloud(isManual = false) {
             };
           }
 
-          metodosMap[metId].totalUSD += m;
+          metodosMap[metId].totalUSD += vTotal;
           metodosMap[metId].totalBs += montoBs;
           metodosMap[metId].cantidadVentas += 1;
 
-          if (metId === 'efectivo_usd') efectivoUSD += m;
-          else if (metId === 'efectivo_bs') { efectivoBsUSD += m; efectivoBs += montoBs; }
-          else if (metId === 'pago_movil') { pagoMovil += m; pagoMovilBs += montoBs; }
-          else if (metId === 'punto') { punto += m; puntoBs += montoBs; }
-          else if (metId === 'transferencia') { transferencia += m; }
-        });
-      } else {
-        let metId = v.metodoPago || 'efectivo_usd';
-        if (metId === 'punto_venta') metId = 'punto';
-        const montoBs = vTotal * tasa;
-
-        if (!metodosMap[metId]) {
-          metodosMap[metId] = {
-            id: metId,
-            label: metId,
-            icon: '💳',
-            moneda: 'Bs',
-            color: '#3B82F6',
-            totalUSD: 0,
-            totalBs: 0,
-            cantidadVentas: 0
-          };
+          if (metId === 'efectivo_usd') efectivoUSD += vTotal;
+          else if (metId === 'efectivo_bs') { efectivoBsUSD += vTotal; efectivoBs += montoBs; }
+          else if (metId === 'pago_movil') { pagoMovil += vTotal; pagoMovilBs += montoBs; }
+          else if (metId === 'punto') { punto += vTotal; puntoBs += montoBs; }
+          else if (metId === 'transferencia') { transferencia += vTotal; }
         }
-
-        metodosMap[metId].totalUSD += vTotal;
-        metodosMap[metId].totalBs += montoBs;
-        metodosMap[metId].cantidadVentas += 1;
-
-        if (metId === 'efectivo_usd') efectivoUSD += vTotal;
-        else if (metId === 'efectivo_bs') { efectivoBsUSD += vTotal; efectivoBs += montoBs; }
-        else if (metId === 'pago_movil') { pagoMovil += vTotal; pagoMovilBs += montoBs; }
-        else if (metId === 'punto') { punto += vTotal; puntoBs += montoBs; }
-        else if (metId === 'transferencia') { transferencia += vTotal; }
       }
+    });
+
+    // Sumar abonos cobrados hoy al dinero real ingresado y a sus métodos de pago
+    abonosHoy.forEach(a => {
+      const m = parseFloat(a.monto) || 0;
+      if (m <= 0) return;
+      const currentTasa = parseFloat(a.tasa) || tasa;
+      let metId = a.metodo || 'efectivo_usd';
+      if (metId === 'punto_venta') metId = 'punto';
+      const montoBs = a.montoBs ? parseFloat(a.montoBs) : (m * currentTasa);
+
+      cobrosCreditoUSD += m;
+      totalUSD += m;
+
+      if (!metodosMap[metId]) {
+        metodosMap[metId] = {
+          id: metId,
+          label: a.metodoNombre || metId,
+          icon: '💳',
+          moneda: 'Bs',
+          color: '#3B82F6',
+          totalUSD: 0,
+          totalBs: 0,
+          cantidadVentas: 0
+        };
+      }
+
+      metodosMap[metId].totalUSD += m;
+      metodosMap[metId].totalBs += montoBs;
+      metodosMap[metId].cantidadVentas += 1;
+
+      if (metId === 'efectivo_usd') efectivoUSD += m;
+      else if (metId === 'efectivo_bs') { efectivoBsUSD += m; efectivoBs += montoBs; }
+      else if (metId === 'pago_movil') { pagoMovil += m; pagoMovilBs += montoBs; }
+      else if (metId === 'punto') { punto += m; puntoBs += montoBs; }
+      else if (metId === 'transferencia') { transferencia += m; }
     });
 
     // Lista de métodos ordenada para el visor
@@ -340,13 +389,20 @@ export async function syncToCloud(isManual = false) {
       precio: p.precio || 0
     }));
 
-    // Análisis del mes acumulado (Septiembre 2026)
+    // Análisis del mes acumulado (Ingreso real cobrado vs crédito)
     const mesActualStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const ventasMes = ventas.filter(v => {
       if (!v.fecha) return false;
       return v.fecha.startsWith(mesActualStr);
     });
-    const totalMesUSD = ventasMes.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+    const abonosMes = abonos.filter(a => {
+      if (!a.fecha) return false;
+      return a.fecha.startsWith(mesActualStr);
+    });
+    const totalMesUSD = ventasMes.reduce((s, v) => {
+      if (['credito', 'convenio', 'garantia', 'cortesia'].includes(v.tipo)) return s;
+      return s + (parseFloat(v.total) || 0);
+    }, 0) + abonosMes.reduce((s, a) => s + (parseFloat(a.monto) || 0), 0);
     const totalMesBs = totalMesUSD * tasa;
     const totalBotellonesMes = ventasMes.reduce((s, v) => s + (parseInt(v.botellones) || 0), 0);
 
@@ -496,6 +552,8 @@ export async function syncToCloud(isManual = false) {
       resumen_hoy: {
         totalUSD,
         totalBs,
+        totalFacturadoUSD,
+        cobrosCreditoUSD,
         botellones,
         litros,
         numVentas: ventasHoy.length,

@@ -2442,13 +2442,13 @@ body.hide-montos #cierre-digital-usd {
         </div>
       </div>
 
-      <!-- Resumen Detallado de Cuadre del Día -->
+        <!-- Resumen Detallado de Cuadre del Día -->
       <div class="card-login" style="padding: 1.25rem; margin-top: 14px; background: var(--neu-surface); border: 1px solid #fff; box-shadow: var(--neu-shadow-sm);">
         <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 10px; color: var(--neu-text-main);">
           📊 Detalle de Cuadre del Día
         </div>
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
-          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Total Facturado:</span>
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Total Cobrado en Caja:</span>
           <strong id="cierre-total-usd" style="color: var(--neu-text-main); font-size: 0.95rem;">$ 0.00</strong>
         </div>
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
@@ -2462,6 +2462,10 @@ body.hide-montos #cierre-digital-usd {
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
           <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Efectivo en Sistema (Bs):</span>
           <strong id="cierre-efectivo-bs" style="color: #10B981; font-size: 0.95rem;">Bs 0.00</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);">
+          <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Crédito Hoy (Por Cobrar):</span>
+          <strong id="cierre-credito-usd" style="color: #F43F5E; font-size: 0.95rem;">$ 0.00</strong>
         </div>
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);" id="row-cierre-diferencia">
           <span style="color: var(--neu-text-muted); font-size: 0.88rem;">Diferencia de Caja:</span>
@@ -3177,13 +3181,14 @@ function calcularTiempoDesconexion(fechaIso) {
   return { online: false, texto: `Hace ${diffDias} d`, horaExacta, detalle: `${fechaExacta} ${horaExacta}` };
 }
 
-// 🛡️ Calcula los totales precisos de una tienda para Hoy, Semana o Mes
+// 🛡️ Calcula los totales precisos de una tienda para Hoy, Semana o Mes (Excluyendo Ventas a Crédito del Dinero Ingresado)
 function calcularTotalesPeriodoTienda(tienda, periodo) {
-  if (!tienda) return { totalUSD: 0, totalBs: 0, efectivoUSD: 0, efectivoBs: 0, bancosUSD: 0, botellones: 0, litros: 0, numVentas: 0 };
+  if (!tienda) return { totalUSD: 0, totalBs: 0, creditoUSD: 0, efectivoUSD: 0, efectivoBs: 0, bancosUSD: 0, botellones: 0, litros: 0, numVentas: 0 };
 
   const r = tienda.resumen_hoy || {};
   const stats = tienda.analisis_mes || {};
   const ventas = (tienda.respaldo_completo && Array.isArray(tienda.respaldo_completo.ventas)) ? tienda.respaldo_completo.ventas : [];
+  const abonos = (tienda.respaldo_completo && Array.isArray(tienda.respaldo_completo.abonos)) ? tienda.respaldo_completo.abonos : [];
   const now = new Date();
   const hoyStr = now.toISOString().substring(0, 10);
   const mesStr = now.toISOString().substring(0, 7);
@@ -3192,8 +3197,13 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
   let tasa = (r.totalUSD > 0 && r.totalBs > 0) ? (r.totalBs / r.totalUSD) : 890;
 
   if (periodo === 'hoy') {
-    const tUSD = r.totalUSD || 0;
-    const tBs = r.totalBs || 0;
+    const credHoy = r.credito || 0;
+    // Si resumen_hoy viene del formato nuevo (con totalFacturadoUSD), r.totalUSD ya es el ingreso real cobrado.
+    // Si viene del formato anterior, restamos r.credito para que el crédito no infle el dinero cobrado ni bancos.
+    const tUSD = (r.totalFacturadoUSD !== undefined)
+      ? (r.totalUSD || 0)
+      : Math.max(0, (r.totalUSD || 0) - credHoy);
+    const tBs = tUSD * tasa;
     const efUSD = r.efectivoUSD || 0;
     const efBs = r.efectivoBs || 0;
     const efBsUSD = r.efectivoBsUSD || 0;
@@ -3201,6 +3211,7 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
     return {
       totalUSD: tUSD,
       totalBs: tBs,
+      creditoUSD: credHoy,
       efectivoUSD: efUSD,
       efectivoBs: efBs,
       bancosUSD: bancos,
@@ -3212,23 +3223,31 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
 
   if (periodo === 'semana') {
     const ventasSemana = ventas.filter(v => v.fecha && new Date(v.fecha) >= sieteDiasAtras);
-    if (ventasSemana.length > 0) {
-      let tUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
+    const abonosSemana = abonos.filter(a => a.fecha && new Date(a.fecha) >= sieteDiasAtras);
+    if (ventasSemana.length > 0 || abonosSemana.length > 0) {
+      let tUSD = 0, credUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
       ventasSemana.forEach(v => {
-        const tot = parseFloat(v.total) || 0;
-        tUSD += tot;
+        const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+        const tot = isSinCobro ? 0 : (parseFloat(v.total) || 0);
         const b = parseInt(v.botellones) || 0;
         bots += b;
         lts += parseFloat(v.litrosTotales) || (b * 20);
 
-        if (v.pagos && Array.isArray(v.pagos)) {
+        if (v.tipo === 'credito') {
+          credUSD += tot;
+          return; // No entra a caja ni a bancos hasta que se abone
+        }
+        if (isSinCobro) return;
+
+        tUSD += tot;
+        if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
           v.pagos.forEach(p => {
             const m = (p.metodo || '').toLowerCase();
             if (m.includes('efectivo') && m.includes('usd')) {
               efUSD += (p.montoUSD || p.monto || 0);
             } else if (m.includes('efectivo')) {
               efBs += (p.montoBs || p.monto || 0);
-            } else {
+            } else if (m !== 'saldo_favor') {
               digUSD += (p.montoUSD || p.monto || 0);
             }
           });
@@ -3236,9 +3255,24 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
           digUSD += tot;
         }
       });
+      abonosSemana.forEach(a => {
+        const mVal = parseFloat(a.monto) || 0;
+        if (mVal <= 0) return;
+        tUSD += mVal;
+        const m = (a.metodo || '').toLowerCase();
+        const aTasa = parseFloat(a.tasa) || tasa;
+        if (m.includes('efectivo') && m.includes('usd')) {
+          efUSD += mVal;
+        } else if (m.includes('efectivo')) {
+          efBs += (a.montoBs || (mVal * aTasa));
+        } else {
+          digUSD += mVal;
+        }
+      });
       return {
         totalUSD: tUSD,
         totalBs: tUSD * tasa,
+        creditoUSD: credUSD,
         efectivoUSD: efUSD,
         efectivoBs: efBs,
         bancosUSD: digUSD,
@@ -3247,12 +3281,15 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
         numVentas: ventasSemana.length
       };
     } else {
+      const credHoy = r.credito || 0;
+      const tUSD = (r.totalFacturadoUSD !== undefined) ? (r.totalUSD || 0) : Math.max(0, (r.totalUSD || 0) - credHoy);
       return {
-        totalUSD: r.totalUSD || 0,
-        totalBs: r.totalBs || 0,
+        totalUSD: tUSD,
+        totalBs: tUSD * tasa,
+        creditoUSD: credHoy,
         efectivoUSD: r.efectivoUSD || 0,
         efectivoBs: r.efectivoBs || 0,
-        bancosUSD: Math.max(0, (r.totalUSD || 0) - (r.efectivoUSD || 0)),
+        bancosUSD: Math.max(0, tUSD - (r.efectivoUSD || 0) - (r.efectivoBsUSD || 0)),
         botellones: r.botellones || 0,
         litros: r.litros || 0,
         numVentas: r.numVentas || 0
@@ -3262,24 +3299,32 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
 
   if (periodo === 'mes') {
     const ventasMes = ventas.filter(v => v.fecha && v.fecha.startsWith(mesStr));
-    let tUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
+    const abonosMes = abonos.filter(a => a.fecha && a.fecha.startsWith(mesStr));
+    let tUSD = 0, credUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
 
-    if (ventasMes.length > 0) {
+    if (ventasMes.length > 0 || abonosMes.length > 0) {
       ventasMes.forEach(v => {
-        const tot = parseFloat(v.total) || 0;
-        tUSD += tot;
+        const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+        const tot = isSinCobro ? 0 : (parseFloat(v.total) || 0);
         const b = parseInt(v.botellones) || 0;
         bots += b;
         lts += parseFloat(v.litrosTotales) || (b * 20);
 
-        if (v.pagos && Array.isArray(v.pagos)) {
+        if (v.tipo === 'credito') {
+          credUSD += tot;
+          return; // No entra a caja ni a bancos hasta que se abone
+        }
+        if (isSinCobro) return;
+
+        tUSD += tot;
+        if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
           v.pagos.forEach(p => {
             const m = (p.metodo || '').toLowerCase();
             if (m.includes('efectivo') && m.includes('usd')) {
               efUSD += (p.montoUSD || p.monto || 0);
             } else if (m.includes('efectivo')) {
               efBs += (p.montoBs || p.monto || 0);
-            } else {
+            } else if (m !== 'saldo_favor') {
               digUSD += (p.montoUSD || p.monto || 0);
             }
           });
@@ -3287,9 +3332,24 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
           digUSD += tot;
         }
       });
+      abonosMes.forEach(a => {
+        const mVal = parseFloat(a.monto) || 0;
+        if (mVal <= 0) return;
+        tUSD += mVal;
+        const m = (a.metodo || '').toLowerCase();
+        const aTasa = parseFloat(a.tasa) || tasa;
+        if (m.includes('efectivo') && m.includes('usd')) {
+          efUSD += mVal;
+        } else if (m.includes('efectivo')) {
+          efBs += (a.montoBs || (mVal * aTasa));
+        } else {
+          digUSD += mVal;
+        }
+      });
       return {
         totalUSD: tUSD,
         totalBs: tUSD * tasa,
+        creditoUSD: credUSD,
         efectivoUSD: efUSD,
         efectivoBs: efBs,
         bancosUSD: digUSD,
@@ -3301,6 +3361,7 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
       return {
         totalUSD: stats.totalMesUSD || 0,
         totalBs: stats.totalMesBs || (stats.totalMesUSD * tasa),
+        creditoUSD: 0,
         efectivoUSD: stats.totalMesUSD * 0.3,
         efectivoBs: 0,
         bancosUSD: stats.totalMesUSD * 0.7,
@@ -3309,12 +3370,15 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
         numVentas: r.numVentas || 0
       };
     } else {
+      const credHoy = r.credito || 0;
+      const tUSD = (r.totalFacturadoUSD !== undefined) ? (r.totalUSD || 0) : Math.max(0, (r.totalUSD || 0) - credHoy);
       return {
-        totalUSD: r.totalUSD || 0,
-        totalBs: r.totalBs || 0,
+        totalUSD: tUSD,
+        totalBs: tUSD * tasa,
+        creditoUSD: credHoy,
         efectivoUSD: r.efectivoUSD || 0,
         efectivoBs: r.efectivoBs || 0,
-        bancosUSD: Math.max(0, (r.totalUSD || 0) - (r.efectivoUSD || 0)),
+        bancosUSD: Math.max(0, tUSD - (r.efectivoUSD || 0) - (r.efectivoBsUSD || 0)),
         botellones: r.botellones || 0,
         litros: r.litros || 0,
         numVentas: r.numVentas || 0
@@ -3322,7 +3386,7 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
     }
   }
 
-  return { totalUSD: 0, totalBs: 0, efectivoUSD: 0, efectivoBs: 0, bancosUSD: 0, botellones: 0, litros: 0, numVentas: 0 };
+  return { totalUSD: 0, totalBs: 0, creditoUSD: 0, efectivoUSD: 0, efectivoBs: 0, bancosUSD: 0, botellones: 0, litros: 0, numVentas: 0 };
 }
 
 function aplicarPeriodoVentas(storeData, periodo) {
@@ -3993,9 +4057,12 @@ function cambiarTab(tabName) {
           if (!v.fecha) return;
           const vTime = new Date(v.fecha).getTime();
           if (vTime >= todayStart && vTime <= todayEnd) {
-            const vTot = parseFloat(v.total) || 0;
+            const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+            const vTot = isSinCobro ? 0 : (parseFloat(v.total) || 0);
             if (v.tipo === 'credito') {
               creditoHoy += vTot;
+            } else if (isSinCobro) {
+              // Sin cobro: no sumar a caja
             } else if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
               v.pagos.forEach(p => {
                 const m = parseFloat(p.monto) || 0;
@@ -4329,10 +4396,12 @@ function cambiarTab(tabName) {
           let g = groupIndexMap[k];
           if (!g) {
             g = {
+              tempGrouping: true,
               dayKey: k,
               label: formatDayHeader(m.fecha),
               items: [],
-              totalUSD: 0
+              totalUSD: 0,
+              creditoUSD: 0
             };
             groupIndexMap[k] = g;
             dayGroups.push(g);
@@ -4340,7 +4409,13 @@ function cambiarTab(tabName) {
           g.items.push(m);
           if (m.tipo !== 'Merma' && m.monto) {
             const num = parseFloat(String(m.monto).replace(/[^0-9.-]/g, '')) || 0;
-            g.totalUSD += num;
+            const isCred = (m.tipo === 'Crédito' || (m.metodo && String(m.metodo).toLowerCase().includes('crédito')));
+            const isFree = (m.metodo && /cortes[ií]a|garant[ií]a|convenio/i.test(String(m.metodo)));
+            if (isCred) {
+              g.creditoUSD += num;
+            } else if (!isFree) {
+              g.totalUSD += num;
+            }
           }
         });
 
@@ -4422,6 +4497,7 @@ function cambiarTab(tabName) {
                   </div>
                   <div class="feed-day-total">
                     <span>$ ${group.totalUSD.toFixed(2)}</span>
+                    ${group.creditoUSD > 0 ? `<span style="font-size:0.7rem; color:#F43F5E; font-weight:700;">(+ $${group.creditoUSD.toFixed(2)} créd.)</span>` : ''}
                   </div>
                 </div>
               </div>
@@ -4524,6 +4600,10 @@ function cambiarTab(tabName) {
     const efBsItem = metodosCierre.find(m => m.id === 'efectivo_bs');
     const totalEfBs = efBsItem?.totalBs || (r.efectivoBs || 0);
     const totalEfBsUSD = efBsItem?.totalUSD || (r.efectivoBsUSD || 0);
+    const totalCreditoHoy = metodosCierre.find(m => m.id === 'credito')?.totalUSD || (r.credito || 0);
+    const totalCobradoHoy = (r.totalFacturadoUSD !== undefined)
+      ? (r.totalUSD || 0)
+      : Math.max(0, (r.totalUSD || 0) - totalCreditoHoy);
 
     document.getElementById('cierre-efectivo-usd').textContent = `$ ${totalEfUSD.toFixed(2)}`;
     document.getElementById('cierre-efectivo-usd-2').textContent = `$ ${totalEfUSD.toFixed(2)}`;
@@ -4537,9 +4617,11 @@ function cambiarTab(tabName) {
       cierreEfBsHero.textContent = `+ Bs ${totalEfBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} en efectivo`;
     }
 
-    document.getElementById('cierre-total-usd').textContent = `$ ${(r.totalUSD || 0).toFixed(2)}`;
-    const totalDigital = Math.max(0, (r.totalUSD || 0) - totalEfUSD - totalEfBsUSD);
+    document.getElementById('cierre-total-usd').textContent = `$ ${totalCobradoHoy.toFixed(2)}`;
+    const totalDigital = Math.max(0, totalCobradoHoy - totalEfUSD - totalEfBsUSD);
     document.getElementById('cierre-digital-usd').textContent = `$ ${totalDigital.toFixed(2)}`;
+    const cierreCredEl = document.getElementById('cierre-credito-usd');
+    if (cierreCredEl) cierreCredEl.textContent = `$ ${totalCreditoHoy.toFixed(2)}`;
     const mermaEl = document.getElementById('cierre-merma-litros');
     if (mermaEl) mermaEl.textContent = `${r.litrosMermasHoy || 0} Litros`;
 
@@ -4719,6 +4801,7 @@ function cambiarTab(tabName) {
     }
 
     const ventasPorDia = {};
+    const abonos = storeData.respaldo_completo?.abonos || [];
     ventas.forEach(v => {
       if (!v.fecha) return;
       const dia = v.fecha.substring(0, 10);
@@ -4729,6 +4812,7 @@ function cambiarTab(tabName) {
         ventasPorDia[dia] = {
           fecha: dia,
           totalUSD: 0,
+          creditoUSD: 0,
           efectivoUSD: 0,
           efectivoBs: 0,
           digitalUSD: 0,
@@ -4737,14 +4821,27 @@ function cambiarTab(tabName) {
         };
       }
       const d = ventasPorDia[dia];
-      d.totalUSD += (v.total || 0);
+      const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+      const vTot = isSinCobro ? 0 : (parseFloat(v.total) || 0);
       d.ventasCount++;
 
-      if (Array.isArray(v.detalles)) {
+      if (Array.isArray(v.detalles) && v.detalles.length > 0) {
         v.detalles.forEach(it => {
-          d.botellones += (it.cantidad || 0);
+          if (it.categoria !== 'servicio') {
+            d.botellones += (it.cantidad || 0);
+          }
         });
+      } else {
+        d.botellones += (parseInt(v.botellones) || 0);
       }
+
+      if (v.tipo === 'credito') {
+        d.creditoUSD += vTot;
+        return; // No sumar al ingreso real cobrado en caja de ese día
+      }
+      if (isSinCobro) return;
+
+      d.totalUSD += vTot;
 
       if (v.pagos && Array.isArray(v.pagos)) {
         v.pagos.forEach(p => {
@@ -4753,10 +4850,29 @@ function cambiarTab(tabName) {
             d.efectivoUSD += (p.montoUSD || p.monto || 0);
           } else if (met.includes('efectivo')) {
             d.efectivoBs += (p.montoBs || p.monto || 0);
-          } else {
+          } else if (met !== 'saldo_favor') {
             d.digitalUSD += (p.montoUSD || p.monto || 0);
           }
         });
+      }
+    });
+
+    abonos.forEach(a => {
+      if (!a.fecha) return;
+      const dia = a.fecha.substring(0, 10);
+      if (dia === hoyStr && !arqHoy) return;
+      if (!ventasPorDia[dia]) return;
+      const d = ventasPorDia[dia];
+      const mVal = parseFloat(a.monto) || 0;
+      if (mVal <= 0) return;
+      d.totalUSD += mVal;
+      const met = (a.metodo || '').toLowerCase();
+      if (met.includes('efectivo') && met.includes('usd')) {
+        d.efectivoUSD += mVal;
+      } else if (met.includes('efectivo')) {
+        d.efectivoBs += (a.montoBs || (mVal * (parseFloat(a.tasa) || 890)));
+      } else {
+        d.digitalUSD += mVal;
       }
     });
 
@@ -4812,7 +4928,7 @@ function cambiarTab(tabName) {
           <div class="historial-grid-3">
             <div>
               <div class="historial-col-val" style="color: var(--neu-text-main);">$ ${dataDia.totalUSD.toFixed(2)}</div>
-              <div class="historial-col-lbl">Facturado</div>
+              <div class="historial-col-lbl">Cobrado Caja</div>
             </div>
             <div>
               <div class="historial-col-val" style="color: #0284C7;">$ ${dataDia.efectivoUSD.toFixed(2)}</div>
@@ -4826,7 +4942,7 @@ function cambiarTab(tabName) {
 
           <div class="historial-cierre-foot">
             <span>💧 <strong>${dataDia.botellones}</strong> botellones recargados</span>
-            <span>🧾 <strong>${dataDia.ventasCount}</strong> ventas</span>
+            <span>🧾 <strong>${dataDia.ventasCount}</strong> ventas${dataDia.creditoUSD > 0 ? ` · <strong style="color:#F43F5E;">+$${dataDia.creditoUSD.toFixed(2)} créd.</strong>` : ''}</span>
           </div>
         </div>
       `;
