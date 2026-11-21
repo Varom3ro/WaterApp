@@ -193,7 +193,7 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
-          ${methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).map(m => {
+          ${methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key)).map(m => {
             const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
             const defaultValue = (!store.isOperario() && m.key === 'pago_movil' && cierreTurno?.bs && typeof cierreTurno.bs.pago_movil === 'number')
               ? Utils.formatNumber(cierreTurno.bs.pago_movil, true)
@@ -263,7 +263,7 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const declaracion = {};
-    methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).forEach(m => {
+    methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key)).forEach(m => {
       let rawVal = fd.get('arqueo_' + m.key) || '0';
       rawVal = rawVal.replace(/\./g, '').replace(',', '.');
       declaracion[m.key] = parseFloat(rawVal) || 0;
@@ -331,7 +331,7 @@ function renderFormularioArqueo(container, fecha, infoActivo, methods) {
             <div>📲 <strong>Pago Móvil:</strong> Bs ${Utils.formatNumber(declaracion.pago_movil || 0, true)}</div>
             <div>💳 <strong>Punto de Venta:</strong> Bs ${Utils.formatNumber(declaracion.punto || declaracion.punto_de_venta || 0, true)}</div>
             ${declaracion.transferencia ? `<div>🏦 <strong>Transferencia:</strong> Bs ${Utils.formatNumber(declaracion.transferencia || 0, true)}</div>` : ''}
-            ${methods.filter(m => !['efectivo_usd', 'efectivo_bs', 'pago_movil', 'punto', 'transferencia', 'credito', 'convenio', 'garantia', 'cortesia'].includes(m.key) && declaracion[m.key] > 0).map(m => `<div>${m.icon} <strong>${m.label}:</strong> ${m.moneda === 'USD' ? Utils.formatCurrency(declaracion[m.key]) : 'Bs ' + Utils.formatNumber(declaracion[m.key], true)}</div>`).join('')}
+            ${methods.filter(m => !['efectivo_usd', 'efectivo_bs', 'pago_movil', 'punto', 'transferencia', 'credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key) && declaracion[m.key] > 0).map(m => `<div>${m.icon} <strong>${m.label}:</strong> ${m.moneda === 'USD' ? Utils.formatCurrency(declaracion[m.key]) : 'Bs ' + Utils.formatNumber(declaracion[m.key], true)}</div>`).join('')}
           </div>
         </div>
       `,
@@ -350,7 +350,7 @@ function renderCuadreTurnoTable(turno, methods) {
   const cierreSistema = turno.sistema || store.getCierreCaja(turno.fecha, turno.inicio, turno.fin);
   const declaracion = turno.declaracion || {};
 
-  const filas = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).map(m => {
+  const filas = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key)).map(m => {
     const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
     const declarado = declaracion[m.key] || 0;
     const sistema = isUsd ? (cierreSistema[m.key] || 0) : (cierreSistema.bs ? (cierreSistema.bs[m.key] || 0) : 0);
@@ -410,6 +410,12 @@ function renderCuadreTurnoTable(turno, methods) {
           </tfoot>
         </table>
       </div>
+      ${(cierreSistema.saldo_favor || 0) > 0 ? `
+        <div style="margin-top: 10px; padding: 10px 14px; background: #ECFDF5; border: 1px solid #10B981; border-radius: 8px; font-size: 13px; color: #065F46; display: flex; justify-content: space-between; align-items: center;">
+          <span>💰 <strong>Saldo a Favor Utilizado en este Turno (Reconocido automáticamente por el sistema):</strong></span>
+          <strong style="font-size: 14px;">${Utils.formatCurrency(cierreSistema.saldo_favor)}</strong>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -520,7 +526,7 @@ function renderConsolidadoZ(turnos, fecha, methods) {
     let declUsd = 0;
     let declBs = 0;
     if (t.declaracion) {
-      methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).forEach(m => {
+      methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key)).forEach(m => {
         const val = t.declaracion[m.key] || 0;
         if (m.moneda === 'USD' || m.key === 'efectivo_usd') declUsd += val;
         else declBs += val;
@@ -549,7 +555,7 @@ function renderConsolidadoZ(turnos, fecha, methods) {
   let totalDiferenciaBs = 0;
   const declaracionConsolidada = arqueoConsolidado?.declaracion || {};
 
-  const filasMetodos = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).map(m => {
+  const filasMetodos = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key)).map(m => {
     const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
     const declarado = declaracionConsolidada[m.key] || 0;
     const sistema = isUsd ? (cierreGlobal[m.key] || 0) : (cierreGlobal.bs ? (cierreGlobal.bs[m.key] || 0) : 0);
@@ -663,6 +669,12 @@ function renderConsolidadoZ(turnos, fecha, methods) {
           </tfoot>
         </table>
       </div>
+      ${(cierreGlobal.saldo_favor || 0) > 0 ? `
+        <div style="margin-top: 10px; padding: 10px 14px; background: #ECFDF5; border: 1px solid #10B981; border-radius: 8px; font-size: 13px; color: #065F46; display: flex; justify-content: space-between; align-items: center;">
+          <span>💰 <strong>Saldo a Favor Utilizado Hoy (Reconocido automáticamente por el sistema):</strong></span>
+          <strong style="font-size: 14px;">${Utils.formatCurrency(cierreGlobal.saldo_favor)}</strong>
+        </div>
+      ` : ''}
     </div>
 
     <!-- Métricas Principales de Caja y Ventas (Solo Administrador) -->
@@ -950,7 +962,7 @@ function imprimirTicketTurno(turno) {
   let totalDiferenciaUsd = 0;
   let totalDiferenciaBs = 0;
 
-  const filas = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.key)).map(m => {
+  const filas = methods.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key)).map(m => {
     const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
     const declarado = declaracion[m.key] || 0;
     const sistema = isUsd ? (cierreSistema[m.key] || 0) : (cierreSistema.bs ? (cierreSistema.bs[m.key] || 0) : 0);
@@ -1444,12 +1456,15 @@ export function getReporteTxtString(fecha) {
   lines.push("2. RESUMEN DE FLUJO DE CAJA (DINERO REAL RECIBIDO)");
   lines.push(sepDouble);
   lines.push(`${padRight('INGRESO REAL EN CAJA (CONTADO + ABONOS):', 48)} ${padLeft('$ ' + (cierre.real_ingresado || 0).toFixed(2), 23)}`);
-  lines.push(`${padRight('  (+) Ventas Cobradas de Contado Hoy:', 48)} ${padLeft('$ ' + Math.max(0, (cierre.total || 0) - (cierre.credito || 0)).toFixed(2), 23)}`);
+  lines.push(`${padRight('  (+) Ventas Cobradas de Contado Hoy:', 48)} ${padLeft('$ ' + Math.max(0, (cierre.total || 0) - (cierre.credito || 0) - (cierre.saldo_favor || 0)).toFixed(2), 23)}`);
   lines.push(`${padRight('  (+) Abonos / Cobros de Deudas Recibidos Hoy:', 48)} ${padLeft('+ $ ' + (cierre.cobros_credito || 0).toFixed(2), 23)}`);
   if ((cierre.totalPropinasUSD || 0) > 0) {
     lines.push(`${padRight('  (+) Propinas por Punto/Banco Recibidas Hoy:', 48)} ${padLeft('+ $ ' + (cierre.totalPropinasUSD || 0).toFixed(2), 23)}`);
   }
   lines.push(sepSingle);
+  if ((cierre.saldo_favor || 0) > 0) {
+    lines.push(`${padRight('Saldo a Favor Usado Hoy (Abonos Previos):', 48)} ${padLeft('$ ' + (cierre.saldo_favor || 0).toFixed(2), 23)}`);
+  }
   lines.push(`${padRight('Crédito Otorgado Hoy (Por Cobrar / NO en Caja):', 48)} ${padLeft('$ ' + (cierre.credito || 0).toFixed(2), 23)}`);
   lines.push(`${padRight('Valor Total Despachado (Contado + Crédito):', 48)} ${padLeft('$ ' + (cierre.total || 0).toFixed(2), 23)}`);
   lines.push(sepSingle);
@@ -1461,7 +1476,7 @@ export function getReporteTxtString(fecha) {
   lines.push(`${padRight('MÉTODO', 32)} ${padLeft('MONTO ($)', 18)} ${padLeft('MONTO (Bs)', 20)}`);
   lines.push(sepSingle);
 
-  allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.id)).forEach(m => {
+  allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.id)).forEach(m => {
     const isUsd = m.moneda === 'USD' || m.id === 'efectivo_usd';
     const usd = cierre[m.id] || 0;
     const bs = cierre.bs ? (cierre.bs[m.id] || 0) : 0;
@@ -1488,7 +1503,7 @@ export function getReporteTxtString(fecha) {
       let usd = 0;
       let bs = 0;
       if (t.declaracion) {
-        allMetodos.forEach(m => {
+        allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.id)).forEach(m => {
           const val = t.declaracion[m.id] || 0;
           if (m.moneda === 'USD' || m.id === 'efectivo_usd') usd += val;
           else bs += val;
@@ -1510,7 +1525,7 @@ export function getReporteTxtString(fecha) {
 
     let totDifUsd = 0;
     let totDifBs = 0;
-    allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia'].includes(m.id)).forEach(m => {
+    allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.id)).forEach(m => {
       const isUsd = m.moneda === 'USD' || m.id === 'efectivo_usd';
       const decl = arqueo.declaracion[m.id] || 0;
       const sist = isUsd ? (cierre[m.id] || 0) : (cierre.bs ? (cierre.bs[m.id] || 0) : 0);
@@ -1640,7 +1655,7 @@ export function getMatricialReportHTML(fecha) {
   const turnos = store.getTurnos(fecha);
   const allMetodos = store.getMetodosPago(false);
 
-  const methodsArqueo = allMetodos.map(m => ({
+  const methodsArqueo = allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.id)).map(m => ({
     key: m.id,
     label: m.label,
     icon: m.icon || '💳',
@@ -1782,12 +1797,18 @@ export function getMatricialReportHTML(fecha) {
           </tr>
           <tr>
             <td style="padding: 4px 0; color: #333;">(+) VENTAS COBRADAS DE CONTADO HOY:</td>
-            <td style="text-align: right; padding: 4px 0; color: #333;">${Utils.formatCurrency(Math.max(0, (cierre.total || 0) - (cierre.credito || 0)))}</td>
+            <td style="text-align: right; padding: 4px 0; color: #333;">${Utils.formatCurrency(Math.max(0, (cierre.total || 0) - (cierre.credito || 0) - (cierre.saldo_favor || 0)))}</td>
           </tr>
           <tr>
             <td style="padding: 4px 0; color: #333;">(+) CRÉDITO COBRADO HOY (ABONOS RECIBIDOS):</td>
             <td style="text-align: right; padding: 4px 0; color: #333;">+ ${Utils.formatCurrency(cierre.cobros_credito)}</td>
           </tr>
+          ${(cierre.saldo_favor || 0) > 0 ? `
+          <tr style="border-top: 1px dotted #999;">
+            <td style="padding: 4px 0; color: #666;">(*) SALDO A FAVOR USADO HOY (ABONOS PREVIOS):</td>
+            <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.saldo_favor)}</td>
+          </tr>
+          ` : ''}
           <tr style="border-top: 1px dotted #999;">
             <td style="padding: 4px 0; color: #666;">(*) CRÉDITO OTORGADO HOY (POR COBRAR / NO EN CAJA):</td>
             <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.credito)}</td>
