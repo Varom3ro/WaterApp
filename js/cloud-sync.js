@@ -69,7 +69,7 @@ export async function syncToCloud(isManual = false) {
 
     // Mapa dinámico de métodos de pago (estándar y personalizados)
     const allMetodosConfig = (typeof store.getMetodosPago === 'function')
-      ? store.getMetodosPago(false)
+      ? store.getMetodosPago(false).filter(m => m.id !== 'saldo_favor')
       : [
           { id: 'efectivo_usd', label: 'Efectivo USD', icon: '💵', moneda: 'USD', color: 'var(--primary)' },
           { id: 'efectivo_bs', label: 'Efectivo Bs', icon: '💴', moneda: 'Bs', color: '#10B981' },
@@ -102,13 +102,14 @@ export async function syncToCloud(isManual = false) {
       if (v.tipo === 'credito') {
         credito += vTotal;
       } else if (!isSinCobro) {
-        totalUSD += vTotal;
         if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
           v.pagos.forEach(p => {
             const m = parseFloat(p.monto) || 0;
             const currentTasa = parseFloat(p.tasa) || tasa;
             let metId = p.metodo || 'efectivo_usd';
             if (metId === 'punto_venta') metId = 'punto';
+            if (metId === 'saldo_favor') return; // Consumo de abono previo: no es dinero ingresado hoy
+            totalUSD += m;
             const montoBs = p.montoBs ? parseFloat(p.montoBs) : (m * currentTasa);
 
             if (!metodosMap[metId]) {
@@ -137,6 +138,8 @@ export async function syncToCloud(isManual = false) {
         } else {
           let metId = v.metodoPago || 'efectivo_usd';
           if (metId === 'punto_venta') metId = 'punto';
+          if (metId === 'saldo_favor') return;
+          totalUSD += vTotal;
           const montoBs = vTotal * tasa;
 
           if (!metodosMap[metId]) {
@@ -401,6 +404,11 @@ export async function syncToCloud(isManual = false) {
     });
     const totalMesUSD = ventasMes.reduce((s, v) => {
       if (['credito', 'convenio', 'garantia', 'cortesia'].includes(v.tipo)) return s;
+      if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
+        const pagadoReal = v.pagos.reduce((acc, p) => p.metodo === 'saldo_favor' ? acc : acc + (parseFloat(p.monto) || 0), 0);
+        return s + pagadoReal;
+      }
+      if (v.metodoPago === 'saldo_favor') return s;
       return s + (parseFloat(v.total) || 0);
     }, 0) + abonosMes.reduce((s, a) => s + (parseFloat(a.monto) || 0), 0);
     const totalMesBs = totalMesUSD * tasa;

@@ -3239,19 +3239,22 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
         }
         if (isSinCobro) return;
 
-        tUSD += tot;
         if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
           v.pagos.forEach(p => {
             const m = (p.metodo || '').toLowerCase();
+            const pMonto = (p.montoUSD || p.monto || 0);
+            if (m === 'saldo_favor') return;
+            tUSD += pMonto;
             if (m.includes('efectivo') && m.includes('usd')) {
-              efUSD += (p.montoUSD || p.monto || 0);
+              efUSD += pMonto;
             } else if (m.includes('efectivo')) {
               efBs += (p.montoBs || p.monto || 0);
-            } else if (m !== 'saldo_favor') {
-              digUSD += (p.montoUSD || p.monto || 0);
+            } else {
+              digUSD += pMonto;
             }
           });
-        } else {
+        } else if (v.metodoPago !== 'saldo_favor') {
+          tUSD += tot;
           digUSD += tot;
         }
       });
@@ -3316,19 +3319,22 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
         }
         if (isSinCobro) return;
 
-        tUSD += tot;
         if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
           v.pagos.forEach(p => {
             const m = (p.metodo || '').toLowerCase();
+            const pMonto = (p.montoUSD || p.monto || 0);
+            if (m === 'saldo_favor') return;
+            tUSD += pMonto;
             if (m.includes('efectivo') && m.includes('usd')) {
-              efUSD += (p.montoUSD || p.monto || 0);
+              efUSD += pMonto;
             } else if (m.includes('efectivo')) {
               efBs += (p.montoBs || p.monto || 0);
-            } else if (m !== 'saldo_favor') {
-              digUSD += (p.montoUSD || p.monto || 0);
+            } else {
+              digUSD += pMonto;
             }
           });
-        } else {
+        } else if (v.metodoPago !== 'saldo_favor') {
+          tUSD += tot;
           digUSD += tot;
         }
       });
@@ -4019,6 +4025,7 @@ function cambiarTab(tabName) {
     if (r.desglose_metodos && Array.isArray(r.desglose_metodos)) {
       r.desglose_metodos.forEach(m => {
         let mId = m.id;
+        if (mId === 'saldo_favor') return;
         if (mId === 'punto_venta') mId = 'punto';
         if (!metodosMap[mId]) {
           metodosMap[mId] = { ...m };
@@ -4067,6 +4074,7 @@ function cambiarTab(tabName) {
               v.pagos.forEach(p => {
                 const m = parseFloat(p.monto) || 0;
                 let mId = p.metodo || 'efectivo_usd';
+                if (mId === 'saldo_favor') return;
                 if (mId === 'punto_venta') mId = 'punto';
                 const mBs = p.montoBs ? parseFloat(p.montoBs) : (m * (parseFloat(p.tasa) || tasa));
 
@@ -4841,19 +4849,22 @@ function cambiarTab(tabName) {
       }
       if (isSinCobro) return;
 
-      d.totalUSD += vTot;
-
       if (v.pagos && Array.isArray(v.pagos)) {
         v.pagos.forEach(p => {
           const met = (p.metodo || '').toLowerCase();
+          const pMonto = (p.montoUSD || p.monto || 0);
+          if (met === 'saldo_favor') return;
+          d.totalUSD += pMonto;
           if (met.includes('efectivo') && met.includes('usd')) {
-            d.efectivoUSD += (p.montoUSD || p.monto || 0);
+            d.efectivoUSD += pMonto;
           } else if (met.includes('efectivo')) {
             d.efectivoBs += (p.montoBs || p.monto || 0);
-          } else if (met !== 'saldo_favor') {
-            d.digitalUSD += (p.montoUSD || p.monto || 0);
+          } else {
+            d.digitalUSD += pMonto;
           }
         });
+      } else if (v.metodoPago !== 'saldo_favor') {
+        d.totalUSD += vTot;
       }
     });
 
