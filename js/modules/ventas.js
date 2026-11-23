@@ -1404,6 +1404,12 @@ export function renderNuevaVentaForm(container) {
   const todayStr = Utils.todayISO();
   const lecturaHoy = store.getLecturaCaudalimetro(todayStr);
   const pendientesGlobales = (store.getAll('ventas') || []).filter(v => v.estadoEntrega === 'pendiente');
+  const capacidadTanque = parseFloat(inventario.capacidadTanque) || 30000;
+  const litrosTanque = parseFloat(inventario.litros) || 0;
+  const pctTanque = capacidadTanque > 0 ? Math.round((litrosTanque / capacidadTanque) * 100) : 0;
+  const tanqueVacio = litrosTanque <= 0;
+  const tanqueBajo = !tanqueVacio && pctTanque < 15;
+  const bloquearSinAguaCfg = store.getConfig('bloquearVentaSinAgua') === true;
 
   const formHtml = `
     <div style="padding: 0 0 8px 0;">
@@ -1425,9 +1431,9 @@ export function renderNuevaVentaForm(container) {
             </div>
 
             <!-- Disponibilidad del Agua -->
-            <div class="alert-panel info" style="margin: 0; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px; height: 42px;" title="Litros de agua disponibles en tanque">
-              <span style="font-size: 14px;">💧 Disp:</span>
-              <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(inventario.litros)} L</strong>
+            <div id="badge-disp-tanque-pv" class="${tanqueVacio || tanqueBajo ? 'alert-panel' : 'alert-panel info'}" style="margin: 0; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px; height: 42px; ${tanqueVacio ? 'background: #FEF2F2; border: 1.5px solid #EF4444; color: #B91C1C; cursor: pointer;' : (tanqueBajo ? 'background: #FFFBEB; border: 1.5px solid #F59E0B; color: #92400E; cursor: pointer;' : '')}" title="${tanqueVacio ? 'Tanque vacío (0 L) - Clic para registrar cisterna' : (tanqueBajo ? `Nivel bajo (${pctTanque}%) - Clic para registrar cisterna` : 'Litros de agua disponibles en tanque')}">
+              <span style="font-size: 14px;">${tanqueVacio ? '⚠️ Tanque:' : (tanqueBajo ? '⚠️ Disp:' : '💧 Disp:')}</span>
+              <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(litrosTanque)} L${tanqueBajo ? ` (${pctTanque}%)` : ''}</strong>
             </div>
 
             <!-- Botón Caja Chica (Inicio, Retiros y Cierre) -->
@@ -1468,6 +1474,21 @@ export function renderNuevaVentaForm(container) {
             </button>
           </div>
         </div>
+        ${tanqueVacio || tanqueBajo ? `
+          <div id="banner-tanque-bajo-pv" style="margin-bottom: 8px; padding: 8px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: ${tanqueVacio ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${tanqueVacio ? '#EF4444' : '#F59E0B'}; color: ${tanqueVacio ? '#991B1B' : '#92400E'}; font-size: 12.5px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
+              <span style="font-size: 16px;">${tanqueVacio ? '🚨' : '⚠️'}</span>
+              <span>
+                ${tanqueVacio
+                  ? `<strong>Tanque en 0 L:</strong> ${bloquearSinAguaCfg ? 'Las recargas de agua están bloqueadas hasta cargar una cisterna o calibrar el tanque.' : 'Registra la cisterna o calibra el tanque (se pedirá confirmación al facturar recargas).'}`
+                  : `<strong>Nivel de agua bajo (${Utils.formatNumber(litrosTanque)} L · ${pctTanque}%):</strong> Recuerda registrar la próxima cisterna o calibrar el tanque.`}
+              </span>
+            </div>
+            <button type="button" id="btn-cisterna-rapida-pv" class="btn btn-sm" style="background: ${tanqueVacio ? '#DC2626' : '#D97706'}; color: #fff; border: none; font-weight: 700; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+              🚛 Registrar Cisterna
+            </button>
+          </div>
+        ` : ''}
         ${content}
       </form>
     </div>
@@ -1552,6 +1573,22 @@ export function renderNuevaVentaForm(container) {
         renderNuevaVentaForm(container);
       });
     });
+  }
+
+  const abrirCisternaDesdePV = () => {
+    openCisternaModal(null, () => {
+      renderNuevaVentaForm(container);
+    });
+  };
+
+  const btnCisternaRapidaPV = modal.querySelector('#btn-cisterna-rapida-pv');
+  if (btnCisternaRapidaPV) {
+    btnCisternaRapidaPV.addEventListener('click', abrirCisternaDesdePV);
+  }
+
+  const badgeDispTanquePV = modal.querySelector('#badge-disp-tanque-pv');
+  if (badgeDispTanquePV && (tanqueVacio || tanqueBajo)) {
+    badgeDispTanquePV.addEventListener('click', abrirCisternaDesdePV);
   }
   
   function parseTasaValue(valStr) {
@@ -1924,6 +1961,22 @@ export function renderNuevaVentaForm(container) {
       const litrosMermaLavado = store.calcularMermaLavado ? store.calcularMermaLavado(totalLitros) : Utils.calcularMermaLavado(totalLitros);
       const totalSalidaAgua = Math.round((totalLitros + litrosMermaLavado) * 1000) / 1000;
 
+      const verificarBloqueoEstrictoAgua = () => {
+        if (totalSalidaAgua <= 0 || store.getConfig('bloquearVentaSinAgua') !== true) return false;
+        const litrosDisp = parseFloat(store.getInventarioActual().litros) || 0;
+        if (litrosDisp >= totalSalidaAgua) return false;
+        showToast(
+          litrosDisp <= 0
+            ? `🔒 Tanque vacío (0 L). Registra una cisterna o calibra el tanque para despachar ${Utils.formatNumber(totalSalidaAgua)} L.`
+            : `🔒 Agua insuficiente en tanque (${Utils.formatNumber(litrosDisp)} L disponibles vs ${Utils.formatNumber(totalSalidaAgua)} L requeridos).`,
+          'error'
+        );
+        return true;
+      };
+
+      // 🔒 Bloqueo estricto temprano si está activado y el tanque no tiene litros suficientes
+      if (verificarBloqueoEstrictoAgua()) return;
+
       const pagos = [];
       let totalPagadoUSD = 0;
       let totalPagadoBs = 0;
@@ -1994,7 +2047,7 @@ export function renderNuevaVentaForm(container) {
                 if (hInp) hInp.value = cliObj.id;
                 actualizarBalanceBadge();
               }
-              ejecutarRegistroVenta({
+              validarAguaYEjecutarVenta({
                 tipoFinal: 'credito',
                 clienteIdFinal: cidConfirmado,
                 pagosFinales: pagos,
@@ -2007,13 +2060,46 @@ export function renderNuevaVentaForm(container) {
         }
       }
 
-      ejecutarRegistroVenta({
+      validarAguaYEjecutarVenta({
         tipoFinal: tipo,
         clienteIdFinal: clienteId,
         pagosFinales: pagos,
         totalPagadoUSDFinal: totalPagadoUSD,
         faltaUSDFinal: 0
       });
+
+      function validarAguaYEjecutarVenta(params) {
+        if (verificarBloqueoEstrictoAgua()) return;
+        if (totalSalidaAgua > 0) {
+          const litrosDisp = parseFloat(store.getInventarioActual().litros) || 0;
+          if (litrosDisp < totalSalidaAgua) {
+            const sinAgua = litrosDisp <= 0;
+            openModal({
+              title: sinAgua ? '⚠️ Tanque Vacío (0 L)' : '⚠️ Agua Insuficiente en Tanque',
+              content: `
+                <div style="padding: 8px 0; font-size: 13.5px; line-height: 1.5;">
+                  <div style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 12px; margin-bottom: 12px; color: #991B1B;">
+                    El sistema indica <strong>${Utils.formatNumber(litrosDisp)} L</strong> disponibles en tanque, pero este pedido requiere <strong>${Utils.formatNumber(totalSalidaAgua)} L</strong> (incluyendo merma de lavado).
+                  </div>
+                  <p style="margin-bottom: 8px; color: var(--color-text-secondary);">
+                    ¿Deseas facturar esta operación de todas formas? Recuerda <strong>registrar la cisterna o avisar al supervisor</strong> para calibrar el tanque.
+                  </p>
+                  <p style="margin: 0; font-size: 12px; color: #64748B;">
+                    ℹ️ <em>Los productos físicos que no incluyen agua (forros, tapas, dispensadores, etc.) no se ven afectados por esta alerta.</em>
+                  </p>
+                </div>
+              `,
+              saveLabel: 'Sí, Facturar de Todas Formas',
+              onSave: () => {
+                closeModal();
+                ejecutarRegistroVenta(params);
+              }
+            });
+            return;
+          }
+        }
+        ejecutarRegistroVenta(params);
+      }
 
       function ejecutarRegistroVenta({
         tipoFinal,

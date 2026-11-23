@@ -18,6 +18,7 @@ export function renderConfiguracion(container) {
   const cortesiaBotellonNuevo = store.getConfig('cortesiaBotellonNuevo') === true;
   const moduloMermaLavado = store.getConfig('moduloMermaLavado') !== false;
   const mermaLavadoBase20L = parseFloat(store.getConfig('mermaLavadoBase20L')) || 1.0;
+  const bloquearVentaSinAgua = store.getConfig('bloquearVentaSinAgua') === true;
   const metodosPago = store.getMetodosPago(false);
 
   let usuarioEmail = 'Licencia Local';
@@ -521,6 +522,36 @@ export function renderConfiguracion(container) {
         </div>
       </div>
 
+      <!-- Control de Ventas con Tanque Vacío -->
+      <div class="card full-width" style="border-left: 4px solid #EF4444;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+              <span>🚰</span> Control de Ventas con Tanque Vacío (0 L)
+            </h3>
+            <p class="text-muted" style="font-size: var(--font-size-sm); margin-top: 4px;">
+              Define si el Punto de Venta muestra una alerta de confirmación o bloquea estrictamente la venta de recargas cuando el tanque no tiene agua suficiente.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="label-status-bloquear-sin-agua" style="font-size: 13px; font-weight: 700; color: ${bloquearVentaSinAgua ? '#DC2626' : '#D97706'};">
+              ${bloquearVentaSinAgua ? '🔴 Bloqueo Estricto' : '🟡 Alerta y Confirmación'}
+            </span>
+            <label style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0; cursor: pointer;">
+              <input type="checkbox" id="toggle-bloquear-sin-agua" ${bloquearVentaSinAgua ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+              <span id="slider-bloquear-sin-agua" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${bloquearVentaSinAgua ? '#DC2626' : '#CBD5E1'}; transition: .3s; border-radius: 26px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+                <span id="slider-knob-bloquear-sin-agua" style="position: absolute; content: ''; height: 20px; width: 20px; left: ${bloquearVentaSinAgua ? '27px' : '3px'}; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text-secondary); line-height: 1.5;">
+          <div>🟡 <strong>Modo Alerta y Confirmación (Recomendado):</strong> Muestra aviso visible cuando el tanque baja del 15% o llega a <code>0 L</code> (con acceso rápido a cisterna) y solicita confirmación antes de facturar recargas sin agua.</div>
+          <div style="margin-top: 4px;">🔴 <strong>Bloqueo Estricto (Activado):</strong> Impide facturar recargas o botellones con agua gratis si el tanque no tiene litros suficientes hasta cargar cisterna o calibrar el tanque. Los productos físicos sin agua (forros, tapas, dispensadores, etc.) siempre se pueden vender normalmente.</div>
+        </div>
+      </div>
+
       <!-- Seguridad y Roles de Acceso -->
       <div class="card">
         <div class="card-header">
@@ -763,6 +794,31 @@ export function renderConfiguracion(container) {
         showToast(`Merma base actualizada a ${val} L por cada 20 L (${((val / 20) * 100).toFixed(1)}%)`, 'success');
         if (typeof syncToCloud === 'function') syncToCloud();
       }
+    });
+  }
+
+  // Control de Ventas con Tanque Vacío Toggle
+  const toggleBloquearSinAgua = container.querySelector('#toggle-bloquear-sin-agua');
+  const labelStatusBloquearSinAgua = container.querySelector('#label-status-bloquear-sin-agua');
+  const sliderBloquearSinAgua = container.querySelector('#slider-bloquear-sin-agua');
+  const sliderKnobBloquearSinAgua = container.querySelector('#slider-knob-bloquear-sin-agua');
+
+  if (toggleBloquearSinAgua) {
+    toggleBloquearSinAgua.addEventListener('change', (e) => {
+      const activo = e.target.checked;
+      store.setConfig('bloquearVentaSinAgua', activo);
+      if (labelStatusBloquearSinAgua) {
+        labelStatusBloquearSinAgua.textContent = activo ? '🔴 Bloqueo Estricto' : '🟡 Alerta y Confirmación';
+        labelStatusBloquearSinAgua.style.color = activo ? '#DC2626' : '#D97706';
+      }
+      if (sliderBloquearSinAgua) {
+        sliderBloquearSinAgua.style.backgroundColor = activo ? '#DC2626' : '#CBD5E1';
+      }
+      if (sliderKnobBloquearSinAgua) {
+        sliderKnobBloquearSinAgua.style.left = activo ? '27px' : '3px';
+      }
+      showToast(activo ? '🔒 Bloqueo estricto sin agua activado' : '⚠️ Modo Alerta y Confirmación sin agua activado', activo ? 'warning' : 'info');
+      if (typeof syncToCloud === 'function') syncToCloud();
     });
   }
 
