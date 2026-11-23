@@ -4526,11 +4526,14 @@ function cambiarTab(tabName) {
       }
     }
 
-    // Productos en Inventario
+    // Productos en Inventario (Ordenados alfabéticamente A-Z)
     const invProdsCont = document.getElementById('inv-products-container');
     if (invProdsCont) {
       if (prods.length > 0) {
-        invProdsCont.innerHTML = prods.map(p => `
+        const prodsOrdenados = [...prods].sort((a, b) =>
+          String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es', { sensitivity: 'base' })
+        );
+        invProdsCont.innerHTML = prodsOrdenados.map(p => `
           <div class="stock-row">
             <div>
               <div style="font-weight: 700; color: #fff;">📦 ${escapeHtml(p.nombre)}</div>

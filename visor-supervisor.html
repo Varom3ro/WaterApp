@@ -1668,11 +1668,26 @@
   // =========================================================================
   // RENDERIZADO DE STOCK FÍSICO
   // =========================================================================
+  function compararNombreEs(a, b) {
+    return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es', { sensitivity: 'base' });
+  }
+
+  function ordenarCatalogo(catalogo) {
+    return [...(catalogo || [])].sort((a, b) => {
+      if (a.categoria !== b.categoria) {
+        return a.categoria === 'relleno' ? -1 : 1;
+      }
+      return compararNombreEs(a, b);
+    });
+  }
+
   function renderizarStockFisico(catalogo) {
     const cont = document.getElementById('container-productos-stock');
     if (!cont) return;
 
-    const fisicos = catalogo.filter(item => item.categoria === 'producto');
+    const fisicos = catalogo
+      .filter(item => item.categoria === 'producto')
+      .sort(compararNombreEs);
 
     if (fisicos.length === 0) {
       cont.innerHTML = `
@@ -1758,6 +1773,7 @@
     if (filtroCatalogoActual !== 'todos') {
       items = catalogo.filter(x => x.categoria === filtroCatalogoActual);
     }
+    items = ordenarCatalogo(items);
 
     if (items.length === 0) {
       cont.innerHTML = `
@@ -2192,6 +2208,7 @@
     } else {
       currentCatalogo.push(itemModificado);
     }
+    currentCatalogo = ordenarCatalogo(currentCatalogo);
 
     // Determinar sedes de destino
     const radioAmbito = document.querySelector('input[name="radio-ambito"]:checked');
@@ -2292,6 +2309,10 @@
             continue;
           }
         }
+
+        // Mantener el catálogo y el stock físico ordenados alfabéticamente antes de guardar en la nube
+        catalogoParaSede = ordenarCatalogo(catalogoParaSede);
+        prodsFisicosParaSede = [...prodsFisicosParaSede].sort(compararNombreEs);
 
         // 1. Guardar en licencia_agua_clientes (para inyección al POS de planta)
         await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}`, {
