@@ -223,5 +223,34 @@ export const Utils = {
     if (l <= 0) return 0;
     const factor = (parseFloat(mermaPor20L) || 1.0) / 20;
     return Math.round(l * factor * 1000) / 1000;
+  },
+
+  // Determinar si un producto físico califica como envase/botellón con agua de cortesía
+  // 1) Si el producto tiene la bandera explícita `incluyeAguaCortesia` (boolean), se obedece estrictamente.
+  // 2) Si no la tiene aún (legado), exige palabra clave de envase + litraje explícito y excluye accesorios.
+  esProductoConAguaCortesia(item) {
+    if (!item || item.categoria !== 'producto') return false;
+    if (typeof item.incluyeAguaCortesia === 'boolean') {
+      return item.incluyeAguaCortesia;
+    }
+    const nombre = (item.nombre || '').trim();
+    if (!nombre) return false;
+    const esAccesorio = /\b(?:forro|porta|tapa|tapas|base|soporte|dispensador|bomba|llave|grifo|cepillo|funda|estante|rack|balanc[ií]n|casillero|rejilla|regilla|filtro|humificador|silic[oó]n|tobito|hielo|aquatabs)\b/i.test(nombre);
+    if (esAccesorio) return false;
+    const esEnvase = /\b(?:botell[oó]n|botellones|botella|botellas|garraf[oó]n|garrafones|envase|envases)\b/i.test(nombre);
+    const tieneLitraje = /\b\d+(?:[.,]\d+)?\s*(?:l|lt|lts|litro|litros)\b/i.test(nombre);
+    return esEnvase && tieneLitraje;
+  },
+
+  // Obtener litros de agua de cortesía de un producto físico (o capacidad por defecto)
+  obtenerLitrosAguaProducto(item) {
+    if (!item) return 20;
+    const litrosExplicitos = parseFloat(item.litros);
+    if (item.categoria === 'producto' && !isNaN(litrosExplicitos) && litrosExplicitos > 0) {
+      return litrosExplicitos;
+    }
+    const match = (item.nombre || '').match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|lts|litro|litros)\b/i)
+      || (item.nombre || '').match(/(\d+)\s*(?:l|lt|lts|litro|litros)?/i);
+    return match ? parseFloat(String(match[1]).replace(',', '.')) : 20;
   }
 };

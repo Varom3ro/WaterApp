@@ -2812,10 +2812,10 @@ export function renderNuevaVentaForm(container) {
         return;
       }
     }
-    const esBotellonFisico = (categoria === 'producto') && /(?:botell[oó]n|botellones)/i.test(rawNombre);
+    const esBotellonFisico = (categoria === 'producto') && Utils.esProductoConAguaCortesia(t);
     const tieneCortesia = cortesiaActiva && esBotellonFisico;
     const litrosCapacidad = esBotellonFisico 
-      ? extraerLitrosDeNombre(rawNombre) 
+      ? Utils.obtenerLitrosAguaProducto(t) 
       : (parseFloat(t.litros) || 20);
 
     const isBsProducto = (t.moneda === 'VES' || t.moneda === 'Bs');
@@ -2909,9 +2909,9 @@ export function renderNuevaVentaForm(container) {
       const isBs = t.moneda === 'VES' || t.moneda === 'Bs';
       const precioBase = parseFloat(t.precio) || 0;
       const rawNombre = t.nombre || '';
-      const esBotellonFisico = isProducto && /(?:botell[oó]n|botellones)/i.test(rawNombre);
+      const esBotellonFisico = isProducto && Utils.esProductoConAguaCortesia(t);
       const tieneCortesia = cortesiaActiva && esBotellonFisico;
-      const litros = esBotellonFisico ? extraerLitrosDeNombre(rawNombre) : (parseFloat(t.litros) || 20);
+      const litros = esBotellonFisico ? Utils.obtenerLitrosAguaProducto(t) : (parseFloat(t.litros) || 20);
       const qtyInCart = qtyMap[t.id] || 0;
       const stock = isProducto && t.stock !== undefined && t.stock !== null ? parseInt(t.stock) : null;
       const isAgotado = isProducto && stock !== null && stock <= 0;

@@ -133,9 +133,16 @@ export function renderConfiguracion(container) {
                   </td>
                   <td>
                     ${t.categoria === 'producto' ? `
-                      <span class="badge ${ (t.stock || 0) > 0 ? 'badge-info' : 'badge-warning'}" style="font-size: 11px; padding: 3px 8px;">
-                        📦 Stock: <b>${t.stock !== undefined ? t.stock : 0}</b> un.
-                      </span>
+                      <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+                        <span class="badge ${ (t.stock || 0) > 0 ? 'badge-info' : 'badge-warning'}" style="font-size: 11px; padding: 3px 8px;">
+                          📦 Stock: <b>${t.stock !== undefined ? t.stock : 0}</b> un.
+                        </span>
+                        ${Utils.esProductoConAguaCortesia(t) ? `
+                          <span class="badge" style="font-size: 10.5px; padding: 3px 7px; background: #EDE9FE; color: #6D28D9; border: 1px solid #DDD6FE;">
+                            🎁 +Agua ${Utils.obtenerLitrosAguaProducto(t)}L
+                          </span>
+                        ` : ''}
+                      </div>
                     ` : `
                       <span style="font-weight: 500;">💧 ${t.litros + 'L'}</span>
                     `}
@@ -1378,6 +1385,8 @@ function openTipoModal(id = null) {
   const tipo = isEdit ? tipos.find(t => t.id === id) : {};
   const currentMoneda = tipo.moneda || 'USD';
   const isProd = tipo.categoria === 'producto';
+  const tieneAguaCortesia = isProd ? Utils.esProductoConAguaCortesia(tipo) : false;
+  const litrosCortesia = isProd ? Utils.obtenerLitrosAguaProducto(tipo) : 20;
 
   const content = `
     <form id="form-tipo">
@@ -1391,13 +1400,13 @@ function openTipoModal(id = null) {
         </div>
         <div class="form-group" style="flex: 1.5;">
           <label class="form-label">Nombre del Ítem</label>
-          <input type="text" class="form-control" name="nombre" value="${tipo.nombre || ''}" placeholder="Ej: Botellón 20L / Agarradera" required/>
+          <input type="text" class="form-control" name="nombre" id="tipo-nombre-input" value="${Utils.escapeHtml(tipo.nombre || '')}" placeholder="Ej: Botellón 20L / Forro Botellón" required/>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group" id="grupo-litros" style="${isProd ? 'display:none;' : ''}; flex: 1;">
           <label class="form-label">Capacidad (Litros)</label>
-          <input type="number" class="form-control" name="litros" value="${tipo.litros !== undefined ? tipo.litros : 20}" min="1"/>
+          <input type="number" class="form-control" name="litros" value="${tipo.litros !== undefined ? tipo.litros : 20}" min="1" step="0.5"/>
         </div>
         <div class="form-group" id="grupo-stock" style="${!isProd ? 'display:none;' : ''}; flex: 1;">
           <label class="form-label">Stock / Cantidad Disponible</label>
@@ -1415,6 +1424,16 @@ function openTipoModal(id = null) {
           <input type="text" inputmode="decimal" class="form-control" name="precio" id="input-precio-venta" value="${tipo.precio !== undefined ? tipo.precio : '1.50'}" placeholder="0.00" required/>
         </div>
       </div>
+      <div id="grupo-agua-cortesia" style="${!isProd ? 'display:none;' : ''}; margin-top: 8px; padding: 12px; border-radius: 8px; background: #F5F3FF; border: 1px solid #DDD6FE;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; color: #5B21B6; font-size: 13.5px; margin: 0;">
+          <input type="checkbox" id="tipo-incluye-agua-cortesia" name="incluyeAguaCortesia" ${tieneAguaCortesia ? 'checked' : ''} style="width: 17px; height: 17px; accent-color: #7C3AED; cursor: pointer;" />
+          <span>🎁 Incluye primera recarga de agua gratis (descuenta del tanque)</span>
+        </label>
+        <div id="grupo-litros-cortesia" style="${tieneAguaCortesia ? 'display:flex;' : 'display:none;'} align-items: center; gap: 10px; margin-top: 10px; padding-left: 25px;">
+          <label class="form-label" style="margin: 0; font-size: 12.5px; color: #5B21B6; white-space: nowrap;">Litros de agua de cortesía (L):</label>
+          <input type="number" class="form-control" name="litrosCortesia" id="tipo-litros-cortesia" value="${litrosCortesia}" min="1" step="0.5" style="max-width: 110px; height: 34px; font-weight: 700;" />
+        </div>
+      </div>
     </form>
   `;
 
@@ -1425,18 +1444,52 @@ function openTipoModal(id = null) {
       const catSelect = overlay.querySelector('#tipo-categoria-select');
       const grupoLitros = overlay.querySelector('#grupo-litros');
       const grupoStock = overlay.querySelector('#grupo-stock');
+      const grupoCortesia = overlay.querySelector('#grupo-agua-cortesia');
+      const chkCortesia = overlay.querySelector('#tipo-incluye-agua-cortesia');
+      const grupoLitrosCortesia = overlay.querySelector('#grupo-litros-cortesia');
+      const inputLitrosCortesia = overlay.querySelector('#tipo-litros-cortesia');
+      const inputNombre = overlay.querySelector('#tipo-nombre-input');
       const monSelect = overlay.querySelector('#tipo-moneda-select');
       const labelPrecio = overlay.querySelector('#label-precio-venta');
+      let cortesiaTouched = isEdit;
+
+      const toggleLitrosCortesia = () => {
+        if (grupoLitrosCortesia && chkCortesia) {
+          grupoLitrosCortesia.style.display = chkCortesia.checked ? 'flex' : 'none';
+        }
+      };
 
       const toggleFields = () => {
         const isProducto = catSelect.value === 'producto';
         if (grupoLitros) grupoLitros.style.display = isProducto ? 'none' : 'block';
         if (grupoStock) grupoStock.style.display = isProducto ? 'block' : 'none';
+        if (grupoCortesia) grupoCortesia.style.display = isProducto ? 'block' : 'none';
+        toggleLitrosCortesia();
       };
 
       if (catSelect) {
         catSelect.addEventListener('change', toggleFields);
         toggleFields(); // sincronizar al abrir
+      }
+
+      if (chkCortesia) {
+        chkCortesia.addEventListener('change', () => {
+          cortesiaTouched = true;
+          toggleLitrosCortesia();
+        });
+      }
+
+      if (inputNombre && !isEdit) {
+        inputNombre.addEventListener('input', () => {
+          if (cortesiaTouched || !catSelect || catSelect.value !== 'producto') return;
+          const mockItem = { categoria: 'producto', nombre: inputNombre.value };
+          const sug = Utils.esProductoConAguaCortesia(mockItem);
+          if (chkCortesia) chkCortesia.checked = sug;
+          if (inputLitrosCortesia && sug) {
+            inputLitrosCortesia.value = Utils.obtenerLitrosAguaProducto(mockItem);
+          }
+          toggleLitrosCortesia();
+        });
       }
 
       if (monSelect && labelPrecio) {
@@ -1450,7 +1503,12 @@ function openTipoModal(id = null) {
       const fd = new FormData(form);
       const categoria = fd.get('categoria');
       const nombre = (fd.get('nombre') || '').trim();
-      const litros = categoria === 'producto' ? 0 : (parseInt(fd.get('litros')) || 20);
+      const incluyeAguaCortesia = categoria === 'producto'
+        ? !!overlay.querySelector('#tipo-incluye-agua-cortesia')?.checked
+        : false;
+      const litros = categoria === 'producto'
+        ? (incluyeAguaCortesia ? (parseFloat(fd.get('litrosCortesia')) || Utils.obtenerLitrosAguaProducto({ categoria: 'producto', nombre })) : 0)
+        : (parseFloat(fd.get('litros')) || 20);
       const stock = categoria === 'producto' ? (parseInt(fd.get('stock')) || 0) : 0;
       const moneda = fd.get('moneda') || 'USD';
       
@@ -1466,12 +1524,12 @@ function openTipoModal(id = null) {
       if (isEdit) {
         const idx = tipos.findIndex(t => String(t.id) === String(id));
         if (idx !== -1) {
-          tipos[idx] = { ...tipos[idx], categoria, nombre, litros, stock, moneda, precio };
+          tipos[idx] = { ...tipos[idx], categoria, nombre, litros, stock, moneda, precio, incluyeAguaCortesia };
         } else {
-          tipos.push({ id, categoria, nombre, litros, stock, moneda, precio });
+          tipos.push({ id, categoria, nombre, litros, stock, moneda, precio, incluyeAguaCortesia });
         }
       } else {
-        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, stock, moneda, precio });
+        tipos.push({ id: Utils.generateId(), categoria, nombre, litros, stock, moneda, precio, incluyeAguaCortesia });
       }
 
       store.setConfig('tiposBotellon', tipos);

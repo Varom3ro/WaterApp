@@ -1174,6 +1174,17 @@
         <input type="number" id="cat-item-stock" class="input-neu" placeholder="0" min="0" value="0" />
       </div>
 
+      <div id="grp-cat-agua-cortesia" style="display: none; background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 700; color: #5B21B6; cursor: pointer; margin: 0;">
+          <input type="checkbox" id="cat-item-agua-cortesia" style="width: 17px; height: 17px; accent-color: #7C3AED;" />
+          <span>🎁 Incluye primera recarga de agua gratis (descuenta del tanque)</span>
+        </label>
+        <div id="grp-cat-litros-cortesia" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #DDD6FE;">
+          <label class="form-label" style="color: #5B21B6; font-size: 0.76rem; margin-bottom: 4px;">Litros de agua de cortesía (L)</label>
+          <input type="number" id="cat-item-litros-cortesia" class="input-neu" placeholder="20" min="1" step="0.5" value="20" style="margin-bottom: 0;" />
+        </div>
+      </div>
+
       <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px;">
         <div>
           <label class="form-label" style="color: #475569;">Moneda</label>
@@ -1709,6 +1720,34 @@
   }
 
   // =========================================================================
+  // REGLAS DE AGUA DE CORTESÍA EN PRODUCTOS FÍSICOS
+  // =========================================================================
+  function esProductoConAguaCortesiaSup(item) {
+    if (!item || item.categoria !== 'producto') return false;
+    if (typeof item.incluyeAguaCortesia === 'boolean') {
+      return item.incluyeAguaCortesia;
+    }
+    const nombre = (item.nombre || '').trim();
+    if (!nombre) return false;
+    const esAccesorio = /\b(?:forro|porta|tapa|tapas|base|soporte|dispensador|bomba|llave|grifo|cepillo|funda|estante|rack|balanc[ií]n|casillero|rejilla|regilla|filtro|humificador|silic[oó]n|tobito|hielo|aquatabs)\b/i.test(nombre);
+    if (esAccesorio) return false;
+    const esEnvase = /\b(?:botell[oó]n|botellones|botella|botellas|garraf[oó]n|garrafones|envase|envases)\b/i.test(nombre);
+    const tieneLitraje = /\b\d+(?:[.,]\d+)?\s*(?:l|lt|lts|litro|litros)\b/i.test(nombre);
+    return esEnvase && tieneLitraje;
+  }
+
+  function obtenerLitrosAguaProductoSup(item) {
+    if (!item) return 20;
+    const litrosExplicitos = parseFloat(item.litros);
+    if (item.categoria === 'producto' && !isNaN(litrosExplicitos) && litrosExplicitos > 0) {
+      return litrosExplicitos;
+    }
+    const match = (item.nombre || '').match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|lts|litro|litros)\b/i)
+      || (item.nombre || '').match(/(\d+)\s*(?:l|lt|lts|litro|litros)?/i);
+    return match ? parseFloat(String(match[1]).replace(',', '.')) : 20;
+  }
+
+  // =========================================================================
   // RENDERIZADO DEL CATÁLOGO (RECARGAS Y PRODUCTOS)
   // =========================================================================
   function renderizarCatalogo(catalogo) {
@@ -1734,6 +1773,8 @@
       const icono = isRecarga ? '💧' : '📦';
       const precio = parseFloat(item.precio) || 0;
       const monedaSimbolo = (item.moneda === 'VES' || item.moneda === 'Bs') ? 'Bs.' : '$';
+      const llevaAgua = !isRecarga && esProductoConAguaCortesiaSup(item);
+      const litrosAgua = llevaAgua ? obtenerLitrosAguaProductoSup(item) : 0;
 
       return `
         <div class="card-neu" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin-bottom: 8px;">
@@ -1741,8 +1782,9 @@
             <span style="font-size: 1.5rem;">${icono}</span>
             <div>
               <div style="font-weight: 800; font-size: 0.95rem; color: #0F172A;">${escapeHtml(item.nombre)}</div>
-              <div style="font-size: 0.78rem; color: #64748B;">
-                ${isRecarga ? `Capacidad: <strong>${item.litros || 20}L</strong>` : `Stock actual: <strong>${item.stock || 0} un.</strong>`}
+              <div style="font-size: 0.78rem; color: #64748B; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+                <span>${isRecarga ? `Capacidad: <strong>${item.litros || 20}L</strong>` : `Stock actual: <strong>${item.stock || 0} un.</strong>`}</span>
+                ${llevaAgua ? `<span style="background: #EDE9FE; color: #6D28D9; border: 1px solid #DDD6FE; font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 999px;">🎁 +Agua ${litrosAgua}L</span>` : ''}
               </div>
             </div>
           </div>
@@ -2031,8 +2073,11 @@
   document.getElementById('btn-crear-recarga').addEventListener('click', () => abrirFormularioCatalogo('relleno'));
   document.getElementById('btn-crear-producto').addEventListener('click', () => abrirFormularioCatalogo('producto'));
 
+  let catCortesiaTouched = false;
+
   function abrirFormularioCatalogo(categoriaPredeterminada = 'relleno', item = null) {
     const isEdit = !!item;
+    catCortesiaTouched = isEdit;
     document.getElementById('titulo-modal-catalogo').textContent = isEdit ? '✏️ Editar Ítem' : '➕ Nuevo Ítem';
     document.getElementById('cat-item-id').value = isEdit ? item.id : '';
 
@@ -2045,6 +2090,15 @@
     document.getElementById('cat-item-moneda').value = (isEdit && item.moneda) ? item.moneda : 'USD';
     document.getElementById('cat-item-precio').value = (isEdit && item.precio !== undefined) ? item.precio : '1.50';
 
+    const chkAgua = document.getElementById('cat-item-agua-cortesia');
+    const inpLitrosAgua = document.getElementById('cat-item-litros-cortesia');
+    if (chkAgua) {
+      chkAgua.checked = (isEdit && item.categoria === 'producto') ? esProductoConAguaCortesiaSup(item) : false;
+    }
+    if (inpLitrosAgua) {
+      inpLitrosAgua.value = (isEdit && item.categoria === 'producto') ? obtenerLitrosAguaProductoSup(item) : 20;
+    }
+
     alternarCamposCatalogo();
     document.getElementById('modal-item-catalogo').style.display = 'flex';
   }
@@ -2054,9 +2108,29 @@
     const isProd = cat === 'producto';
     document.getElementById('grp-cat-litros').style.display = isProd ? 'none' : 'block';
     document.getElementById('grp-cat-stock').style.display = isProd ? 'block' : 'none';
+    const grpAgua = document.getElementById('grp-cat-agua-cortesia');
+    const chkAgua = document.getElementById('cat-item-agua-cortesia');
+    const grpLitrosAgua = document.getElementById('grp-cat-litros-cortesia');
+    if (grpAgua) grpAgua.style.display = isProd ? 'block' : 'none';
+    if (grpLitrosAgua && chkAgua) grpLitrosAgua.style.display = (isProd && chkAgua.checked) ? 'block' : 'none';
   }
 
   document.getElementById('cat-item-categoria').addEventListener('change', alternarCamposCatalogo);
+  document.getElementById('cat-item-agua-cortesia').addEventListener('change', () => {
+    catCortesiaTouched = true;
+    alternarCamposCatalogo();
+  });
+  document.getElementById('cat-item-nombre').addEventListener('input', () => {
+    if (catCortesiaTouched || document.getElementById('cat-item-categoria').value !== 'producto') return;
+    const nombreVal = document.getElementById('cat-item-nombre').value;
+    const mockItem = { categoria: 'producto', nombre: nombreVal };
+    const sug = esProductoConAguaCortesiaSup(mockItem);
+    const chkAgua = document.getElementById('cat-item-agua-cortesia');
+    const inpLitrosAgua = document.getElementById('cat-item-litros-cortesia');
+    if (chkAgua) chkAgua.checked = sug;
+    if (inpLitrosAgua && sug) inpLitrosAgua.value = obtenerLitrosAguaProductoSup(mockItem);
+    alternarCamposCatalogo();
+  });
 
   window.abrirEditarCatalogo = function(id) {
     const item = currentCatalogo.find(x => x.id === id);
@@ -2081,7 +2155,12 @@
     const id = document.getElementById('cat-item-id').value;
     const categoria = document.getElementById('cat-item-categoria').value;
     const nombre = document.getElementById('cat-item-nombre').value.trim();
-    const litros = categoria === 'relleno' ? (parseInt(document.getElementById('cat-item-litros').value) || 20) : 0;
+    const incluyeAguaCortesia = categoria === 'producto'
+      ? !!document.getElementById('cat-item-agua-cortesia')?.checked
+      : false;
+    const litros = categoria === 'relleno'
+      ? (parseFloat(document.getElementById('cat-item-litros').value) || 20)
+      : (incluyeAguaCortesia ? (parseFloat(document.getElementById('cat-item-litros-cortesia').value) || obtenerLitrosAguaProductoSup({ categoria: 'producto', nombre })) : 0);
     const stock = categoria === 'producto' ? (parseInt(document.getElementById('cat-item-stock').value) || 0) : 0;
     const moneda = document.getElementById('cat-item-moneda').value;
     const precio = parseFloat(document.getElementById('cat-item-precio').value) || 0;
@@ -2101,7 +2180,8 @@
       litros,
       stock,
       moneda,
-      precio
+      precio,
+      incluyeAguaCortesia
     };
 
     if (isEdit) {
@@ -2183,6 +2263,7 @@
                   categoria: itemModificado.categoria,
                   nombre: itemModificado.nombre,
                   litros: itemModificado.litros,
+                  incluyeAguaCortesia: itemModificado.incluyeAguaCortesia,
                   moneda: itemModificado.moneda,
                   precio: itemModificado.precio,
                   stock: (itemModificado.categoria === 'producto') ? stockPropio : null
