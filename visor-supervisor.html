@@ -1152,7 +1152,7 @@
       <h3 class="modal-title" id="titulo-modal-catalogo">➕ Nuevo Ítem</h3>
       <button class="modal-close" onclick="cerrarModales()">✕</button>
     </div>
-    <form id="form-item-catalogo">
+    <form id="form-item-catalogo" novalidate>
       <input type="hidden" id="cat-item-id" />
 
       <label class="form-label" style="color: #475569;">Tipo de Ítem *</label>
@@ -1214,7 +1214,7 @@
 
       <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
         <button type="button" class="btn-action-neu" onclick="cerrarModales()">Cancelar</button>
-        <button type="submit" class="btn-action-neu primary">💾 Guardar Ítem</button>
+        <button type="submit" id="btn-guardar-item-catalogo" class="btn-action-neu primary">💾 Guardar Ítem</button>
       </div>
     </form>
   </div>
@@ -2101,7 +2101,7 @@
     catSelect.value = isEdit ? item.categoria : categoriaPredeterminada;
 
     document.getElementById('cat-item-nombre').value = isEdit ? item.nombre : '';
-    document.getElementById('cat-item-litros').value = (isEdit && item.litros !== undefined) ? item.litros : 20;
+    document.getElementById('cat-item-litros').value = (isEdit && item.categoria !== 'producto' && parseFloat(item.litros) > 0) ? item.litros : 20;
     document.getElementById('cat-item-stock').value = (isEdit && item.stock !== undefined) ? item.stock : 0;
     document.getElementById('cat-item-moneda').value = (isEdit && item.moneda) ? item.moneda : 'USD';
     document.getElementById('cat-item-precio').value = (isEdit && item.precio !== undefined) ? item.precio : '1.50';
@@ -2112,7 +2112,7 @@
       chkAgua.checked = (isEdit && item.categoria === 'producto') ? esProductoConAguaCortesiaSup(item) : false;
     }
     if (inpLitrosAgua) {
-      inpLitrosAgua.value = (isEdit && item.categoria === 'producto') ? obtenerLitrosAguaProductoSup(item) : 20;
+      inpLitrosAgua.value = (isEdit && item.categoria === 'producto') ? (obtenerLitrosAguaProductoSup(item) || 20) : 20;
     }
 
     alternarCamposCatalogo();
@@ -2122,13 +2122,21 @@
   function alternarCamposCatalogo() {
     const cat = document.getElementById('cat-item-categoria').value;
     const isProd = cat === 'producto';
-    document.getElementById('grp-cat-litros').style.display = isProd ? 'none' : 'block';
-    document.getElementById('grp-cat-stock').style.display = isProd ? 'block' : 'none';
+    const inpLitros = document.getElementById('cat-item-litros');
+    const inpStock = document.getElementById('cat-item-stock');
     const grpAgua = document.getElementById('grp-cat-agua-cortesia');
     const chkAgua = document.getElementById('cat-item-agua-cortesia');
     const grpLitrosAgua = document.getElementById('grp-cat-litros-cortesia');
+    const inpLitrosAgua = document.getElementById('cat-item-litros-cortesia');
+
+    document.getElementById('grp-cat-litros').style.display = isProd ? 'none' : 'block';
+    document.getElementById('grp-cat-stock').style.display = isProd ? 'block' : 'none';
+    if (inpLitros) inpLitros.disabled = isProd;
+    if (inpStock) inpStock.disabled = !isProd;
     if (grpAgua) grpAgua.style.display = isProd ? 'block' : 'none';
-    if (grpLitrosAgua && chkAgua) grpLitrosAgua.style.display = (isProd && chkAgua.checked) ? 'block' : 'none';
+    const mostrarLitrosAgua = isProd && !!(chkAgua && chkAgua.checked);
+    if (grpLitrosAgua) grpLitrosAgua.style.display = mostrarLitrosAgua ? 'block' : 'none';
+    if (inpLitrosAgua) inpLitrosAgua.disabled = !mostrarLitrosAgua;
   }
 
   document.getElementById('cat-item-categoria').addEventListener('change', alternarCamposCatalogo);
@@ -2174,15 +2182,29 @@
     const incluyeAguaCortesia = categoria === 'producto'
       ? !!document.getElementById('cat-item-agua-cortesia')?.checked
       : false;
+    const rawLitrosRecarga = parseFloat(String(document.getElementById('cat-item-litros').value || '').replace(',', '.'));
+    const rawLitrosCortesia = parseFloat(String(document.getElementById('cat-item-litros-cortesia').value || '').replace(',', '.'));
     const litros = categoria === 'relleno'
-      ? (parseFloat(document.getElementById('cat-item-litros').value) || 20)
-      : (incluyeAguaCortesia ? (parseFloat(document.getElementById('cat-item-litros-cortesia').value) || obtenerLitrosAguaProductoSup({ categoria: 'producto', nombre })) : 0);
+      ? rawLitrosRecarga
+      : (incluyeAguaCortesia ? (rawLitrosCortesia > 0 ? rawLitrosCortesia : obtenerLitrosAguaProductoSup({ categoria: 'producto', nombre })) : 0);
     const stock = categoria === 'producto' ? (parseInt(document.getElementById('cat-item-stock').value) || 0) : 0;
     const moneda = document.getElementById('cat-item-moneda').value;
-    const precio = parseFloat(document.getElementById('cat-item-precio').value) || 0;
+    const rawPrecio = String(document.getElementById('cat-item-precio').value || '').trim().replace(',', '.');
+    const precio = parseFloat(rawPrecio);
 
     if (!nombre) {
       alert('Introduce el nombre del ítem.');
+      document.getElementById('cat-item-nombre')?.focus();
+      return;
+    }
+    if (categoria === 'relleno' && (isNaN(litros) || litros <= 0)) {
+      alert('Introduce una capacidad en litros válida (mayor a 0).');
+      document.getElementById('cat-item-litros')?.focus();
+      return;
+    }
+    if (isNaN(precio) || precio < 0) {
+      alert('Introduce un precio de venta válido.');
+      document.getElementById('cat-item-precio')?.focus();
       return;
     }
 
@@ -2215,11 +2237,28 @@
     const replicarGrupo = radioAmbito && radioAmbito.value === 'grupo';
     const sedesDestino = (replicarGrupo && supervisorSession) ? supervisorSession.sedes : [currentStoreEmail];
 
-    await guardarCatalogoEnSupabase(currentCatalogo, sedesDestino, false, itemModificado);
-    cerrarModales();
-    renderizarCatalogo(currentCatalogo);
-    renderizarStockFisico(currentCatalogo);
-    alert(`✅ Ítem guardado correctamente${replicarGrupo ? ' en todas las sedes asignadas' : ''}.`);
+    const btnGuardar = document.getElementById('btn-guardar-item-catalogo');
+    const txtOriginal = btnGuardar ? btnGuardar.textContent : '💾 Guardar Ítem';
+    if (btnGuardar) {
+      btnGuardar.disabled = true;
+      btnGuardar.textContent = '⏳ Guardando...';
+    }
+
+    try {
+      await guardarCatalogoEnSupabase(currentCatalogo, sedesDestino, false, itemModificado);
+      cerrarModales();
+      renderizarCatalogo(currentCatalogo);
+      renderizarStockFisico(currentCatalogo);
+      alert(`✅ Ítem guardado correctamente${replicarGrupo ? ' en todas las sedes asignadas' : ''}.`);
+    } catch (err) {
+      console.error('Error al guardar ítem del catálogo:', err);
+      alert('❌ Ocurrió un error al guardar el ítem. Verifica tu conexión e intenta nuevamente.');
+    } finally {
+      if (btnGuardar) {
+        btnGuardar.disabled = false;
+        btnGuardar.textContent = txtOriginal;
+      }
+    }
   });
 
   async function guardarCatalogoEnSupabase(nuevoCatalogo, listaSedes, esAjusteStock = false, itemModificado = null) {
