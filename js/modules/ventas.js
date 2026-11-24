@@ -4,12 +4,20 @@ import { openClienteModal, openAbonoClienteDirecto } from './clientes.js';
 // ============================================
 
 import { store } from '../store.js';
-import { Utils } from '../utils.js';
+import { Utils } from '../utils.js?v=2.8.71';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { getMatricialReportHTML } from './cierre.js';
-import { syncToCloud } from '../cloud-sync.js';
-import { openCisternaModal } from './inventario.js';
+import { syncToCloud } from '../cloud-sync.js?v=2.8.71';
+import { openCisternaModal, openMantenimientoFiltrosModal } from './inventario.js?v=2.8.71';
+import {
+  esCuentaRefillH2O,
+  getEmailLicenciaActiva,
+  getMetasRefillConfigLocal,
+  cargarMetasRefillDesdeNube,
+  getRangoSemanaLunSab,
+  calcularVentaRealSemana,
+  evaluarProgresoMetasSede
+} from '../refill-metas.js?v=2.8.71';
 
 export function renderVentas(container, showFichas = true) {
   const isOp = store.isOperario();
@@ -47,6 +55,9 @@ export function renderVentas(container, showFichas = true) {
 
     ${shouldShowFichas ? '<!-- Fichas de Totales por Método de Pago --><div id="ventas-totales-fichas" style="margin-bottom: 20px;"></div>' : ''}
 
+    <!-- Barra Progresiva de Metas Semanales (Exclusiva Refill H2O) -->
+    <div id="refill-metas-progress-slot"></div>
+
     <!-- Table -->
     <div class="card">
       <div class="table-container">
@@ -71,6 +82,9 @@ export function renderVentas(container, showFichas = true) {
   `;
 
   renderVentasTable();
+  if (esCuentaRefillH2O(getEmailLicenciaActiva())) {
+    cargarMetasRefillDesdeNube(store, false).then(() => renderRefillMetasProgressBar()).catch(() => {});
+  }
 
   container.querySelector('#filter-fecha').addEventListener('change', renderVentasTable);
   container.querySelector('#search-ventas').addEventListener('input', Utils.debounce(renderVentasTable, 200));
@@ -669,6 +683,102 @@ function renderVentasTable() {
       renderVentasTable();
     });
   });
+
+  renderRefillMetasProgressBar();
+}
+
+export function renderRefillMetasProgressBar() {
+  const slot = document.getElementById('refill-metas-progress-slot');
+  if (!slot) return;
+
+  const email = getEmailLicenciaActiva();
+  if (!esCuentaRefillH2O(email)) {
+    slot.innerHTML = '';
+    return;
+  }
+
+  const cfg = getMetasRefillConfigLocal(store);
+  const sede = (cfg.sedes || []).find(s =>
+    s && s.activa !== false && s.email && s.email.trim().toLowerCase() === email
+  );
+  if (!sede || !Array.isArray(sede.metas) || sede.metas.length === 0) {
+    slot.innerHTML = '';
+    return;
+  }
+
+  const rango = getRangoSemanaLunSab();
+  const ventaSem = calcularVentaRealSemana(store.getAll('ventas') || [], store.getAll('abonos') || [], rango);
+  const ev = evaluarProgresoMetasSede(sede, ventaSem.totalUSD);
+  const todayISO = Utils.todayISO();
+
+  let statusBadgeHTML = '';
+  if (ev.metaAlcanzada && !ev.proximaMeta) {
+    statusBadgeHTML = `<span style="background:#DCFCE7; color:#166534; border:1px solid #86EFAC; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;">🏆 ¡Meta Máxima Alcanzada! (+$${Utils.formatNumber(ev.bonoPorEmpleadoUSD)}/emp)</span>`;
+  } else if (ev.metaAlcanzada) {
+    statusBadgeHTML = `<span style="background:#DCFCE7; color:#166534; border:1px solid #86EFAC; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;">✅ Meta ${ev.metaAlcanzada.nivel} Lograda (+$${Utils.formatNumber(ev.bonoPorEmpleadoUSD)}/emp)</span>`;
+  } else {
+    statusBadgeHTML = `<span style="background:#F3E8FF; color:#6B21A8; border:1px solid #D8B4FE; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;">🎯 Meta 1: faltan ${Utils.formatCurrency(ev.faltanteProximaUSD)}</span>`;
+  }
+
+  const hitosTicksHTML = ev.hitos.map(h => `
+    <div style="position:absolute; left:${h.pctPos}%; top:0; bottom:0; width:2px; background:${h.alcanzada ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.22)'}; transform:translateX(-1px);" title="Meta ${h.nivel}: ${Utils.formatCurrency(h.montoUSD)} (+$${h.bonoUSD}/emp)"></div>
+  `).join('');
+
+  const hitosPillsHTML = ev.hitos.map(h => `
+    <span style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; background:${h.alcanzada ? '#DCFCE7' : '#F8FAFC'}; color:${h.alcanzada ? '#166534' : '#475569'}; border:1px solid ${h.alcanzada ? '#86EFAC' : '#CBD5E1'};">
+      ${h.alcanzada ? '✓' : '○'} Meta ${h.nivel}: ${Utils.formatCurrency(h.montoUSD)} <span style="opacity:0.85;">($${Utils.formatNumber(h.bonoUSD)}/emp)</span>
+    </span>
+  `).join('');
+
+  const diasGridHTML = rango.dias.map(d => {
+    const montoDia = ventaSem.porDia[d.iso] || 0;
+    const isHoy = d.iso === todayISO;
+    return `
+      <div style="padding:5px 6px; border-radius:8px; text-align:center; background:${isHoy ? '#EEF2FF' : '#F8FAFC'}; border:1px solid ${isHoy ? '#818CF8' : '#E2E8F0'};">
+        <div style="font-size:10.5px; font-weight:700; color:${isHoy ? '#4338CA' : '#64748B'};">${d.label} ${d.shortDate}</div>
+        <div style="font-size:12px; font-weight:800; color:${montoDia > 0 ? '#047857' : '#94A3B8'}; margin-top:1px;">${Utils.formatCurrency(montoDia)}</div>
+      </div>
+    `;
+  }).join('');
+
+  slot.innerHTML = `
+    <div class="card" style="margin-bottom: 14px; padding: 12px 16px; border-left: 4px solid ${ev.metaAlcanzada ? '#10B981' : '#7C3AED'};">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <strong style="font-size:14.5px; color:#0F172A;">🏆 Progreso Semanal de Metas · ${Utils.escapeHtml(sede.nombre)}</strong>
+          <span style="font-size:11.5px; font-weight:700; color:#475569; background:#F1F5F9; padding:2px 8px; border-radius:6px;">
+            ${rango.etiquetaRango} · ${rango.esDomingo ? 'Semana Cerrada' : `Día ${rango.diaActualIdx} de 6`}
+          </span>
+        </div>
+        ${statusBadgeHTML}
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; margin-bottom:6px; font-size:13px;">
+        <div>
+          <span class="text-muted">Venta real acumulada (Lun–Sáb):</span>
+          <strong style="font-size:16.5px; color:#0F172A; margin-left:4px;">${Utils.formatCurrency(ev.totalSemanalUSD)}</strong>
+        </div>
+        <div style="font-size:12.5px; color:#475569;">
+          ${ev.proximaMeta
+            ? `Siguiente objetivo: <strong>Meta ${ev.proximaMeta.nivel}</strong> (${Utils.formatCurrency(ev.proximaMeta.montoUSD)} · bono <strong>$${Utils.formatNumber(ev.proximaMeta.bonoUSD)}/emp</strong> · faltan <strong>${Utils.formatCurrency(ev.faltanteProximaUSD)}</strong>)`
+            : `<strong>Meta máxima (${Utils.formatCurrency(ev.metaMaximaUSD)}) completada al 100%</strong>`}
+        </div>
+      </div>
+
+      <div style="position:relative; height:12px; background:#E2E8F0; border-radius:999px; overflow:hidden; margin-bottom:8px;">
+        <div style="width:${ev.progresoPctGlobal}%; height:100%; border-radius:999px; transition:width 0.35s ease; background:${ev.metaAlcanzada ? 'linear-gradient(90deg, #10B981 0%, #059669 100%)' : 'linear-gradient(90deg, #7C3AED 0%, #10B981 100%)'};"></div>
+        ${hitosTicksHTML}
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+        ${hitosPillsHTML}
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap:6px;">
+        ${diasGridHTML}
+      </div>
+    </div>
+  `;
 }
 
 export function openModalPedidosPendientes(onUpdate) {
@@ -795,13 +905,72 @@ export function renderNuevaVentaForm(container) {
 
       <!-- Estilos para el Catálogo Táctil POS y Split Layout -->
       <style>
+        #form-venta.pos-viewport-shell {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 14px);
+          height: calc(100dvh - 14px);
+          min-height: 520px;
+          box-sizing: border-box;
+          padding-bottom: 12px;
+        }
+        #form-venta.pos-viewport-shell > .page-header,
+        #form-venta.pos-viewport-shell > #pos-alerts-row,
+        #form-venta.pos-viewport-shell > .pos-bottom-checkout-bar {
+          flex-shrink: 0;
+        }
+        .pos-alerts-row {
+          display: flex;
+          align-items: stretch;
+          gap: 8px;
+          margin-bottom: 6px;
+          width: 100%;
+        }
+        .pos-alerts-row .pos-alert-banner {
+          flex: 1 1 0;
+          min-width: 0;
+          padding: 4px 10px;
+          min-height: 42px;
+          box-sizing: border-box;
+          border-radius: 8px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+        }
+        .pos-alerts-row .pos-alert-banner .pos-alert-text {
+          min-width: 0;
+          line-height: 1.2;
+        }
+        .pos-alerts-row .pos-alert-banner .pos-alert-btn {
+          flex-shrink: 0;
+          height: 30px;
+          padding: 0 10px;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          border: none;
+          font-weight: 700;
+          border-radius: 6px;
+          font-size: 11.5px;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        @media (max-width: 780px) {
+          .pos-alerts-row {
+            flex-direction: column;
+          }
+        }
         .pos-main-split {
           display: grid;
           grid-template-columns: 1fr 1.25fr;
           gap: 8px;
           align-items: stretch;
-          height: calc(100vh - 84px - 146px);
-          min-height: 360px;
+          flex: 1 1 0;
+          min-height: 220px;
+          height: auto;
         }
         .pos-left-column {
           min-width: 0;
@@ -1159,7 +1328,6 @@ export function renderNuevaVentaForm(container) {
         @media (max-width: 960px) and (min-width: 701px) {
           .pos-main-split {
             gap: 8px;
-            height: calc(100vh - 84px - 150px);
           }
           .pos-products-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1167,9 +1335,16 @@ export function renderNuevaVentaForm(container) {
         }
 
         @media (max-width: 700px) {
+          #form-venta.pos-viewport-shell {
+            height: auto;
+            min-height: 0;
+            padding-bottom: 8px;
+          }
           .pos-main-split {
+            flex: none;
             grid-template-columns: 1fr;
             height: auto;
+            min-height: 0;
           }
           .pos-left-column, .pos-right-column {
             height: auto;
@@ -1412,8 +1587,8 @@ export function renderNuevaVentaForm(container) {
   const bloquearSinAguaCfg = store.getConfig('bloquearVentaSinAgua') === true;
 
   const formHtml = `
-    <div style="padding: 0 0 8px 0;">
-      <form id="form-venta">
+    <div style="padding: 0;">
+      <form id="form-venta" class="pos-viewport-shell">
         <div class="page-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
           <div></div>
           
@@ -1474,21 +1649,50 @@ export function renderNuevaVentaForm(container) {
             </button>
           </div>
         </div>
-        ${tanqueVacio || tanqueBajo ? `
-          <div id="banner-tanque-bajo-pv" style="margin-bottom: 6px; padding: 4px 12px; min-height: 42px; box-sizing: border-box; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: ${tanqueVacio ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${tanqueVacio ? '#EF4444' : '#F59E0B'}; color: ${tanqueVacio ? '#991B1B' : '#92400E'}; font-size: 12px;">
-            <div style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-              <span style="font-size: 14px; line-height: 1;">${tanqueVacio ? '🚨' : '⚠️'}</span>
-              <span>
-                ${tanqueVacio
-                  ? `<strong>Tanque en 0 L:</strong> ${bloquearSinAguaCfg ? 'Las recargas de agua están bloqueadas hasta cargar una cisterna o calibrar el tanque.' : 'Registra la cisterna o calibra el tanque (se pedirá confirmación al facturar recargas).'}`
-                  : `<strong>Nivel de agua bajo (${Utils.formatNumber(litrosTanque)} L · ${pctTanque}%):</strong> Recuerda registrar la próxima cisterna o calibrar el tanque.`}
-              </span>
+        ${(() => {
+          const mantFiltros = store.getConfig('mantenimientoFiltros', null);
+          const estadoFiltros = Utils.evaluarEstadoMantenimientoFiltros(mantFiltros);
+          const alertaAgua = tanqueVacio || tanqueBajo;
+          const alertaFiltros = estadoFiltros.mostrarAlerta;
+          if (!alertaAgua && !alertaFiltros) return '';
+
+          const bannerAguaHTML = alertaAgua ? `
+            <div id="banner-tanque-bajo-pv" class="pos-alert-banner" style="background: ${tanqueVacio ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${tanqueVacio ? '#EF4444' : '#F59E0B'}; color: ${tanqueVacio ? '#991B1B' : '#92400E'};">
+              <div class="pos-alert-text" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span style="font-size: 14px; line-height: 1; flex-shrink: 0;">${tanqueVacio ? '🚨' : '⚠️'}</span>
+                <span>
+                  ${tanqueVacio
+                    ? `<strong>Tanque en 0 L:</strong> ${alertaFiltros ? 'Carga cisterna o calibra el tanque.' : (bloquearSinAguaCfg ? 'Las recargas de agua están bloqueadas hasta cargar una cisterna o calibrar el tanque.' : 'Registra la cisterna o calibra el tanque (se pedirá confirmación al facturar recargas).')}`
+                    : `<strong>Nivel de agua bajo (${Utils.formatNumber(litrosTanque)} L · ${pctTanque}%):</strong> ${alertaFiltros ? 'Recuerda registrar cisterna.' : 'Recuerda registrar la próxima cisterna o calibrar el tanque.'}`}
+                </span>
+              </div>
+              <button type="button" id="btn-cisterna-rapida-pv" class="pos-alert-btn" style="background: ${tanqueVacio ? '#DC2626' : '#D97706'}; color: #fff;">
+                🚛 ${alertaFiltros ? 'Cisterna' : 'Registrar Cisterna'}
+              </button>
             </div>
-            <button type="button" id="btn-cisterna-rapida-pv" style="height: 30px; padding: 0 10px; line-height: 1; display: inline-flex; align-items: center; gap: 5px; background: ${tanqueVacio ? '#DC2626' : '#D97706'}; color: #fff; border: none; font-weight: 700; border-radius: 6px; font-size: 11.5px; cursor: pointer;">
-              🚛 Registrar Cisterna
-            </button>
-          </div>
-        ` : ''}
+          ` : '';
+
+          const filtUrgente = estadoFiltros.vencido || estadoFiltros.venceHoy;
+          const bannerFiltrosHTML = alertaFiltros ? `
+            <div id="banner-filtros-pv" class="pos-alert-banner" style="background: ${filtUrgente ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${filtUrgente ? '#EF4444' : '#F59E0B'}; color: ${filtUrgente ? '#991B1B' : '#92400E'};">
+              <div class="pos-alert-text" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span style="font-size: 14px; line-height: 1; flex-shrink: 0;">${filtUrgente ? '🚨' : '🧪'}</span>
+                <span>
+                  ${estadoFiltros.vencido
+                    ? `<strong>Filtros vencidos (${Math.abs(estadoFiltros.diasRestantes)}d):</strong> Mantenimiento ${estadoFiltros.frecuenciaLabel.toLowerCase()} pend. (${Utils.formatDate(estadoFiltros.proximaFecha)}).`
+                    : estadoFiltros.venceHoy
+                      ? `<strong>Mantenimiento de filtros HOY:</strong> Vence hoy (${Utils.formatDate(estadoFiltros.proximaFecha)} · ${estadoFiltros.frecuenciaLabel}).`
+                      : `<strong>Filtros en ${estadoFiltros.diasRestantes} día${estadoFiltros.diasRestantes === 1 ? '' : 's'}:</strong> Toca el ${Utils.formatDate(estadoFiltros.proximaFecha)} (${estadoFiltros.frecuenciaLabel}).`}
+                </span>
+              </div>
+              <button type="button" id="btn-filtros-rapido-pv" class="pos-alert-btn" style="background: ${filtUrgente ? '#DC2626' : '#D97706'}; color: #fff;">
+                🧪 Registrar
+              </button>
+            </div>
+          ` : '';
+
+          return `<div id="pos-alerts-row" class="pos-alerts-row">${bannerAguaHTML}${bannerFiltrosHTML}</div>`;
+        })()}
         ${content}
       </form>
     </div>
@@ -1584,6 +1788,15 @@ export function renderNuevaVentaForm(container) {
   const btnCisternaRapidaPV = modal.querySelector('#btn-cisterna-rapida-pv');
   if (btnCisternaRapidaPV) {
     btnCisternaRapidaPV.addEventListener('click', abrirCisternaDesdePV);
+  }
+
+  const btnFiltrosRapidoPV = modal.querySelector('#btn-filtros-rapido-pv');
+  if (btnFiltrosRapidoPV) {
+    btnFiltrosRapidoPV.addEventListener('click', () => {
+      openMantenimientoFiltrosModal(() => {
+        renderNuevaVentaForm(container);
+      });
+    });
   }
 
   const badgeDispTanquePV = modal.querySelector('#badge-disp-tanque-pv');

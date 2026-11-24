@@ -1,6 +1,6 @@
 import { store } from '../store.js';
-import { Utils } from '../utils.js';
-import { renderNuevaVentaForm, renderVentas } from './ventas.js';
+import { Utils } from '../utils.js?v=2.8.71';
+import { renderNuevaVentaForm, renderVentas } from './ventas.js?v=2.8.71';
 import { getCumpleanerosHoy, getWhatsAppBirthdayUrl } from './clientes.js';
 
 export function renderDashboard(container) {
@@ -40,7 +40,7 @@ export function renderDashboard(container) {
       </div>
     ` : ''}
     <div id="home-venta-container"></div>
-    <div id="home-historial-container"></div>
+    <div id="home-historial-container" style="margin-top: 16px;"></div>
   `;
 
   const banner = container.querySelector('#banner-cumpleanos-dashboard');

@@ -594,11 +594,8 @@ function renderConsolidadoZ(turnos, fecha, methods) {
         </div>
       </div>
       <div>
-        <button id="btn-imprimir-reporte-z" class="btn btn-primary" style="font-weight: 700; height: 40px; padding: 0 16px;">
-          📄 Imprimir Reporte Z (PDF)
-        </button>
-        <button id="btn-imprimir-reporte-txt" class="btn btn-secondary" style="font-weight: 700; height: 40px; padding: 0 16px; margin-left: 8px;">
-          📋 Descargar Reporte Cierre
+        <button id="btn-imprimir-reporte-txt" class="btn btn-secondary" style="font-weight: 700; height: 40px; padding: 0 16px;">
+          📋 Descargar Reporte Z
         </button>
       </div>
     </div>
@@ -1122,12 +1119,6 @@ function renderCierreContent(fecha, activeTab = null) {
     pane.innerHTML = renderConsolidadoZ(turnos, fecha, methods);
     
     // Listeners del Reporte Z
-    const btnPrintZ = pane.querySelector('#btn-imprimir-reporte-z');
-    if (btnPrintZ) {
-      btnPrintZ.addEventListener('click', () => {
-        document.getElementById('btn-generar-pdf-home')?.click();
-      });
-    }
     const btnPrintTxt = pane.querySelector('#btn-imprimir-reporte-txt');
     if (btnPrintTxt) {
       btnPrintTxt.addEventListener('click', () => {
@@ -1412,7 +1403,7 @@ export function getReporteTxtString(fecha) {
   // ENCABEZADO
   lines.push(sepDouble);
   lines.push(`*** ${nombreTienda.toUpperCase()} ***`.padStart(Math.floor((w + nombreTienda.length + 8) / 2)).padEnd(w));
-  lines.push("REPORTE CONSOLIDADO DE CIERRE DE CAJA Y VENTAS".padStart(Math.floor((w + 46) / 2)).padEnd(w));
+  lines.push("REPORTE Z - CONSOLIDADO DE CIERRE DE CAJA Y VENTAS".padStart(Math.floor((w + 50) / 2)).padEnd(w));
   lines.push(sepDouble);
   lines.push(`FECHA DEL REPORTE : ${fecha}`);
   lines.push(`FECHA DE EMISIÓN  : ${ahoraStr}`);
@@ -1634,7 +1625,7 @@ export function getReporteTxtString(fecha) {
 export function descargarReporteTxt(fecha) {
   const contenido = getReporteTxtString(fecha);
   const nombreTienda = getNombreTiendaCompleto().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const filename = `Reporte_${nombreTienda}_${fecha}.txt`;
+  const filename = `Reporte_Z_${nombreTienda}_${fecha}.txt`;
 
   // Usar UTF-8 BOM para apertura directa y limpia en Bloc de Notas de Windows y teléfonos móviles
   const blob = new Blob(['\uFEFF' + contenido], { type: 'text/plain;charset=utf-8' });
@@ -1649,416 +1640,246 @@ export function descargarReporteTxt(fecha) {
 }
 
 
-export function getMatricialReportHTML(fecha) {
+const REPORTE_X_MAX_DIARIO = 3;
+const REPORTE_X_STORAGE_KEY = 'waterapp_reporte_x_log';
+
+export function getReporteXEstadoHoy(hoyISO = Utils.todayISO()) {
+  let regLocal = null;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(REPORTE_X_STORAGE_KEY);
+      if (raw) regLocal = JSON.parse(raw);
+    }
+  } catch (_) {}
+
+  let regStore = null;
+  try {
+    regStore = store.getConfig('reporteXRegistro', null);
+  } catch (_) {}
+
+  const listLocal = (regLocal && regLocal.fecha === hoyISO && Array.isArray(regLocal.consultas))
+    ? regLocal.consultas
+    : [];
+  const listStore = (regStore && regStore.fecha === hoyISO && Array.isArray(regStore.consultas))
+    ? regStore.consultas
+    : [];
+
+  const consultas = listLocal.length >= listStore.length ? [...listLocal] : [...listStore];
+  return {
+    fecha: hoyISO,
+    consultas,
+    usadas: consultas.length,
+    restantes: Math.max(0, REPORTE_X_MAX_DIARIO - consultas.length),
+    max: REPORTE_X_MAX_DIARIO
+  };
+}
+
+export function registrarSolicitudReporteX(hoyISO = Utils.todayISO()) {
+  const estadoActual = getReporteXEstadoHoy(hoyISO);
+  if (estadoActual.usadas >= REPORTE_X_MAX_DIARIO) {
+    return { permitido: false, estado: estadoActual };
+  }
+
+  const hora = new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const consultas = [...estadoActual.consultas, hora];
+  const registro = { fecha: hoyISO, consultas };
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(REPORTE_X_STORAGE_KEY, JSON.stringify(registro));
+    }
+  } catch (_) {}
+  try {
+    store.setConfig('reporteXRegistro', registro);
+  } catch (_) {}
+
+  return {
+    permitido: true,
+    estado: {
+      fecha: hoyISO,
+      consultas,
+      usadas: consultas.length,
+      restantes: Math.max(0, REPORTE_X_MAX_DIARIO - consultas.length),
+      max: REPORTE_X_MAX_DIARIO
+    }
+  };
+}
+
+export function openReporteXModal(fecha, onAfterUse = null) {
+  const res = registrarSolicitudReporteX();
+
+  if (!res.permitido) {
+    showToast('Límite diario alcanzado: máximo 3 Reportes X por día.', 'warning');
+    const historialHoras = res.estado.consultas.map((h, i) => `
+      <div style="display:flex; justify-content:space-between; padding:6px 10px; background:#F8FAFC; border-radius:6px; border:1px solid #E2E8F0; font-size:13px;">
+        <span style="font-weight:600; color:#475569;">Consulta #${i + 1}</span>
+        <strong style="color:#0F172A;">${Utils.escapeHtml(h)}</strong>
+      </div>
+    `).join('');
+
+    openModal({
+      title: '🚫 Límite Diario de Reporte X Alcanzado',
+      showFooter: false,
+      content: `
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div style="background:#FEF2F2; border:1.5px solid #FCA5A5; border-radius:10px; padding:12px 14px; color:#991B1B; font-size:13.5px; line-height:1.45;">
+            Ya utilizaste las <strong>${res.estado.max} consultas permitidas de Reporte X</strong> por el día de hoy (${Utils.formatDate(res.estado.fecha)}). Podrás volver a solicitarlo mañana o emitir el <strong>Reporte Z</strong> al finalizar.
+          </div>
+          <div>
+            <div style="font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">
+              Consultas realizadas hoy (${res.estado.usadas}/${res.estado.max})
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              ${historialHoras}
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; margin-top:4px;">
+            <button type="button" id="btn-cerrar-reporte-x" class="btn btn-primary" style="min-width:120px;">Entendido</button>
+          </div>
+        </div>
+      `,
+      onOpen: (overlay) => {
+        overlay.querySelector('#btn-cerrar-reporte-x')?.addEventListener('click', closeModal);
+      }
+    });
+    return;
+  }
+
+  if (typeof onAfterUse === 'function') {
+    onAfterUse(res.estado);
+  }
+
   const cierre = store.getCierreCaja(fecha);
-  const arqueo = store.getArqueo(fecha);
-  const turnos = store.getTurnos(fecha);
-  const allMetodos = store.getMetodosPago(false);
+  const methods = getMethodsList();
 
-  const methodsArqueo = allMetodos.filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.id)).map(m => ({
-    key: m.id,
-    label: m.label,
-    icon: m.icon || '💳',
-    moneda: m.moneda || 'Bs'
-  }));
+  const ventaTotalRealUSD = cierre.real_ingresado || 0;
+  const ventaTotalRealBs = cierre.bs?.real_ingresado || 0;
+  const contadoUSD = Math.max(0, (cierre.total || 0) - (cierre.credito || 0) - (cierre.saldo_favor || 0));
+  const abonosUSD = cierre.cobros_credito || 0;
+  const creditoUSD = cierre.credito || 0;
+  const saldoFavorUSD = cierre.saldo_favor || 0;
+  const propinasUSD = cierre.totalPropinasUSD || 0;
+  const horaConsulta = res.estado.consultas[res.estado.consultas.length - 1] || '--:--';
 
-  // Sección Desglose de Turnos
-  let turnosHtml = '';
-  if (turnos.length > 0) {
-    const filasTurnos = turnos.map(t => {
-      const sist = t.sistema || store.getCierreCaja(t.fecha, t.inicio, t.fin);
-      const decl = t.declaracion || {};
-      let usd = 0;
-      let bs = 0;
-      methodsArqueo.forEach(m => {
-        const val = decl[m.key] || 0;
-        if (m.moneda === 'USD' || m.key === 'efectivo_usd') usd += val;
-        else bs += val;
-      });
+  const activeMethodRows = methods
+    .filter(m => !['credito', 'convenio', 'garantia', 'cortesia', 'saldo_favor'].includes(m.key))
+    .map(m => {
+      const valUsd = cierre[m.key] || 0;
+      const valBs = cierre.bs ? (cierre.bs[m.key] || 0) : 0;
+      if (valUsd <= 0 && valBs <= 0) return null;
+      const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
+      const montoPrincipal = isUsd ? Utils.formatCurrency(valUsd) : `Bs ${Utils.formatNumber(valBs, true)}`;
+      const montoSecundario = isUsd ? '' : `<span style="font-size:11px; color:#64748B; margin-left:6px;">(${Utils.formatCurrency(valUsd)})</span>`;
       return `
         <tr>
-          <td style="padding: 3px 0; font-weight: bold;">TURNO ${t.numeroTurno} (${formatHora(t.inicio)} - ${formatHora(t.fin)})</td>
-          <td style="text-align: center; padding: 3px 0;">${sist.cantidadVentas || 0} VTAS</td>
-          <td style="text-align: right; padding: 3px 0;">${Utils.formatCurrency(usd)}</td>
-          <td style="text-align: right; padding: 3px 0;">Bs ${Utils.formatNumber(bs, true)}</td>
+          <td style="padding:7px 8px; border-bottom:1px solid #E2E8F0; font-size:13px;">
+            ${m.icon || '💳'} ${Utils.escapeHtml(m.label)}
+          </td>
+          <td style="padding:7px 8px; border-bottom:1px solid #E2E8F0; text-align:right; font-weight:700; font-size:13px; color:#0F172A;">
+            ${montoPrincipal}${montoSecundario}
+          </td>
         </tr>
       `;
-    }).join('');
+    })
+    .filter(Boolean)
+    .join('');
 
-    turnosHtml = `
-      <div style="margin-bottom: 20px;">
-        <div style="font-weight: bold; margin-bottom: 6px; font-size: 13px;">[ DESGLOSE DE TURNOS DE CAJA (${turnos.length}) ]</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px;">
-          <thead>
-            <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; padding: 4px 0;">TURNO / HORARIO</th>
-              <th style="text-align: center; padding: 4px 0;">OPERACIONES</th>
-              <th style="text-align: right; padding: 4px 0;">FÍSICO ($)</th>
-              <th style="text-align: right; padding: 4px 0;">FÍSICO (Bs)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filasTurnos}
-          </tbody>
-        </table>
-        <div style="border-top: 1px dashed #000; margin-top: 10px; margin-bottom: 5px;"></div>
-      </div>
-    `;
-  }
+  const notaRestantes = res.estado.restantes > 0
+    ? `Te quedan <strong>${res.estado.restantes}</strong> consulta${res.estado.restantes === 1 ? '' : 's'} disponible${res.estado.restantes === 1 ? '' : 's'} hoy.`
+    : 'Has utilizado las <strong>3 consultas</strong> permitidas de hoy.';
 
-  let cuadreHtml = '';
-  if (arqueo) {
-      let totalDiferenciaUsd = 0;
-      let totalDiferenciaBs = 0;
-      let cuadreRows = methodsArqueo.map(m => {
-          const isUsd = m.moneda === 'USD' || m.key === 'efectivo_usd';
-          const declarado = arqueo.declaracion ? (arqueo.declaracion[m.key] || 0) : 0;
-          const sistema = isUsd ? (cierre[m.key] || 0) : (cierre.bs ? (cierre.bs[m.key] || 0) : 0);
-          const dif = declarado - sistema;
-
-          if (isUsd) totalDiferenciaUsd += dif;
-          else totalDiferenciaBs += dif;
-
-          const formatter = (val) => isUsd ? Utils.formatCurrency(val) : `Bs ${Utils.formatNumber(val, true)}`;
-
-          return `
-            <tr>
-              <td style="padding: 4px 0;">${m.label.toUpperCase()}</td>
-              <td style="text-align: right; padding: 4px 0;">${formatter(declarado)}</td>
-              <td style="text-align: right; padding: 4px 0;">${formatter(sistema)}</td>
-              <td style="text-align: right; padding: 4px 0; font-weight:bold;">${dif > 0 ? '+' : ''}${formatter(dif)}</td>
-            </tr>
-          `;
-      }).join('');
-
-      cuadreHtml = `
-      <div style="margin-bottom: 25px;">
-        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ CUADRE CONSOLIDADO DEL DÍA - REPORTE Z ]</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px;">
-          <thead>
-            <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; padding: 6px 0;">MÉTODO</th>
-              <th style="text-align: right; padding: 6px 0;">TOTAL FÍSICO</th>
-              <th style="text-align: right; padding: 6px 0;">TOTAL SISTEMA</th>
-              <th style="text-align: right; padding: 6px 0;">DIFERENCIA</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${cuadreRows}
-          </tbody>
-          <tfoot>
-            <tr style="border-top: 1px solid #000;">
-              <td colspan="3" style="text-align: right; padding: 6px 0; font-weight: bold;">TOTAL DIFERENCIA (USD):</td>
-              <td style="text-align: right; padding: 6px 0; font-weight: bold; font-size: 13px;">${totalDiferenciaUsd > 0 ? '+' : ''}${Utils.formatCurrency(totalDiferenciaUsd)}</td>
-            </tr>
-            <tr>
-              <td colspan="3" style="text-align: right; padding: 0 0 6px 0; font-weight: bold;">TOTAL DIFERENCIA (Bs):</td>
-              <td style="text-align: right; padding: 0 0 6px 0; font-weight: bold; font-size: 13px;">${totalDiferenciaBs > 0 ? '+' : ''}Bs ${Utils.formatNumber(totalDiferenciaBs, true)}</td>
-            </tr>
-          </tfoot>
-        </table>
-        ${arqueo.observaciones ? `
-          <div style="margin-top: 10px; padding: 6px 8px; border: 1px dashed #000; font-size: 11px;">
-            <b>OBSERVACIONES:</b> ${Utils.escapeHtml(arqueo.observaciones)}
+  openModal({
+    title: '📊 Reporte X — Venta Total Real',
+    showFooter: false,
+    content: `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px 12px;">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#0F172A;">${Utils.escapeHtml(getNombreTiendaCompleto())}</div>
+            <div style="font-size:12px; color:#64748B;">📅 ${Utils.formatDate(fecha)} · 🕒 ${Utils.escapeHtml(horaConsulta)}</div>
           </div>
-        ` : ''}
-        <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
-      </div>`;
-  }
-
-  const methods = [
-    ...allMetodos.map(m => ({
-      key: m.id,
-      label: m.label,
-      icon: m.icon || '💳',
-      moneda: m.moneda || 'Bs'
-    })),
-    { key: 'credito', label: 'A Crédito (Ventas)', icon: '📋', moneda: 'USD' }
-  ];
-
-  return `
-    <div style="font-family: 'Courier New', Courier, monospace; color: #000; background: #fff; padding: 25px; line-height: 1.4; font-size: 13px; max-width: 800px; margin: 0 auto;">
-      
-      <!-- Encabezado de Ticket Matricial -->
-      <div style="text-align: center; margin-bottom: 25px;">
-        <div style="font-size: 20px; font-weight: bold; letter-spacing: 2px;">*** ${Utils.escapeHtml(getNombreTiendaCompleto())} ***</div>
-        <div style="font-size: 14px; font-weight: bold; margin-top: 5px; letter-spacing: 1px;">REPORTE Z - CIERRE CONSOLIDADO DEL DÍA</div>
-        <div style="font-size: 13px; margin-top: 5px;">FECHA DEL REPORTE: ${fecha}</div>
-        <div style="border-top: 2px double #000; margin-top: 15px; margin-bottom: 5px;"></div>
-      </div>
-
-      <!-- Resumen de Flujo de Caja (Dinero Real) -->
-      <div style="margin-bottom: 20px;">
-        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ RESUMEN DE FLUJO DE CAJA (DINERO REAL RECIBIDO) ]</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: inherit;">
-          <tr>
-            <td style="padding: 4px 0; font-weight: bold;">INGRESO REAL EN CAJA (CONTADO + ABONOS):</td>
-            <td style="text-align: right; font-weight: bold; padding: 4px 0; font-size: 15px;">${Utils.formatCurrency(cierre.real_ingresado)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0; color: #333;">(+) VENTAS COBRADAS DE CONTADO HOY:</td>
-            <td style="text-align: right; padding: 4px 0; color: #333;">${Utils.formatCurrency(Math.max(0, (cierre.total || 0) - (cierre.credito || 0) - (cierre.saldo_favor || 0)))}</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0; color: #333;">(+) CRÉDITO COBRADO HOY (ABONOS RECIBIDOS):</td>
-            <td style="text-align: right; padding: 4px 0; color: #333;">+ ${Utils.formatCurrency(cierre.cobros_credito)}</td>
-          </tr>
-          ${(cierre.saldo_favor || 0) > 0 ? `
-          <tr style="border-top: 1px dotted #999;">
-            <td style="padding: 4px 0; color: #666;">(*) SALDO A FAVOR USADO HOY (ABONOS PREVIOS):</td>
-            <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.saldo_favor)}</td>
-          </tr>
-          ` : ''}
-          <tr style="border-top: 1px dotted #999;">
-            <td style="padding: 4px 0; color: #666;">(*) CRÉDITO OTORGADO HOY (POR COBRAR / NO EN CAJA):</td>
-            <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.credito)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0; color: #666;">VALOR TOTAL DESPACHADO (CONTADO + CRÉDITO):</td>
-            <td style="text-align: right; padding: 4px 0; color: #666;">${Utils.formatCurrency(cierre.total)}</td>
-          </tr>
-        </table>
-        <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
-      </div>
-
-      <!-- Resumen Operativo -->
-      <div style="margin-bottom: 20px;">
-        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ RESUMEN OPERATIVO ]</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: inherit;">
-          <tr>
-            <td style="padding: 4px 0;">VENTAS FACTURADAS HOY (OPERACIONES):</td>
-            <td style="text-align: right; padding: 4px 0; font-weight: bold;">${cierre.cantidadVentas}</td>
-          </tr>
-          ${(() => {
-            const vDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
-            const pPend = vDia.filter(v => v.estadoEntrega === 'pendiente').length;
-            if (pPend === 0) return '';
-            return `
-              <tr>
-                <td style="padding: 4px 0; color: #D97706; font-weight: bold;">⏳ PEDIDOS PENDIENTES DE ENTREGA HOY:</td>
-                <td style="text-align: right; padding: 4px 0; color: #D97706; font-weight: bold;">${pPend}</td>
-              </tr>
-            `;
-          })()}
-        </table>
-        <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
-      </div>
-
-      ${turnosHtml}
-
-      ${(() => {
-        const moduloCaud = store.getConfig('moduloCaudalimetro') || false;
-        if (!moduloCaud) return '';
-        const unidadCaud = store.getConfig('unidadCaudalimetro') || 'L';
-        const lectCaud = store.getLecturaCaudalimetro(fecha);
-        const vDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
-        const lFact = vDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
-        const lLavado = vDia.reduce((s, v) => {
-          if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
-          const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
-          return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
-        }, 0);
-        const mDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
-        const lMerm = mDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
-        const totSist = Math.round((lFact + lLavado + lMerm) * 100) / 100;
-        const dAgua = Math.round((lectCaud.litrosReloj - totSist) * 100) / 100;
-
-        return `
-        <!-- Resumen Caudalímetro -->
-        <div style="margin-bottom: 20px;">
-          <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ AUDITORÍA DE RELOJ MEDIDOR DE AGUA ]</div>
-          <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: inherit;">
-            <tr>
-              <td style="padding: 3px 0;">LECTURA INICIAL (APERTURA):</td>
-              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.inicial !== null ? lectCaud.inicial.toLocaleString() : 'N/R'} ${unidadCaud}</td>
-            </tr>
-            <tr>
-              <td style="padding: 3px 0;">LECTURA FINAL (CIERRE):</td>
-              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.final !== null ? lectCaud.final.toLocaleString() : 'N/R'} ${unidadCaud}</td>
-            </tr>
-            <tr style="border-top: 1px dotted #000;">
-              <td style="padding: 3px 0; font-weight: bold;">AGUA SEGÚN RELOJ FÍSICO:</td>
-              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${lectCaud.litrosReloj.toLocaleString()} L</td>
-            </tr>
-            <tr>
-              <td style="padding: 3px 0;">VENTAS DESPACHADAS:</td>
-              <td style="text-align: right; padding: 3px 0;">${lFact.toLocaleString()} L</td>
-            </tr>
-            <tr>
-              <td style="padding: 3px 0;">MERMA DE LAVADO ESTIMADA:</td>
-              <td style="text-align: right; padding: 3px 0;">${lLavado.toLocaleString()} L</td>
-            </tr>
-            ${lMerm > 0 ? `
-            <tr>
-              <td style="padding: 3px 0;">MERMAS MANUALES:</td>
-              <td style="text-align: right; padding: 3px 0;">${lMerm.toLocaleString()} L</td>
-            </tr>
-            ` : ''}
-            <tr style="border-top: 1px dotted #000;">
-              <td style="padding: 3px 0; font-weight: bold;">AGUA JUSTIFICADA POR SISTEMA:</td>
-              <td style="text-align: right; font-weight: bold; padding: 3px 0;">${totSist.toLocaleString()} L</td>
-            </tr>
-            <tr style="border-top: 1px solid #000; font-weight: bold;">
-              <td style="padding: 4px 0;">DIFERENCIA DE AGUA:</td>
-              <td style="text-align: right; padding: 4px 0; font-size: 13px;">${dAgua > 0 ? '+' : ''}${dAgua.toLocaleString()} L (${dAgua === 0 ? 'CUADRE EXACTO' : (dAgua > 0 ? 'SOBRANTE DE FLUJO' : 'MENOS FLUJO')})</td>
-            </tr>
-          </table>
-          <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
+          <span style="padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; background:${res.estado.restantes === 0 ? '#FEF3C7' : '#DBEAFE'}; color:${res.estado.restantes === 0 ? '#92400E' : '#1E40AF'};">
+            Consulta ${res.estado.usadas} de ${res.estado.max} hoy
+          </span>
         </div>
-        `;
-      })()}
 
-      ${cuadreHtml}
-
-      <!-- Detalle de Abonos/Cobros Recibidos Hoy -->
-      <div style="margin-bottom: 25px; page-break-inside: avoid;">
-        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ DETALLE DE COBROS / ABONOS RECIBIDOS ]</div>
-        ${cierre.abonosDetalle && cierre.abonosDetalle.length > 0 ? `
-          <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px;">
-            <thead>
-              <tr style="border-bottom: 1px solid #000;">
-                <th style="text-align: left; padding: 6px 0; width: 12%;">HORA</th>
-                <th style="text-align: left; padding: 6px 0; width: 38%;">CLIENTE</th>
-                <th style="text-align: right; padding: 6px 0; width: 18%;">MONTO</th>
-                <th style="text-align: left; padding: 6px 0; padding-left: 15px; width: 18%;">MÉTODO</th>
-                <th style="text-align: left; padding: 6px 0; width: 14%;">REF.</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${cierre.abonosDetalle.map(a => {
-                const cli = store.getById('clientes', a.clienteId);
-                const nombreCliente = cli ? cli.nombre : 'Cliente Desconocido';
-                const horaStr = new Date(a.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
-                const foundMethod = methods.find(m => m.key === a.metodo);
-                const metodoStr = foundMethod ? foundMethod.label.toUpperCase() : a.metodo.toUpperCase();
-                const refParts = [];
-                if (a.referencia) refParts.push(`REF: ${a.referencia}`);
-                if (a.telefono) refParts.push(`TEL: ${a.telefono}`);
-                const refDisplay = refParts.length > 0 ? refParts.join(' | ') : '-';
-                return `
-                  <tr>
-                    <td style="padding: 5px 0; color:#333;">${horaStr}</td>
-                    <td style="padding: 5px 0; font-weight: bold;">${nombreCliente.toUpperCase()}</td>
-                    <td style="padding: 5px 0; text-align: right; font-weight: bold; color: var(--color-success);">${Utils.formatCurrency(a.monto)}</td>
-                    <td style="padding: 5px 0; padding-left: 15px;">${metodoStr}</td>
-                    <td style="padding: 5px 0; color:#333; font-weight: bold;">${refDisplay.toUpperCase()}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        ` : '<div style="padding: 8px 0; font-style: italic; color: #555;">NO SE REGISTRARON ABONOS HOY.</div>'}
-        <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
-      </div>
-
-      <!-- Detalle de Propinas por Punto/Banco a Liquidar al Personal -->
-      ${cierre.propinasDetalle && cierre.propinasDetalle.length > 0 ? `
-      <div style="margin-bottom: 25px; page-break-inside: avoid;">
-        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ PROPINAS POR PUNTO/BANCO A LIQUIDAR AL PERSONAL ]</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px;">
-          <thead>
-            <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; padding: 6px 0; width: 12%;">HORA</th>
-              <th style="text-align: left; padding: 6px 0; width: 20%;">MÉTODO</th>
-              <th style="text-align: left; padding: 6px 0; width: 20%;">REF. VOUCHER</th>
-              <th style="text-align: right; padding: 6px 0; width: 24%;">MONTO (Bs)</th>
-              <th style="text-align: right; padding: 6px 0; width: 24%;">MONTO ($)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${cierre.propinasDetalle.map(p => {
-              const horaStr = new Date(p.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
-              const foundMethod = methods.find(m => m.key === p.metodo);
-              const metodoStr = foundMethod ? foundMethod.label.toUpperCase() : (p.metodo || 'PUNTO').toUpperCase();
-              const montoBs = p.moneda === 'Bs' || p.moneda === 'VES' ? p.monto : (p.monto * (p.tasa || 40));
-              const montoUSD = p.moneda === 'USD' ? p.monto : (p.monto / (p.tasa || 40));
-              return `
-                <tr>
-                  <td style="padding: 5px 0; color:#333;">${horaStr}</td>
-                  <td style="padding: 5px 0;">${metodoStr}</td>
-                  <td style="padding: 5px 0; font-weight: bold; color:#111;">${(p.referencia || '-').toUpperCase()}</td>
-                  <td style="padding: 5px 0; text-align: right; font-weight: bold;">Bs ${Utils.formatNumber(montoBs, true)}</td>
-                  <td style="padding: 5px 0; text-align: right; font-weight: bold;">${Utils.formatCurrency(montoUSD)}</td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-          <tfoot>
-            <tr style="border-top: 1px solid #000; font-weight: bold;">
-              <td colspan="3" style="padding: 6px 0; text-align: right;">TOTAL PROPINAS A ENTREGAR:</td>
-              <td style="padding: 6px 0; text-align: right; font-size: 12px;">Bs ${Utils.formatNumber(cierre.totalPropinasBs || 0, true)}</td>
-              <td style="padding: 6px 0; text-align: right; font-size: 12px;">${Utils.formatCurrency(cierre.totalPropinasUSD || 0)}</td>
-            </tr>
-          </tfoot>
-        </table>
-        <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
-      </div>
-      ` : ''}
-
-      <!-- Caja Chica (Inicio, Retiros y Cierre) -->
-      ${(() => {
-        const cc = store.getCajaChica ? store.getCajaChica(fecha) : null;
-        if (!cc || (!cc.inicio && (!cc.retiros || cc.retiros.length === 0) && !cc.cierre)) return '';
-        const iniUSD = cc.inicio ? (cc.inicio.montoUSD || 0) : 0;
-        const iniBs = cc.inicio ? (cc.inicio.montoBs || 0) : 0;
-        const rets = Array.isArray(cc.retiros) ? cc.retiros : [];
-        const totRetUSD = rets.filter(r => r.moneda !== 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
-        const totRetBs = rets.filter(r => r.moneda === 'Bs').reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
-        const espUSD = iniUSD - totRetUSD;
-        const espBs = iniBs - totRetBs;
-        return `
-          <div style="margin-bottom: 25px; page-break-inside: avoid;">
-            <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">[ CAJA CHICA (INICIO, RETIROS Y CIERRE) ]</div>
-            <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 11px; margin-bottom: 8px;">
-              <tr>
-                <td style="padding: 3px 0;">INICIO DE CAJA CHICA ${cc.inicio ? `(${cc.inicio.hora || ''})` : ''}:</td>
-                <td style="padding: 3px 0; text-align: right; font-weight: bold;">${cc.inicio ? `${Utils.formatCurrency(iniUSD)} | Bs ${Utils.formatNumber(iniBs, true)}` : 'SIN REGISTRAR'}</td>
-              </tr>
-              <tr>
-                <td style="padding: 3px 0;">TOTAL RETIROS (${rets.length}):</td>
-                <td style="padding: 3px 0; text-align: right; font-weight: bold; color: #B45309;">- ${Utils.formatCurrency(totRetUSD)} | - Bs ${Utils.formatNumber(totRetBs, true)}</td>
-              </tr>
-              <tr>
-                <td style="padding: 3px 0;">SALDO ESPERADO:</td>
-                <td style="padding: 3px 0; text-align: right; font-weight: bold;">${Utils.formatCurrency(espUSD)} | Bs ${Utils.formatNumber(espBs, true)}</td>
-              </tr>
-              <tr style="border-top: 1px solid #000;">
-                <td style="padding: 4px 0; font-weight: bold;">CIERRE DE CAJA CHICA ${cc.cierre ? `(${cc.cierre.hora || ''})` : ''}:</td>
-                <td style="padding: 4px 0; text-align: right; font-weight: bold;">${cc.cierre ? `${Utils.formatCurrency(cc.cierre.montoUSD || 0)} | Bs ${Utils.formatNumber(cc.cierre.montoBs || 0, true)}` : 'PENDIENTE'}</td>
-              </tr>
-            </table>
-            ${rets.length > 0 ? `
-              <table style="width: 100%; border-collapse: collapse; font-family: inherit; font-size: 10.5px;">
-                <thead>
-                  <tr style="border-bottom: 1px solid #000;">
-                    <th style="text-align: left; padding: 4px 0;">FECHA</th>
-                    <th style="text-align: left; padding: 4px 0;">RESPONSABLE</th>
-                    <th style="text-align: left; padding: 4px 0;">MOTIVO</th>
-                    <th style="text-align: right; padding: 4px 0;">MONTO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rets.map(r => `
-                    <tr>
-                      <td style="padding: 3px 0;">${Utils.formatDate(r.fecha || fecha)}</td>
-                      <td style="padding: 3px 0; font-weight: bold;">${Utils.escapeHtml((r.responsable || '').toUpperCase())}</td>
-                      <td style="padding: 3px 0; color: #555;">${Utils.escapeHtml((r.motivo || '-').toUpperCase())}</td>
-                      <td style="padding: 3px 0; text-align: right; font-weight: bold;">${r.moneda === 'Bs' ? `Bs ${Utils.formatNumber(r.monto, true)}` : Utils.formatCurrency(r.monto)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            ` : ''}
-            <div style="border-top: 1px dashed #000; margin-top: 12px; margin-bottom: 5px;"></div>
+        <div style="background:linear-gradient(135deg, #064E3B, #047857); color:#fff; border-radius:12px; padding:16px 18px; text-align:center; box-shadow:0 4px 12px rgba(4,120,87,0.2);">
+          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:1px; opacity:0.88; font-weight:700;">
+            Venta Total Real del POS en el Momento
           </div>
-        `;
-      })()}
+          <div style="font-size:32px; font-weight:900; margin-top:4px; line-height:1.1;">
+            ${Utils.formatCurrency(ventaTotalRealUSD)}
+          </div>
+          <div style="font-size:15px; font-weight:700; opacity:0.92; margin-top:4px;">
+            ≈ Bs ${Utils.formatNumber(ventaTotalRealBs, true)}
+          </div>
+          <div style="margin-top:8px; font-size:12px; opacity:0.85;">
+            ${cierre.cantidadVentas || 0} ${cierre.cantidadVentas === 1 ? 'venta registrada' : 'ventas registradas'} · ${cierre.botellones || 0} botellones
+          </div>
+        </div>
 
-      <div style="text-align: center; font-size: 10px; margin-top: 15px; color: #555; letter-spacing: 1px;">
-        *** FIN DEL REPORTE Z - IMPRESO DESDE SISTEMA LOCAL ***
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px 12px; font-size:13px; display:flex; flex-direction:column; gap:5px;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:#475569;">Ventas cobradas de contado:</span>
+            <strong style="color:#0F172A;">${Utils.formatCurrency(contadoUSD)}</strong>
+          </div>
+          ${abonosUSD > 0 ? `
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#475569;">Abonos / Cobros de crédito:</span>
+              <strong style="color:#047857;">+ ${Utils.formatCurrency(abonosUSD)}</strong>
+            </div>
+          ` : ''}
+          ${propinasUSD > 0 ? `
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#475569;">Propinas registradas:</span>
+              <strong style="color:#0F172A;">+ ${Utils.formatCurrency(propinasUSD)}</strong>
+            </div>
+          ` : ''}
+          ${(creditoUSD > 0 || saldoFavorUSD > 0) ? `
+            <div style="border-top:1px dashed #CBD5E1; margin-top:3px; padding-top:5px; font-size:12px; color:#64748B; display:flex; flex-direction:column; gap:3px;">
+              ${creditoUSD > 0 ? `
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Crédito otorgado (por cobrar, no suma en caja):</span>
+                  <strong>${Utils.formatCurrency(creditoUSD)}</strong>
+                </div>
+              ` : ''}
+              ${saldoFavorUSD > 0 ? `
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Saldo a favor aplicado (abono previo):</span>
+                  <strong>${Utils.formatCurrency(saldoFavorUSD)}</strong>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:6px;">
+            Desglose Real por Método de Pago
+          </div>
+          ${activeMethodRows ? `
+            <div style="border:1px solid #E2E8F0; border-radius:10px; overflow:hidden; background:#fff;">
+              <table style="width:100%; border-collapse:collapse;">
+                <tbody>${activeMethodRows}</tbody>
+              </table>
+            </div>
+          ` : `
+            <div style="padding:12px; text-align:center; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:8px; font-size:13px; color:#64748B;">
+              Aún no hay ventas cobradas registradas en esta fecha.
+            </div>
+          `}
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-top:1px solid #E2E8F0; padding-top:10px;">
+          <span style="font-size:12.5px; color:#475569;">${notaRestantes}</span>
+          <button type="button" id="btn-cerrar-reporte-x" class="btn btn-primary" style="min-width:110px;">Cerrar</button>
+        </div>
       </div>
-    </div>
-  `;
+    `,
+    onOpen: (overlay) => {
+      overlay.querySelector('#btn-cerrar-reporte-x')?.addEventListener('click', closeModal);
+    }
+  });
 }
 
 export function renderCierreCaja(container) {
@@ -2074,8 +1895,11 @@ export function renderCierreCaja(container) {
           <label class="form-label" style="margin:0; font-size:13px; color:var(--color-text-secondary);">Fecha:</label>
           <input type="date" class="form-control" id="cierre-fecha-home" style="max-width:160px; height:36px; padding:4px 8px; font-size:14px;" value="${today}"/>
         </div>
-        <button id="btn-generar-pdf-home" class="btn btn-primary" style="height:36px; padding:0 12px; font-size:13px;">📄 Generar Z (PDF)</button>
-        <button id="btn-generar-txt-home" class="btn btn-secondary" style="height:36px; padding:0 12px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">📋 Reporte Cierre</button>
+        <button id="btn-reporte-x-home" class="btn btn-primary" style="height:36px; padding:0 12px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+          <span>📊 Reporte X</span>
+          <span id="badge-reporte-x-count" style="background:rgba(255,255,255,0.22); padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700;"></span>
+        </button>
+        <button id="btn-generar-txt-home" class="btn btn-secondary" style="height:36px; padding:0 12px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">📋 Reporte Z</button>
       </div>
     </div>
     <div id="cierre-caja-home-content"></div>
@@ -2083,34 +1907,32 @@ export function renderCierreCaja(container) {
 
   const contentDiv = container.querySelector('#cierre-caja-home-content');
   const fechaInput = container.querySelector('#cierre-fecha-home');
-  const pdfBtn = container.querySelector('#btn-generar-pdf-home');
+  const reporteXBtn = container.querySelector('#btn-reporte-x-home');
+  const badgeX = container.querySelector('#badge-reporte-x-count');
   const txtBtn = container.querySelector('#btn-generar-txt-home');
+
+  const actualizarEstadoBotonReporteX = () => {
+    const est = getReporteXEstadoHoy();
+    if (badgeX) badgeX.textContent = `${est.usadas}/${est.max}`;
+    if (reporteXBtn) {
+      reporteXBtn.title = est.restantes > 0
+        ? `Consultar venta total real del POS (${est.restantes} de ${est.max} disponible${est.restantes === 1 ? '' : 's'} hoy)`
+        : `Límite diario alcanzado (${est.usadas}/${est.max} consultas usadas hoy)`;
+      reporteXBtn.style.opacity = est.usadas >= est.max ? '0.7' : '1';
+    }
+  };
+  actualizarEstadoBotonReporteX();
 
   fechaInput.addEventListener('change', () => {
     currentActiveTab = null;
     renderCierre(contentDiv, fechaInput.value);
   });
 
-  pdfBtn.addEventListener('click', () => {
-    if (!store.getArqueo(fechaInput.value)) {
-       alert('Debe realizar al menos un Cierre de Turno antes de generar el Reporte Z.');
-       return;
-    }
-    const htmlMatricial = getMatricialReportHTML(fechaInput.value);
-    const opt = {
-      margin:       0.5,
-      filename:     `Cierre_Z_${fechaInput.value}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
-      pagebreak:    { mode: ['avoid-all', 'css'] }
-    };
-    if (window.html2pdf) {
-        window.html2pdf().set(opt).from(htmlMatricial).save();
-    } else {
-        alert("La librería PDF no está lista o cargada.");
-    }
-  });
+  if (reporteXBtn) {
+    reporteXBtn.addEventListener('click', () => {
+      openReporteXModal(fechaInput.value, () => actualizarEstadoBotonReporteX());
+    });
+  }
 
   if (txtBtn) {
     txtBtn.addEventListener('click', () => {

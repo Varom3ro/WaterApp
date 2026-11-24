@@ -4,20 +4,20 @@
 
 import { router } from './router.js';
 import { store } from './store.js';
-import { Utils } from './utils.js?v=2.8.67';
+import { Utils } from './utils.js?v=2.8.71';
 import { renderSidebar } from './components/sidebar.js?v=2.8.67';
 import { renderHeader } from './components/header.js';
 import { Licencia } from './licencia.js';
-import { syncToCloud } from './cloud-sync.js';
+import { syncToCloud } from './cloud-sync.js?v=2.8.71';
 
 // Import modules
-import { renderDashboard } from './modules/dashboard.js';
+import { renderDashboard } from './modules/dashboard.js?v=2.8.71';
 import { renderClientes } from './modules/clientes.js?v=2.8.67';
-import { renderVentas } from './modules/ventas.js?v=2.8.67';
-import { renderInventario } from './modules/inventario.js?v=2.8.67';
+import { renderVentas } from './modules/ventas.js?v=2.8.71';
+import { renderInventario } from './modules/inventario.js?v=2.8.71';
 import { renderReportes } from './modules/reportes.js';
-import { renderConfiguracion } from './modules/configuracion.js';
-import { renderCierreCaja } from './modules/cierre.js?v=2.8.67';
+import { renderConfiguracion } from './modules/configuracion.js?v=2.8.71';
+import { renderCierreCaja } from './modules/cierre.js?v=2.8.71';
 
 // 🛡️ Blindaje global contra cierre de ventana en PWA de escritorio Windows al presionar F5 o Ctrl+R:
 // Permite hard-refresh (Ctrl+Shift+R o Shift+F5) normalmente.

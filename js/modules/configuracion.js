@@ -2,9 +2,15 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js';
+import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js?v=2.8.71';
 import { renderSidebar } from '../components/sidebar.js';
 import { Licencia } from '../licencia.js';
+import {
+  esCuentaRefillH2O,
+  getMetasRefillConfigLocal,
+  cargarMetasRefillDesdeNube,
+  guardarMetasRefillEnNube
+} from '../refill-metas.js?v=2.8.71';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
@@ -33,6 +39,8 @@ export function renderConfiguracion(container) {
       diasRestantesText = `${diffDays} días restantes`;
     }
   } catch (e) {}
+
+  const esRefill = esCuentaRefillH2O(usuarioEmail);
 
   container.innerHTML = `
     <div class="page-header">
@@ -66,6 +74,8 @@ export function renderConfiguracion(container) {
           </div>
         </div>
       </div>
+
+      ${esRefill ? renderMetasRefillCardHTML(getMetasRefillConfigLocal(store)) : ''}
 
       <!-- Identidad de la Empresa -->
       <div class="card full-width mb-lg">
@@ -691,6 +701,10 @@ export function renderConfiguracion(container) {
         btnSyncManual.textContent = '☁️ Sincronizar Nube Ahora';
       }
     });
+  }
+
+  if (esRefill) {
+    initMetasRefillConfigEvents(container);
   }
 
   // Caudalímetro Toggle & Unidad
@@ -1678,6 +1692,482 @@ function openMetodoPagoModal(id = null) {
       renderConfiguracion(document.querySelector('.main-content'));
       showToast(isEdit ? 'Método de pago actualizado' : 'Método de pago anexado con éxito', 'success');
       if (typeof syncToCloud === 'function') syncToCloud();
+    }
+  });
+}
+
+// ============================================
+// Refill H2O - CRUD Metas Semanales (Lun-Sáb), Sedes y Empleados
+// ============================================
+
+function renderMetasSedesItemsHTML(cfg) {
+  const sedes = cfg?.sedes || [];
+  if (sedes.length === 0) {
+    return `<div class="text-muted" style="padding:14px; text-align:center; border:1px dashed var(--color-border); border-radius:8px;">No hay sedes configuradas. Agrega una nueva tienda.</div>`;
+  }
+
+  return sedes.map(s => {
+    const metasChips = (s.metas || []).map(m => `
+      <span style="display:inline-flex; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #CBD5E1; color:#0F172A; font-size:11.5px; font-weight:600; padding:3px 8px; border-radius:6px;">
+        M${m.nivel}: <strong>$${Utils.formatNumber(m.montoUSD)}</strong> <span style="color:#047857;">(+$${Utils.formatNumber(m.bonoUSD)})</span>
+      </span>
+    `).join('');
+
+    const empleados = s.empleados || [];
+    const empActivos = empleados.filter(e => e && e.activo !== false);
+    const empsHTML = empleados.length > 0
+      ? empleados.map(e => `
+          <span style="display:inline-flex; align-items:center; gap:4px; background:${e.activo !== false ? '#EEF2FF' : '#F1F5F9'}; border:1px solid ${e.activo !== false ? '#C7D2FE' : '#CBD5E1'}; color:${e.activo !== false ? '#3730A3' : '#64748B'}; font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px; ${e.activo === false ? 'text-decoration:line-through;' : ''}">
+            👤 ${Utils.escapeHtml(e.nombre)}${e.cargo ? ` (${Utils.escapeHtml(e.cargo)})` : ''}
+          </span>
+        `).join('')
+      : `<span class="text-muted" style="font-size:12px;">Sin empleados registrados</span>`;
+
+    return `
+      <div style="background:var(--color-bg, #F8FAFC); border:1px solid var(--color-border); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <strong style="font-size:15px; color:#0F172A;">🏪 ${Utils.escapeHtml(s.nombre)}</strong>
+              <span class="badge ${s.activa !== false ? 'badge-success' : 'badge-warning'}" style="font-size:11px; padding:2px 8px;">
+                ${s.activa !== false ? '🟢 Activa' : '⏳ Próximamente'}
+              </span>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:2px;">
+              ${s.email ? `📧 ${Utils.escapeHtml(s.email)}` : 'Sin correo POS vinculado aún'}
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-xs btn-secondary btn-emp-sede-meta" data-sede-id="${Utils.escapeHtml(s.id)}">
+              👥 Empleados (${empActivos.length})
+            </button>
+            <button type="button" class="btn btn-xs btn-secondary btn-edit-sede-meta" data-sede-id="${Utils.escapeHtml(s.id)}">
+              ✏️ Editar
+            </button>
+            <button type="button" class="btn btn-xs btn-secondary btn-del-sede-meta" data-sede-id="${Utils.escapeHtml(s.id)}" style="color:var(--color-danger);">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+          <span style="font-size:11.5px; font-weight:700; color:#475569; margin-right:2px;">Metas (${(s.metas || []).length}):</span>
+          ${metasChips || '<span class="text-muted" style="font-size:12px;">Sin metas</span>'}
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+          <span style="font-size:11.5px; font-weight:700; color:#475569; margin-right:2px;">Personal:</span>
+          ${empsHTML}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderMetasRefillCardHTML(cfg) {
+  return `
+    <div id="card-metas-refill-config" class="card full-width mb-lg" style="border-left: 4px solid #7C3AED;">
+      <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h3 class="card-title" style="display:flex; align-items:center; gap:8px; color:#5B21B6;">
+            <span>🏆</span> Metas Semanales y Bonos por Sede (Refill H2O)
+          </h3>
+          <p class="text-muted" style="font-size: var(--font-size-sm); margin-top:4px;">
+            Ciclo de 6 días (Lunes a Sábado) · Venta real cobrada · Bono escalonado por nivel alcanzado. Exclusivo para sedes Refill H2O.
+          </p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm btn-secondary" id="btn-sync-metas-refill">
+            🔄 Sincronizar
+          </button>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-add-sede-meta">
+            + Nueva Tienda / Sede
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body mt-md" style="display:flex; flex-direction:column; gap:14px;">
+        <div style="background:#F5F3FF; border:1px solid #DDD6FE; border-radius:10px; padding:12px 14px; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+          <div class="form-group" style="flex:1; min-width:190px; margin-bottom:0;">
+            <label class="form-label" style="font-size:12px; font-weight:700; color:#5B21B6;">👤 Responsable de Pagos (WhatsApp)</label>
+            <input type="text" id="input-metas-resp-nombre" class="form-control" value="${Utils.escapeHtml(cfg.nombreResponsablePagos || 'Responsable de Pagos')}" placeholder="Ej: Administración / Pagos" style="height:36px; font-size:13px;" />
+          </div>
+          <div class="form-group" style="flex:1; min-width:190px; margin-bottom:0;">
+            <label class="form-label" style="font-size:12px; font-weight:700; color:#5B21B6;">📲 Número de WhatsApp (con código país)</label>
+            <input type="text" id="input-metas-wa-pagos" class="form-control" value="${Utils.escapeHtml(cfg.whatsappPagos || '')}" placeholder="Ej: 584121234567" style="height:36px; font-size:13px;" />
+          </div>
+          <button type="button" id="btn-save-metas-wa" class="btn btn-sm btn-primary" style="height:36px; white-space:nowrap;">
+            💾 Guardar Pagador
+          </button>
+        </div>
+
+        <div id="container-crud-metas-sedes" style="display:flex; flex-direction:column; gap:10px;">
+          ${renderMetasSedesItemsHTML(cfg)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function initMetasRefillConfigEvents(container) {
+  const card = container.querySelector('#card-metas-refill-config');
+  if (!card) return;
+
+  const refreshMetasUI = (newCfg) => {
+    const cfg = newCfg || getMetasRefillConfigLocal(store);
+    const inpResp = card.querySelector('#input-metas-resp-nombre');
+    const inpWa = card.querySelector('#input-metas-wa-pagos');
+    const listCont = card.querySelector('#container-crud-metas-sedes');
+    if (inpResp) inpResp.value = cfg.nombreResponsablePagos || 'Responsable de Pagos';
+    if (inpWa) inpWa.value = cfg.whatsappPagos || '';
+    if (listCont) listCont.innerHTML = renderMetasSedesItemsHTML(cfg);
+  };
+
+  cargarMetasRefillDesdeNube(store, true).then(refreshMetasUI).catch(() => {});
+
+  const btnSync = card.querySelector('#btn-sync-metas-refill');
+  if (btnSync) {
+    btnSync.addEventListener('click', async () => {
+      btnSync.disabled = true;
+      btnSync.textContent = '⏳...';
+      try {
+        const cfg = await cargarMetasRefillDesdeNube(store, true);
+        refreshMetasUI(cfg);
+        showToast('Metas y empleados sincronizados desde la nube', 'success');
+      } finally {
+        btnSync.disabled = false;
+        btnSync.textContent = '🔄 Sincronizar';
+      }
+    });
+  }
+
+  const btnSaveWa = card.querySelector('#btn-save-metas-wa');
+  if (btnSaveWa) {
+    btnSaveWa.addEventListener('click', async () => {
+      const respNombre = (card.querySelector('#input-metas-resp-nombre')?.value || '').trim() || 'Responsable de Pagos';
+      const wa = (card.querySelector('#input-metas-wa-pagos')?.value || '').trim();
+      const cfgActual = getMetasRefillConfigLocal(store);
+      btnSaveWa.disabled = true;
+      btnSaveWa.textContent = '⏳ Guardando...';
+      try {
+        const res = await guardarMetasRefillEnNube({
+          ...cfgActual,
+          nombreResponsablePagos: respNombre,
+          whatsappPagos: wa
+        }, store);
+        refreshMetasUI(res.config);
+        showToast(res.ok ? 'Datos del pagador guardados en la nube' : 'Guardado localmente (pendiente sincronización)', res.ok ? 'success' : 'warning');
+      } finally {
+        btnSaveWa.disabled = false;
+        btnSaveWa.textContent = '💾 Guardar Pagador';
+      }
+    });
+  }
+
+  card.querySelector('#btn-add-sede-meta')?.addEventListener('click', () => {
+    openSedeMetaModal(null, refreshMetasUI);
+  });
+
+  const listCont = card.querySelector('#container-crud-metas-sedes');
+  if (listCont) {
+    listCont.addEventListener('click', (e) => {
+      const btnEmp = e.target.closest('.btn-emp-sede-meta');
+      if (btnEmp) {
+        openEmpleadosSedeModal(btnEmp.dataset.sedeId, refreshMetasUI);
+        return;
+      }
+      const btnEdit = e.target.closest('.btn-edit-sede-meta');
+      if (btnEdit) {
+        openSedeMetaModal(btnEdit.dataset.sedeId, refreshMetasUI);
+        return;
+      }
+      const btnDel = e.target.closest('.btn-del-sede-meta');
+      if (btnDel) {
+        const sedeId = btnDel.dataset.sedeId;
+        const cfg = getMetasRefillConfigLocal(store);
+        const target = cfg.sedes.find(s => s.id === sedeId);
+        if (!target) return;
+        openModal({
+          title: '🗑️ Eliminar Tienda / Sede',
+          content: `<p style="font-size:14px;">¿Seguro deseas eliminar la sede <strong>${Utils.escapeHtml(target.nombre)}</strong> de la configuración de metas y empleados?</p>`,
+          saveLabel: 'Sí, Eliminar',
+          onSave: async () => {
+            const nextCfg = {
+              ...cfg,
+              sedes: cfg.sedes.filter(s => s.id !== sedeId)
+            };
+            const res = await guardarMetasRefillEnNube(nextCfg, store);
+            closeModal();
+            refreshMetasUI(res.config);
+            showToast(res.ok ? 'Sede eliminada y sincronizada' : 'Sede eliminada localmente', res.ok ? 'success' : 'warning');
+          }
+        });
+      }
+    });
+  }
+}
+
+function openSedeMetaModal(sedeId = null, onUpdated = null) {
+  const cfg = getMetasRefillConfigLocal(store);
+  const existente = sedeId ? cfg.sedes.find(s => s.id === sedeId) : null;
+  const isEdit = !!existente;
+
+  let metasWork = existente && Array.isArray(existente.metas) && existente.metas.length > 0
+    ? existente.metas.map(m => ({ montoUSD: m.montoUSD, bonoUSD: m.bonoUSD }))
+    : [
+        { montoUSD: 1000, bonoUSD: 10 },
+        { montoUSD: 1500, bonoUSD: 20 },
+        { montoUSD: 2000, bonoUSD: 30 },
+        { montoUSD: 2500, bonoUSD: 40 }
+      ];
+
+  const renderMetasRowsHTML = () => metasWork.map((m, i) => `
+    <div class="meta-edit-row" data-idx="${i}" style="display:grid; grid-template-columns: 70px 1fr 1fr 34px; gap:8px; align-items:center;">
+      <span style="font-size:12px; font-weight:700; color:#5B21B6;">Meta ${i + 1}</span>
+      <input type="number" step="1" min="1" class="form-control inp-meta-monto" value="${m.montoUSD}" placeholder="Venta $" style="height:34px; font-size:13px;" />
+      <input type="number" step="0.5" min="0" class="form-control inp-meta-bono" value="${m.bonoUSD}" placeholder="Bono $" style="height:34px; font-size:13px;" />
+      <button type="button" class="btn btn-xs btn-secondary btn-rm-meta-row" data-idx="${i}" style="height:34px; color:#DC2626;" title="Quitar meta">✕</button>
+    </div>
+  `).join('');
+
+  const content = `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Nombre de la Sede / Tienda *</label>
+        <input type="text" id="modal-sede-nombre" class="form-control" value="${Utils.escapeHtml(existente?.nombre || '')}" placeholder="Ej: Los Samanes" required />
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Correo POS Vinculado (opcional si aún no abre)</label>
+        <input type="email" id="modal-sede-email" class="form-control" value="${Utils.escapeHtml(existente?.email || '')}" placeholder="Ej: refillh2o.lss@gmail.com" />
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer;">
+        <input type="checkbox" id="modal-sede-activa" ${(!existente || existente.activa !== false) ? 'checked' : ''} style="width:16px; height:16px;" />
+        <span>Sede activa (mostrar barra de progreso y reporte semanal)</span>
+      </label>
+
+      <div style="border-top:1px solid var(--color-border); padding-top:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:12.5px; font-weight:700; color:#0F172A;">🎯 Niveles de Meta (Venta $ / Bono x Emp $)</span>
+          <button type="button" id="btn-modal-add-meta-row" class="btn btn-xs btn-secondary">+ Agregar Meta</button>
+        </div>
+        <div style="display:grid; grid-template-columns: 70px 1fr 1fr 34px; gap:8px; font-size:11px; font-weight:700; color:#64748B; margin-bottom:4px;">
+          <span>Nivel</span><span>Venta Meta ($)</span><span>Bono / Emp ($)</span><span></span>
+        </div>
+        <div id="modal-metas-rows-container" style="display:flex; flex-direction:column; gap:6px;">
+          ${renderMetasRowsHTML()}
+        </div>
+      </div>
+    </div>
+  `;
+
+  openModal({
+    title: isEdit ? `✏️ Editar Sede: ${Utils.escapeHtml(existente.nombre)}` : '🏪 Nueva Tienda / Sede Refill H2O',
+    content,
+    saveLabel: '💾 Guardar Sede',
+    onOpen: (overlay) => {
+      const rowsCont = overlay.querySelector('#modal-metas-rows-container');
+      const syncInputsToWork = () => {
+        const rows = [...rowsCont.querySelectorAll('.meta-edit-row')];
+        metasWork = rows.map(r => ({
+          montoUSD: parseFloat(r.querySelector('.inp-meta-monto').value) || 0,
+          bonoUSD: parseFloat(r.querySelector('.inp-meta-bono').value) || 0
+        }));
+      };
+      const repaintRows = () => {
+        rowsCont.innerHTML = renderMetasRowsHTML();
+      };
+      overlay.querySelector('#btn-modal-add-meta-row')?.addEventListener('click', () => {
+        syncInputsToWork();
+        const last = metasWork[metasWork.length - 1] || { montoUSD: 0, bonoUSD: 0 };
+        metasWork.push({ montoUSD: last.montoUSD + 500, bonoUSD: last.bonoUSD + 10 });
+        repaintRows();
+      });
+      rowsCont.addEventListener('click', (e) => {
+        const rm = e.target.closest('.btn-rm-meta-row');
+        if (!rm) return;
+        syncInputsToWork();
+        if (metasWork.length <= 1) {
+          showToast('La sede debe tener al menos una meta', 'warning');
+          return;
+        }
+        metasWork.splice(parseInt(rm.dataset.idx, 10), 1);
+        repaintRows();
+      });
+    },
+    onSave: async (overlay) => {
+      const nombre = (overlay.querySelector('#modal-sede-nombre')?.value || '').trim();
+      const email = (overlay.querySelector('#modal-sede-email')?.value || '').trim().toLowerCase();
+      const activa = !!overlay.querySelector('#modal-sede-activa')?.checked;
+      const rows = [...overlay.querySelectorAll('#modal-metas-rows-container .meta-edit-row')];
+      const metasNuevas = rows.map((r, i) => ({
+        nivel: i + 1,
+        montoUSD: parseFloat(r.querySelector('.inp-meta-monto').value) || 0,
+        bonoUSD: parseFloat(r.querySelector('.inp-meta-bono').value) || 0
+      })).filter(m => m.montoUSD > 0);
+
+      if (!nombre) {
+        showToast('Ingresa el nombre de la sede', 'warning');
+        return;
+      }
+      if (metasNuevas.length === 0) {
+        showToast('Configura al menos una meta con monto mayor a 0', 'warning');
+        return;
+      }
+
+      const nextCfg = getMetasRefillConfigLocal(store);
+      if (isEdit) {
+        nextCfg.sedes = nextCfg.sedes.map(s =>
+          s.id === sedeId ? { ...s, nombre, email, activa, metas: metasNuevas } : s
+        );
+      } else {
+        const slug = nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'sede';
+        nextCfg.sedes.push({
+          id: `${slug}_${Date.now().toString(36)}`,
+          nombre,
+          email,
+          activa,
+          metas: metasNuevas,
+          empleados: []
+        });
+      }
+
+      const res = await guardarMetasRefillEnNube(nextCfg, store);
+      closeModal();
+      if (typeof onUpdated === 'function') onUpdated(res.config);
+      showToast(res.ok ? 'Sede guardada y sincronizada' : 'Sede guardada localmente', res.ok ? 'success' : 'warning');
+    }
+  });
+}
+
+function openEmpleadosSedeModal(sedeId, onUpdated = null) {
+  const cfg = getMetasRefillConfigLocal(store);
+  const sede = cfg.sedes.find(s => s.id === sedeId);
+  if (!sede) return;
+
+  let empsWork = (sede.empleados || []).map(e => ({ ...e }));
+
+  const renderEmpsRowsHTML = () => {
+    if (empsWork.length === 0) {
+      return `<div class="text-muted" style="padding:12px; text-align:center; border:1px dashed var(--color-border); border-radius:8px; font-size:13px;">No hay empleados registrados en esta sede. Agrega el primero arriba.</div>`;
+    }
+    return empsWork.map((e, i) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px;">
+        <div style="min-width:0;">
+          <div style="font-size:13.5px; font-weight:700; color:${e.activo !== false ? '#0F172A' : '#94A3B8'}; ${e.activo === false ? 'text-decoration:line-through;' : ''}">
+            👤 ${Utils.escapeHtml(e.nombre)}
+          </div>
+          ${e.cargo ? `<div style="font-size:11.5px; color:#64748B;">${Utils.escapeHtml(e.cargo)}</div>` : ''}
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button type="button" class="btn btn-xs btn-secondary btn-toggle-emp-activo" data-idx="${i}">
+            ${e.activo !== false ? '🟢 Activo' : '⚪ Inactivo'}
+          </button>
+          <button type="button" class="btn btn-xs btn-secondary btn-del-emp-row" data-idx="${i}" style="color:#DC2626;">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  };
+
+  const content = `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div style="background:#EEF2FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end;">
+        <div class="form-group" style="flex:1.4; min-width:150px; margin-bottom:0;">
+          <label class="form-label" style="font-size:11.5px; font-weight:700; color:#3730A3;">Nombre del Empleado *</label>
+          <input type="text" id="inp-nuevo-emp-nombre" class="form-control" placeholder="Ej: Juan Pérez" style="height:34px; font-size:13px;" />
+        </div>
+        <div class="form-group" style="flex:1; min-width:110px; margin-bottom:0;">
+          <label class="form-label" style="font-size:11.5px; font-weight:700; color:#3730A3;">Cargo (opcional)</label>
+          <input type="text" id="inp-nuevo-emp-cargo" class="form-control" placeholder="Ej: Operario" style="height:34px; font-size:13px;" />
+        </div>
+        <button type="button" id="btn-agregar-emp-lista" class="btn btn-sm btn-primary" style="height:34px;">+ Agregar</button>
+      </div>
+
+      <div id="modal-emps-lista-cont" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
+        ${renderEmpsRowsHTML()}
+      </div>
+      <div class="text-muted" style="font-size:11.5px;">
+        Los empleados activos recibirán el bono configurado según la meta alcanzada de lunes a sábado.
+      </div>
+    </div>
+  `;
+
+  openModal({
+    title: `👥 Empleados · ${Utils.escapeHtml(sede.nombre)}`,
+    content,
+    saveLabel: '💾 Guardar Cambios',
+    onOpen: (overlay) => {
+      const inpNom = overlay.querySelector('#inp-nuevo-emp-nombre');
+      const inpCargo = overlay.querySelector('#inp-nuevo-emp-cargo');
+      const listCont = overlay.querySelector('#modal-emps-lista-cont');
+
+      const repaint = () => {
+        listCont.innerHTML = renderEmpsRowsHTML();
+      };
+
+      const addEmp = () => {
+        const nom = (inpNom.value || '').trim();
+        const cargo = (inpCargo.value || '').trim();
+        if (!nom) {
+          showToast('Escribe el nombre del empleado', 'warning');
+          return;
+        }
+        empsWork.push({
+          id: 'emp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+          nombre: nom,
+          cargo,
+          activo: true
+        });
+        inpNom.value = '';
+        inpCargo.value = '';
+        inpNom.focus();
+        repaint();
+      };
+
+      overlay.querySelector('#btn-agregar-emp-lista')?.addEventListener('click', addEmp);
+      inpNom?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addEmp();
+        }
+      });
+
+      listCont.addEventListener('click', (e) => {
+        const toggleBtn = e.target.closest('.btn-toggle-emp-activo');
+        if (toggleBtn) {
+          const idx = parseInt(toggleBtn.dataset.idx, 10);
+          if (empsWork[idx]) {
+            empsWork[idx].activo = empsWork[idx].activo === false;
+            repaint();
+          }
+          return;
+        }
+        const delBtn = e.target.closest('.btn-del-emp-row');
+        if (delBtn) {
+          empsWork.splice(parseInt(delBtn.dataset.idx, 10), 1);
+          repaint();
+        }
+      });
+    },
+    onSave: async (overlay) => {
+      const nomPendiente = (overlay.querySelector('#inp-nuevo-emp-nombre')?.value || '').trim();
+      const cargoPendiente = (overlay.querySelector('#inp-nuevo-emp-cargo')?.value || '').trim();
+      if (nomPendiente) {
+        empsWork.push({
+          id: 'emp_' + Date.now().toString(36),
+          nombre: nomPendiente,
+          cargo: cargoPendiente,
+          activo: true
+        });
+      }
+
+      const nextCfg = getMetasRefillConfigLocal(store);
+      nextCfg.sedes = nextCfg.sedes.map(s =>
+        s.id === sedeId ? { ...s, empleados: empsWork } : s
+      );
+      const res = await guardarMetasRefillEnNube(nextCfg, store);
+      closeModal();
+      if (typeof onUpdated === 'function') onUpdated(res.config);
+      showToast(res.ok ? 'Personal actualizado y sincronizado' : 'Personal guardado localmente', res.ok ? 'success' : 'warning');
     }
   });
 }

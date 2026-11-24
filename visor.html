@@ -2091,7 +2091,46 @@ body.hide-montos #cierre-digital-usd {
 
     <!-- PESTAÑA 1: HOY EN VIVO -->
     <div id="tab-hoy" class="view-section active">
-      
+
+      <style>
+        .visor-alerts-row {
+          display: flex;
+          align-items: stretch;
+          gap: 8px;
+          margin-bottom: 10px;
+          width: 100%;
+        }
+        .visor-alert-card {
+          flex: 1 1 0;
+          min-width: 0;
+          padding: 8px 10px;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 6px;
+          font-size: 0.76rem;
+          line-height: 1.25;
+          box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+        }
+        .visor-alert-top {
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+        }
+        .visor-alert-btn {
+          align-self: flex-start;
+          border: none;
+          border-radius: 8px;
+          padding: 4px 9px;
+          font-size: 0.7rem;
+          font-weight: 800;
+          cursor: pointer;
+          color: #fff;
+        }
+      </style>
+      <div id="visor-alertas-operativas" class="visor-alerts-row" style="display: none;"></div>
+
       <!-- Hero Card de Ventas -->
       <!-- Selector de Periodo Táctil Neumórfico -->
     <div class="period-selector-pill">
@@ -2288,6 +2327,53 @@ body.hide-montos #cierre-digital-usd {
         </div>
       </div>
 
+      <!-- Sección Metas y Bonos Semanales (Lun–Sáb) — Exclusivo Refill H2O -->
+      <div id="sec-metas-bonos-visor" style="display: none; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h3 class="section-title" style="margin: 0;">🏆 Metas y Bonos Semanales</h3>
+            <p id="txt-metas-rango-semana" style="font-size: 0.74rem; color: var(--neu-text-muted); margin: 2px 0 0 0;">
+              Ciclo Lun–Sáb · Cálculo escalonado de bonos
+            </p>
+          </div>
+          <div class="multisede-period-pills" style="background: var(--neu-surface); border: 1px solid #fff; box-shadow: var(--neu-shadow-sm);">
+            <button type="button" class="btn-period-multi active" id="btn-metas-sem-actual" onclick="cambiarSemanaMetasVisor(0)" style="color: #64748B;">Esta Sem.</button>
+            <button type="button" class="btn-period-multi" id="btn-metas-sem-anterior" onclick="cambiarSemanaMetasVisor(-1)" style="color: #64748B;">Anterior</button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px;">
+          <div style="background: var(--neu-surface); border: 1px solid #fff; border-radius: 14px; padding: 10px 6px; text-align: center; box-shadow: var(--neu-shadow-sm);">
+            <div style="font-size: 0.62rem; color: var(--neu-text-muted); font-weight: 800; text-transform: uppercase;">Sedes en Meta</div>
+            <div id="kpi-metas-sedes-ok" style="font-size: 1.05rem; font-weight: 800; color: #059669; margin-top: 2px;">0 / 0</div>
+          </div>
+          <div style="background: var(--neu-surface); border: 1px solid #fff; border-radius: 14px; padding: 10px 6px; text-align: center; box-shadow: var(--neu-shadow-sm);">
+            <div style="font-size: 0.62rem; color: var(--neu-text-muted); font-weight: 800; text-transform: uppercase;">Personal Bono</div>
+            <div id="kpi-metas-emp-count" style="font-size: 1.05rem; font-weight: 800; color: #0284C7; margin-top: 2px;">0</div>
+          </div>
+          <div style="background: var(--neu-surface); border: 1px solid #fff; border-radius: 14px; padding: 10px 6px; text-align: center; box-shadow: var(--neu-shadow-sm);">
+            <div style="font-size: 0.62rem; color: var(--neu-text-muted); font-weight: 800; text-transform: uppercase;">Total a Pagar</div>
+            <div id="kpi-metas-total-usd" style="font-size: 1.05rem; font-weight: 800; color: #7C3AED; margin-top: 2px;">$ 0</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+          <button type="button" onclick="enviarReporteMetasWhatsApp()" style="flex: 1.4; min-width: 170px; background: linear-gradient(135deg, #16A34A 0%, #15803D 100%); color: #fff; border: none; border-radius: 12px; padding: 10px 12px; font-size: 0.82rem; font-weight: 800; cursor: pointer; box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25);">
+            📲 Enviar Reporte a WhatsApp
+          </button>
+          <button type="button" onclick="copiarReporteMetasTexto()" style="background: var(--neu-surface); color: #0F172A; border: 1px solid #CBD5E1; border-radius: 12px; padding: 10px 12px; font-size: 0.8rem; font-weight: 800; cursor: pointer;">
+            📋 Copiar
+          </button>
+          <button type="button" onclick="abrirCrudMetasEnSupervisor()" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; border-radius: 12px; padding: 10px 12px; font-size: 0.8rem; font-weight: 800; cursor: pointer;">
+            ⚙️ Modo Supervisor
+          </button>
+        </div>
+
+        <div id="container-metas-sedes-visor" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Tarjetas por sede generadas dinámicamente -->
+        </div>
+      </div>
+
       <!-- Métricas individuales de la sede activa -->
       <div class="card-hero" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-color: rgba(6, 182, 212, 0.3); margin-bottom: 18px;">
         <div class="hero-label" style="color: #475569;">Facturado este Mes (<span id="txt-stats-sede-activa">Esta Tienda</span>)</div>
@@ -2341,6 +2427,20 @@ body.hide-montos #cierre-digital-usd {
         <div class="tank-progress-bg" style="height: 16px;">
           <div class="tank-progress-fill" id="inv-tank-bar" style="width: 68%;"></div>
         </div>
+      </div>
+
+      <!-- Tarjeta Mantenimiento de Filtros -->
+      <div class="tank-card" id="card-mant-filtros-visor" style="margin-top: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <div style="font-size: 0.95rem; font-weight: 800; color: var(--neu-text-main, #0F172A);">🧪 Mantenimiento de Filtros</div>
+          <span id="visor-mant-badge" style="font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: #F1F5F9; color: #475569;">Sin registrar</span>
+        </div>
+        <div id="visor-mant-detalle" style="font-size: 0.8rem; color: var(--neu-text-muted, #64748B); line-height: 1.45; margin-bottom: 10px;">
+          Aún no se ha registrado la fecha de mantenimiento de filtros.
+        </div>
+        <button type="button" id="btn-abrir-mant-filtros-visor" onclick="abrirModalMantFiltrosVisor()" style="width: 100%; background: var(--neu-surface, #EFF1F5); color: #15803D; border: 1.5px solid #BBF7D0; border-radius: 12px; padding: 9px 12px; font-size: 0.84rem; font-weight: 800; cursor: pointer;">
+          🧪 Registrar / Editar Mantenimiento
+        </button>
       </div>
 
       <h3 class="section-title">📦 Stock de Productos Físicos</h3>
@@ -2605,6 +2705,53 @@ body.hide-montos #cierre-digital-usd {
     <div style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 14px; padding: 12px; font-size: 0.8rem; color: #0369A1; line-height: 1.4;">
       💡 <strong>Enlace oficial del Visor Supervisor:</strong><br/>
       <span style="font-family: monospace; word-break: break-all; color: #0F172A; font-weight: 600;">https://varom3ro.github.io/WaterApp/visor-supervisor.html</span>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Mantenimiento de Filtros para Dueño -->
+<div id="modal-mant-filtros-visor" class="ios-modal-overlay" style="display: none; align-items: center; z-index: 10002;">
+  <div class="ios-modal-card" style="max-width: 420px; text-align: left; max-height: 90vh; overflow-y: auto; background: var(--neu-surface, #EFF1F5); color: var(--neu-text-main, #181A1F); border-radius: 24px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); padding: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 10px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.35rem;">🧪</span>
+        <div>
+          <h3 style="font-size: 1.05rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; margin: 0; color: var(--neu-text-main, #0F172A);">Mantenimiento de Filtros</h3>
+          <p id="visor-mant-modal-sede" style="font-size: 0.74rem; color: var(--neu-text-muted, #64748B); margin: 0;">Control preventivo y alerta 7 días antes</p>
+        </div>
+      </div>
+      <button type="button" onclick="cerrarModalMantFiltrosVisor()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--neu-text-muted);">✕</button>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 12px;">
+      <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin-bottom: 4px; display: block;">Última fecha de mantenimiento *</label>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="date" id="visor-mant-fecha" class="form-control" style="flex: 1; background: #fff; border: 1px solid #CBD5E1; color: #1E293B; height: 42px; border-radius: 10px; font-size: 0.9rem; padding: 0 10px;" />
+        <button type="button" onclick="setFechaHoyMantVisor()" style="background: #E2E8F0; color: #0F172A; border: none; border-radius: 10px; height: 42px; padding: 0 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Hoy</button>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 12px;">
+      <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin-bottom: 4px; display: block;">Frecuencia del mantenimiento *</label>
+      <select id="visor-mant-freq" class="form-control" style="width: 100%; background: #fff; border: 1px solid #CBD5E1; color: #1E293B; height: 42px; border-radius: 10px; font-size: 0.9rem; padding: 0 10px;">
+        <option value="trimestral">Trimestral (cada 3 meses)</option>
+        <option value="cuatrimestral">Cuatrimestral (cada 4 meses)</option>
+        <option value="semestral">Semestral (cada 6 meses)</option>
+      </select>
+    </div>
+
+    <div id="visor-mant-preview" style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; padding: 10px 12px; font-size: 0.8rem; color: #0369A1; margin-bottom: 12px;">
+      Selecciona fecha y frecuencia para calcular el próximo mantenimiento.
+    </div>
+
+    <div class="form-group" style="margin-bottom: 14px;">
+      <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: var(--neu-text-muted); margin-bottom: 4px; display: block;">Nota / Detalle (opcional)</label>
+      <input type="text" id="visor-mant-nota" class="form-control" maxlength="160" placeholder="Ej: Cambio de carbón activado, membranas y sedimentos" style="width: 100%; background: #fff; border: 1px solid #CBD5E1; color: #1E293B; height: 42px; border-radius: 10px; font-size: 0.88rem; padding: 0 10px;" />
+    </div>
+
+    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+      <button type="button" onclick="cerrarModalMantFiltrosVisor()" style="background: #E2E8F0; color: #475569; border: none; padding: 9px 14px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">Cancelar</button>
+      <button type="button" id="btn-guardar-mant-visor" onclick="guardarMantFiltrosVisor()" style="background: var(--primary, #10B981); color: #fff; border: none; padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -3474,6 +3621,12 @@ async function cargarTodasLasSedesRefill() {
     });
 
     renderizarConsolidadoYRankingMultisede(periodoConsolidadoMultisede);
+    if (typeof cargarMetasRefillVisor === 'function') {
+      await cargarMetasRefillVisor();
+    }
+    if (typeof renderizarReporteMetasVisor === 'function') {
+      renderizarReporteMetasVisor();
+    }
 
   } catch(e) {
     console.warn('[Visor] Error al cargar todas las sedes:', e);
@@ -3766,6 +3919,9 @@ function renderizarConsolidadoEnPantallaPrincipal() {
       <span class="live-dot" style="background:#10B981;"></span>
       <span style="color:#059669; font-weight:700;">RED CONECTADA</span> · <span style="color:#475569;">Consolidado de 6 sedes en tiempo real</span>
     `;
+  }
+  if (typeof renderizarAlertasConsolidadasRedVisor === 'function') {
+    renderizarAlertasConsolidadasRedVisor();
   }
 
   const redHoy = calcularTotalesPeriodoRed('hoy');
@@ -4265,6 +4421,8 @@ function cambiarTab(tabName) {
 
     document.getElementById('inv-tank-litros').textContent = `${(t.litros || 0).toLocaleString()} L`;
     document.getElementById('inv-tank-bar').style.width = `${pct}%`;
+
+    renderizarAlertasYCardFiltrosVisor(storeData);
 
     // Feed de Movimientos con Separadores de Día y grupos colapsables (Últimos 6 días con historial completo)
     const feedCont = document.getElementById('feed-container');
@@ -5031,6 +5189,783 @@ function cambiarTab(tabName) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // =========================================================================
+  // MANTENIMIENTO DE FILTROS Y ALERTAS OPERATIVAS COMPARTIDAS (1 O 2 COLUMNAS)
+  // =========================================================================
+  function getTodayISOVisor() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function formatFechaShortVisor(iso) {
+    if (!iso) return '—';
+    const p = String(iso).slice(0, 10).split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+  }
+
+  function calcularProximaFechaFiltrosVisor(ultimaFechaISO, frecuencia = 'trimestral') {
+    if (!ultimaFechaISO || typeof ultimaFechaISO !== 'string') return '';
+    const partes = ultimaFechaISO.slice(0, 10).split('-').map(Number);
+    if (partes.length !== 3 || partes.some(n => isNaN(n))) return '';
+    const [anio, mes, dia] = partes;
+    const meses = { trimestral: 3, cuatrimestral: 4, semestral: 6 }[frecuencia] || 3;
+    const totalMeses = (anio * 12 + (mes - 1)) + meses;
+    const anioDest = Math.floor(totalMeses / 12);
+    const mesDestIdx = totalMeses % 12;
+    const ultimoDiaMes = new Date(anioDest, mesDestIdx + 1, 0).getDate();
+    const diaDest = Math.min(dia, ultimoDiaMes);
+    return `${anioDest}-${String(mesDestIdx + 1).padStart(2, '0')}-${String(diaDest).padStart(2, '0')}`;
+  }
+
+  function evaluarMantenimientoFiltrosVisor(mant) {
+    const freqInfo = {
+      trimestral: { meses: 3, label: 'Trimestral' },
+      cuatrimestral: { meses: 4, label: 'Cuatrimestral' },
+      semestral: { meses: 6, label: 'Semestral' }
+    };
+    const rawFreq = mant && freqInfo[mant.frecuencia] ? mant.frecuencia : 'trimestral';
+    const info = freqInfo[rawFreq];
+    const ultimaFecha = mant && mant.ultimaFecha ? String(mant.ultimaFecha).slice(0, 10) : '';
+    const nota = mant && mant.nota ? String(mant.nota) : '';
+    if (!ultimaFecha) {
+      return {
+        configurado: false, ultimaFecha: '', frecuencia: rawFreq,
+        frecuenciaLabel: info.label, meses: info.meses, proximaFecha: '',
+        diasRestantes: null, mostrarAlerta: false, vencido: false, venceHoy: false, porVencer: false, nota
+      };
+    }
+    const proximaFecha = calcularProximaFechaFiltrosVisor(ultimaFecha, rawFreq);
+    const hoy = getTodayISOVisor();
+    const parseUTC = (iso) => {
+      const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+      return Date.UTC(y, m - 1, d);
+    };
+    const diasRestantes = proximaFecha ? Math.round((parseUTC(proximaFecha) - parseUTC(hoy)) / 86400000) : null;
+    const vencido = diasRestantes !== null && diasRestantes < 0;
+    const venceHoy = diasRestantes === 0;
+    const porVencer = diasRestantes !== null && diasRestantes > 0 && diasRestantes <= 7;
+    return {
+      configurado: true, ultimaFecha, frecuencia: rawFreq,
+      frecuenciaLabel: info.label, meses: info.meses, proximaFecha,
+      diasRestantes, mostrarAlerta: diasRestantes !== null && diasRestantes <= 7,
+      vencido, venceHoy, porVencer, nota
+    };
+  }
+
+  function extraerMantFiltrosStoreData(sd) {
+    if (sd?.nivel_tanque?.mantenimientoFiltros?.ultimaFecha) {
+      return sd.nivel_tanque.mantenimientoFiltros;
+    }
+    const cfg = sd?.respaldo_completo?.configuracion;
+    if (Array.isArray(cfg)) {
+      const found = cfg.find(c => c && c.id === 'mantenimientoFiltros');
+      if (found?.value?.ultimaFecha) return found.value;
+    } else if (cfg?.mantenimientoFiltros?.ultimaFecha) {
+      return cfg.mantenimientoFiltros;
+    }
+    return null;
+  }
+
+  function getBadgeMantVisor(est) {
+    if (!est.configurado) return { text: 'Sin registrar', bg: '#F1F5F9', color: '#475569' };
+    if (est.vencido) return { text: `🚨 Vencido (${Math.abs(est.diasRestantes)}d)`, bg: '#FEE2E2', color: '#991B1B' };
+    if (est.venceHoy) return { text: '🚨 Vence hoy', bg: '#FEE2E2', color: '#991B1B' };
+    if (est.porVencer) return { text: `⚠️ En ${est.diasRestantes}d`, bg: '#FEF3C7', color: '#92400E' };
+    return { text: `✅ Al día (${est.diasRestantes}d)`, bg: '#DCFCE7', color: '#166534' };
+  }
+
+  function renderizarAlertasYCardFiltrosVisor(storeData) {
+    const t = storeData?.nivel_tanque || {};
+    const litros = parseFloat(t.litros) || 0;
+    const cap = parseFloat(t.capacidadTanque) || 30000;
+    const pct = t.nivelPct !== undefined ? t.nivelPct : (cap > 0 ? Math.round((litros / cap) * 100) : 0);
+    const tanqueVacio = litros <= 0;
+    const tanqueBajo = !tanqueVacio && pct < 15;
+    const alertaAgua = tanqueVacio || tanqueBajo;
+
+    const mant = extraerMantFiltrosStoreData(storeData);
+    const est = evaluarMantenimientoFiltrosVisor(mant);
+    const alertaFiltros = est.mostrarAlerta;
+
+    // 1. Fila de alertas operativas en #tab-hoy (1 o 2 columnas en la misma fila)
+    const rowEl = document.getElementById('visor-alertas-operativas');
+    if (rowEl) {
+      if (!alertaAgua && !alertaFiltros) {
+        rowEl.style.display = 'none';
+        rowEl.innerHTML = '';
+      } else {
+        let html = '';
+        if (alertaAgua) {
+          html += `
+            <div class="visor-alert-card" style="background: ${tanqueVacio ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${tanqueVacio ? '#EF4444' : '#F59E0B'}; color: ${tanqueVacio ? '#991B1B' : '#92400E'};">
+              <div class="visor-alert-top">
+                <span style="font-size: 1rem; line-height: 1;">${tanqueVacio ? '🚨' : '⚠️'}</span>
+                <div>
+                  <strong>${tanqueVacio ? 'Tanque en 0 L' : `Agua baja (${pct}%)`}</strong>
+                  <div style="opacity: 0.9;">${litros.toLocaleString()} L disponibles</div>
+                </div>
+              </div>
+              <button type="button" class="visor-alert-btn" style="background: ${tanqueVacio ? '#DC2626' : '#D97706'};" onclick="document.getElementById('tank-litros')?.scrollIntoView({ behavior: 'smooth', block: 'center' })">
+                🚰 Ver Tanque
+              </button>
+            </div>
+          `;
+        }
+        if (alertaFiltros) {
+          const filtUrg = est.vencido || est.venceHoy;
+          const descFilt = est.vencido
+            ? `Venció el ${formatFechaShortVisor(est.proximaFecha)}`
+            : est.venceHoy
+              ? `Toca hoy (${est.frecuenciaLabel})`
+              : `El ${formatFechaShortVisor(est.proximaFecha)} (${est.frecuenciaLabel})`;
+          html += `
+            <div class="visor-alert-card" style="background: ${filtUrg ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${filtUrg ? '#EF4444' : '#F59E0B'}; color: ${filtUrg ? '#991B1B' : '#92400E'};">
+              <div class="visor-alert-top">
+                <span style="font-size: 1rem; line-height: 1;">${filtUrg ? '🚨' : '🧪'}</span>
+                <div>
+                  <strong>${est.vencido ? `Filtros vencidos (${Math.abs(est.diasRestantes)}d)` : est.venceHoy ? 'Filtros: Vence HOY' : `Filtros en ${est.diasRestantes} día${est.diasRestantes === 1 ? '' : 's'}`}</strong>
+                  <div style="opacity: 0.9;">${escapeHtml(descFilt)}</div>
+                </div>
+              </div>
+              <button type="button" class="visor-alert-btn" style="background: ${filtUrg ? '#DC2626' : '#D97706'};" onclick="abrirModalMantFiltrosVisor()">
+                🧪 Actualizar
+              </button>
+            </div>
+          `;
+        }
+        rowEl.innerHTML = html;
+        rowEl.style.display = 'flex';
+      }
+    }
+
+    // 2. Tarjeta en #tab-inv
+    const badgeEl = document.getElementById('visor-mant-badge');
+    const detEl = document.getElementById('visor-mant-detalle');
+    const badge = getBadgeMantVisor(est);
+    if (badgeEl) {
+      badgeEl.textContent = badge.text;
+      badgeEl.style.background = badge.bg;
+      badgeEl.style.color = badge.color;
+    }
+    if (detEl) {
+      if (est.configurado) {
+        detEl.innerHTML = `
+          <div><strong>Último cambio:</strong> ${formatFechaShortVisor(est.ultimaFecha)} · <strong>${est.frecuenciaLabel}</strong> (c/ ${est.meses}m)</div>
+          <div><strong>Próximo cambio:</strong> <span style="color:${est.mostrarAlerta ? badge.color : '#0F172A'}; font-weight:700;">${formatFechaShortVisor(est.proximaFecha)}</span></div>
+          ${est.nota ? `<div style="margin-top:4px; opacity:0.85;">📝 ${escapeHtml(est.nota)}</div>` : ''}
+        `;
+      } else {
+        detEl.textContent = 'Aún no se ha registrado la fecha de mantenimiento de filtros. Regístrala para recibir alerta 7 días antes.';
+      }
+    }
+  }
+
+  function renderizarAlertasConsolidadasRedVisor() {
+    const rowEl = document.getElementById('visor-alertas-operativas');
+    if (!rowEl) return;
+    const sedesAguaBaja = [];
+    const sedesFiltros = [];
+    Object.keys(REFILLH2O_SEDES).forEach(email => {
+      const sd = cacheGlobalTiendas[email.toLowerCase()];
+      if (!sd) return;
+      const info = REFILLH2O_SEDES[email.toLowerCase()];
+      const t = sd.nivel_tanque || {};
+      const litros = parseFloat(t.litros) || 0;
+      const cap = parseFloat(t.capacidadTanque) || 30000;
+      const pct = t.nivelPct !== undefined ? t.nivelPct : (cap > 0 ? Math.round((litros / cap) * 100) : 0);
+      if (litros <= 0 || pct < 15) sedesAguaBaja.push({ email, sede: info.sede });
+      const est = evaluarMantenimientoFiltrosVisor(extraerMantFiltrosStoreData(sd));
+      if (est.mostrarAlerta) sedesFiltros.push({ email, sede: info.sede });
+    });
+
+    if (sedesAguaBaja.length === 0 && sedesFiltros.length === 0) {
+      rowEl.style.display = 'none';
+      rowEl.innerHTML = '';
+      return;
+    }
+    let html = '';
+    if (sedesAguaBaja.length > 0) {
+      html += `
+        <div class="visor-alert-card" style="background:#FFFBEB; border:1.5px solid #F59E0B; color:#92400E;">
+          <div class="visor-alert-top">
+            <span style="font-size:1rem; line-height:1;">⚠️</span>
+            <div>
+              <strong>Agua baja (${sedesAguaBaja.length} sede${sedesAguaBaja.length === 1 ? '' : 's'})</strong>
+              <div style="opacity:0.9;">${sedesAguaBaja.map(s => escapeHtml(s.sede)).join(', ')}</div>
+            </div>
+          </div>
+          <button type="button" class="visor-alert-btn" style="background:#D97706;" onclick="cambiarSedeRefillH2O('${sedesAguaBaja[0].email}')">Ver Sede</button>
+        </div>
+      `;
+    }
+    if (sedesFiltros.length > 0) {
+      html += `
+        <div class="visor-alert-card" style="background:#FFFBEB; border:1.5px solid #F59E0B; color:#92400E;">
+          <div class="visor-alert-top">
+            <span style="font-size:1rem; line-height:1;">🧪</span>
+            <div>
+              <strong>Filtros próximos (${sedesFiltros.length} sede${sedesFiltros.length === 1 ? '' : 's'})</strong>
+              <div style="opacity:0.9;">${sedesFiltros.map(s => escapeHtml(s.sede)).join(', ')}</div>
+            </div>
+          </div>
+          <button type="button" class="visor-alert-btn" style="background:#D97706;" onclick="cambiarSedeRefillH2O('${sedesFiltros[0].email}')">Ver Sede</button>
+        </div>
+      `;
+    }
+    rowEl.innerHTML = html;
+    rowEl.style.display = 'flex';
+  }
+
+  let mantEditEmailVisor = '';
+
+  function actualizarPreviewMantVisor() {
+    const inpFecha = document.getElementById('visor-mant-fecha');
+    const selFreq = document.getElementById('visor-mant-freq');
+    const preview = document.getElementById('visor-mant-preview');
+    if (!inpFecha || !selFreq || !preview) return;
+    const est = evaluarMantenimientoFiltrosVisor({
+      ultimaFecha: inpFecha.value,
+      frecuencia: selFreq.value
+    });
+    if (!est.configurado) {
+      preview.textContent = 'Selecciona fecha y frecuencia para calcular el próximo mantenimiento.';
+      return;
+    }
+    const badge = getBadgeMantVisor(est);
+    preview.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span>📅 <strong>Próximo:</strong> ${formatFechaShortVisor(est.proximaFecha)}</span>
+        <span style="padding:2px 8px; border-radius:999px; font-size:0.72rem; font-weight:800; background:${badge.bg}; color:${badge.color};">${badge.text}</span>
+      </div>
+    `;
+  }
+
+  window.setFechaHoyMantVisor = function() {
+    const inp = document.getElementById('visor-mant-fecha');
+    if (inp) {
+      inp.value = getTodayISOVisor();
+      actualizarPreviewMantVisor();
+    }
+  };
+
+  window.abrirModalMantFiltrosVisor = function() {
+    const emailRaw = (currentStoreEmail || '').toLowerCase();
+    if (!emailRaw || emailRaw === 'todas') {
+      alert('📌 Selecciona primero una sede específica para configurar su mantenimiento de filtros.');
+      return;
+    }
+    mantEditEmailVisor = emailRaw;
+    const sd = cacheGlobalTiendas[emailRaw] || {};
+    const actual = extraerMantFiltrosStoreData(sd);
+    const infoSede = typeof obtenerInfoSedeRefill === 'function' ? obtenerInfoSedeRefill(emailRaw) : null;
+
+    const lblSede = document.getElementById('visor-mant-modal-sede');
+    if (lblSede) lblSede.textContent = infoSede ? `Sede: ${infoSede.sede}` : emailRaw;
+
+    const inpFecha = document.getElementById('visor-mant-fecha');
+    const selFreq = document.getElementById('visor-mant-freq');
+    const inpNota = document.getElementById('visor-mant-nota');
+    if (inpFecha) inpFecha.value = actual?.ultimaFecha ? String(actual.ultimaFecha).slice(0, 10) : getTodayISOVisor();
+    if (selFreq) selFreq.value = actual?.frecuencia || 'trimestral';
+    if (inpNota) inpNota.value = actual?.nota || '';
+
+    actualizarPreviewMantVisor();
+    const modal = document.getElementById('modal-mant-filtros-visor');
+    if (modal) modal.style.display = 'flex';
+  };
+
+  window.cerrarModalMantFiltrosVisor = function() {
+    const modal = document.getElementById('modal-mant-filtros-visor');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.guardarMantFiltrosVisor = async function() {
+    const targetEmail = mantEditEmailVisor || (currentStoreEmail || '').toLowerCase();
+    if (!targetEmail || targetEmail === 'todas') {
+      alert('Selecciona una sede válida.');
+      return;
+    }
+    const ultimaFecha = document.getElementById('visor-mant-fecha')?.value || '';
+    const frecuencia = document.getElementById('visor-mant-freq')?.value || 'trimestral';
+    const nota = (document.getElementById('visor-mant-nota')?.value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ultimaFecha)) {
+      alert('Selecciona una fecha válida de mantenimiento.');
+      return;
+    }
+
+    const mantObj = {
+      ultimaFecha,
+      frecuencia,
+      proximaFecha: calcularProximaFechaFiltrosVisor(ultimaFecha, frecuencia),
+      nota,
+      actualizadoEn: new Date().toISOString()
+    };
+
+    const btn = document.getElementById('btn-guardar-mant-visor');
+    const txtOrig = btn ? btn.textContent : '💾 Guardar';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+    }
+
+    try {
+      // 1. Obtener nivel_tanque actual y actualizar preservando agua/capacidad
+      let baseNT = { ...(cacheGlobalTiendas[targetEmail]?.nivel_tanque || {}) };
+      try {
+        const resNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(targetEmail)}&select=nivel_tanque`, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        if (resNT.ok) {
+          const rows = await resNT.json();
+          if (rows && rows[0] && rows[0].nivel_tanque) baseNT = { ...rows[0].nivel_tanque };
+        }
+      } catch (_) {}
+
+      const nuevoNT = { ...baseNT, mantenimientoFiltros: mantObj };
+      await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(targetEmail)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nivel_tanque: nuevoNT,
+          ultima_actualizacion: new Date().toISOString()
+        })
+      });
+
+      // 2. Enviar comando remoto para el POS en licencia_agua_clientes
+      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(targetEmail)}&select=id,visor_actividad`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (resLic.ok) {
+        const list = await resLic.json();
+        if (list && list.length > 0) {
+          const c = list[0];
+          const act = c.visor_actividad || {};
+          const prevAj = act.ajustes_remotos || {};
+          await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              visor_actividad: {
+                ...act,
+                ajustes_remotos: {
+                  ...prevAj,
+                  mantenimientoFiltros: mantObj,
+                  motivo: `Mantenimiento de filtros (${frecuencia})`,
+                  supervisor: 'Dueño (Visor)',
+                  timestamp: Date.now()
+                }
+              }
+            })
+          });
+        }
+      }
+
+      if (!cacheGlobalTiendas[targetEmail]) cacheGlobalTiendas[targetEmail] = {};
+      cacheGlobalTiendas[targetEmail].nivel_tanque = nuevoNT;
+      renderizarAlertasYCardFiltrosVisor(cacheGlobalTiendas[targetEmail]);
+      cerrarModalMantFiltrosVisor();
+      alert('✅ Mantenimiento de filtros guardado y sincronizado.');
+    } catch (err) {
+      console.error('Error guardando mantenimiento de filtros en Visor:', err);
+      alert('❌ No se pudo guardar en la nube. Verifica tu conexión.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = txtOrig;
+      }
+    }
+  };
+
+  document.getElementById('visor-mant-fecha')?.addEventListener('change', actualizarPreviewMantVisor);
+  document.getElementById('visor-mant-fecha')?.addEventListener('input', actualizarPreviewMantVisor);
+  document.getElementById('visor-mant-freq')?.addEventListener('change', actualizarPreviewMantVisor);
+
+  // =========================================================================
+  // REPORTE DE METAS SEMANALES (LUN-SÁB) Y BONOS POR EMPLEADO (REFILL H2O)
+  // =========================================================================
+  let metasRefillCacheVisor = null;
+  let semanaOffsetMetasVisor = 0;
+
+  function getDefaultMetasRefillVisor() {
+    return {
+      actualizadoEn: '',
+      whatsappPagos: '',
+      nombreResponsablePagos: 'Responsable de Pagos',
+      sedes: [
+        { id: 'lcf', nombre: 'La California Sur', email: 'refillh2o.lcf@gmail.com', activa: true, metas: [ { nivel: 1, montoUSD: 1000, bonoUSD: 10 }, { nivel: 2, montoUSD: 1500, bonoUSD: 20 }, { nivel: 3, montoUSD: 2000, bonoUSD: 30 }, { nivel: 4, montoUSD: 2500, bonoUSD: 40 } ], empleados: [] },
+        { id: 'ldc', nombre: 'Los Dos Caminos', email: 'refillh2o.ldc@gmail.com', activa: true, metas: [ { nivel: 1, montoUSD: 1000, bonoUSD: 10 }, { nivel: 2, montoUSD: 1500, bonoUSD: 20 }, { nivel: 3, montoUSD: 2000, bonoUSD: 30 }, { nivel: 4, montoUSD: 2500, bonoUSD: 40 } ], empleados: [] },
+        { id: 'se', nombre: 'Santa Eduvigis', email: 'refillh2o.se@gmail.com', activa: true, metas: [ { nivel: 1, montoUSD: 2500, bonoUSD: 10 }, { nivel: 2, montoUSD: 3000, bonoUSD: 20 }, { nivel: 3, montoUSD: 3500, bonoUSD: 30 }, { nivel: 4, montoUSD: 4000, bonoUSD: 40 } ], empleados: [] },
+        { id: 'sp', nombre: 'Santa Paula', email: 'refillh2o.sp@gmail.com', activa: true, metas: [ { nivel: 1, montoUSD: 2500, bonoUSD: 10 }, { nivel: 2, montoUSD: 3000, bonoUSD: 20 }, { nivel: 3, montoUSD: 3500, bonoUSD: 30 }, { nivel: 4, montoUSD: 4000, bonoUSD: 40 } ], empleados: [] },
+        { id: 'sr', nombre: 'Santa Rosa', email: 'refillh2o.sr@gmail.com', activa: true, metas: [ { nivel: 1, montoUSD: 1500, bonoUSD: 10 }, { nivel: 2, montoUSD: 2000, bonoUSD: 20 }, { nivel: 3, montoUSD: 2500, bonoUSD: 30 }, { nivel: 4, montoUSD: 3000, bonoUSD: 40 } ], empleados: [] },
+        { id: 'sf', nombre: 'Santa Fe', email: 'refillh2o.sf@gmail.com', activa: true, metas: [ { nivel: 1, montoUSD: 1500, bonoUSD: 10 }, { nivel: 2, montoUSD: 2000, bonoUSD: 20 }, { nivel: 3, montoUSD: 2500, bonoUSD: 30 }, { nivel: 4, montoUSD: 3000, bonoUSD: 40 } ], empleados: [] },
+        { id: 'ls', nombre: 'Los Samanes', email: '', activa: false, metas: [ { nivel: 1, montoUSD: 400, bonoUSD: 10 }, { nivel: 2, montoUSD: 600, bonoUSD: 20 }, { nivel: 3, montoUSD: 800, bonoUSD: 30 } ], empleados: [] },
+        { id: 'lt', nombre: 'La Trinidad', email: '', activa: false, metas: [ { nivel: 1, montoUSD: 1500, bonoUSD: 10 }, { nivel: 2, montoUSD: 2000, bonoUSD: 20 }, { nivel: 3, montoUSD: 2500, bonoUSD: 30 }, { nivel: 4, montoUSD: 3000, bonoUSD: 40 } ], empleados: [] }
+      ]
+    };
+  }
+
+  function normalizarMetasRefillVisor(raw) {
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.sedes) || raw.sedes.length === 0) {
+      return getDefaultMetasRefillVisor();
+    }
+    const sedes = raw.sedes.map((s, idx) => {
+      const metas = (Array.isArray(s.metas) ? s.metas : [])
+        .map(m => ({ montoUSD: Math.max(0, parseFloat(m?.montoUSD) || 0), bonoUSD: Math.max(0, parseFloat(m?.bonoUSD) || 0) }))
+        .filter(m => m.montoUSD > 0)
+        .sort((a, b) => a.montoUSD - b.montoUSD)
+        .map((m, i) => ({ nivel: i + 1, montoUSD: m.montoUSD, bonoUSD: m.bonoUSD }));
+      const empleados = (Array.isArray(s.empleados) ? s.empleados : [])
+        .filter(e => e && String(e.nombre || '').trim().length > 0)
+        .map((e, i) => ({ id: e.id || `emp_${idx}_${i}`, nombre: String(e.nombre).trim(), cargo: String(e.cargo || '').trim(), activo: e.activo !== false }));
+      return {
+        id: s.id || `sede_${idx}`,
+        nombre: String(s.nombre || 'Sede').trim(),
+        email: String(s.email || '').trim().toLowerCase(),
+        activa: s.activa !== false,
+        metas,
+        empleados
+      };
+    });
+    return {
+      actualizadoEn: raw.actualizadoEn || '',
+      whatsappPagos: String(raw.whatsappPagos || '').trim(),
+      nombreResponsablePagos: String(raw.nombreResponsablePagos || 'Responsable de Pagos').trim() || 'Responsable de Pagos',
+      sedes
+    };
+  }
+
+  function formatDateISOVisor(dt) {
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }
+
+  function toLocalISOFromAnyVisor(val) {
+    if (!val) return '';
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? '' : formatDateISOVisor(d);
+  }
+
+  function getRangoSemanaLunSabVisor(offsetSemanas = 0) {
+    const now = new Date();
+    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dow = base.getDay();
+    const diffToMon = dow === 0 ? -6 : (1 - dow);
+    const lunes = new Date(base.getFullYear(), base.getMonth(), base.getDate() + diffToMon + (offsetSemanas * 7));
+    const nombres = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const dias = nombres.map((label, i) => {
+      const dt = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + i);
+      return {
+        iso: formatDateISOVisor(dt),
+        label,
+        shortDate: `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`
+      };
+    });
+    return {
+      lunesISO: dias[0].iso,
+      sabadoISO: dias[5].iso,
+      dias,
+      diaActualIdx: offsetSemanas !== 0 ? 6 : (dow === 0 ? 6 : dow),
+      esDomingo: dow === 0 && offsetSemanas === 0,
+      etiquetaRango: `Lun ${dias[0].shortDate} – Sáb ${dias[5].shortDate}`
+    };
+  }
+
+  function calcularVentaRealSemanaTiendaVisor(tienda, rango) {
+    if (!tienda) return { totalUSD: 0, cantidadVentas: 0 };
+    const ventas = tienda.respaldo_completo?.ventas || [];
+    const abonos = tienda.respaldo_completo?.abonos || [];
+
+    if (ventas.length > 0 || abonos.length > 0) {
+      let totalUSD = 0;
+      let cantidadVentas = 0;
+      ventas.forEach(v => {
+        if (!v) return;
+        const iso = toLocalISOFromAnyVisor(v.fecha);
+        if (!iso || iso < rango.lunesISO || iso > rango.sabadoISO) return;
+        if (['credito', 'convenio', 'garantia', 'cortesia'].includes(v.tipo)) return;
+        let m = 0;
+        if (Array.isArray(v.pagos) && v.pagos.length > 0) {
+          v.pagos.forEach(p => {
+            if (!p || p.metodo === 'saldo_favor') return;
+            const val = parseFloat(p.montoUSD !== undefined ? p.montoUSD : p.monto);
+            if (!isNaN(val) && val > 0) m += val;
+          });
+        } else if (v.metodoPago !== 'saldo_favor') {
+          const val = parseFloat(v.total);
+          if (!isNaN(val) && val > 0) m = val;
+        }
+        if (m > 0) {
+          totalUSD += m;
+          cantidadVentas += 1;
+        }
+      });
+      abonos.forEach(a => {
+        if (!a) return;
+        const iso = toLocalISOFromAnyVisor(a.fecha);
+        if (!iso || iso < rango.lunesISO || iso > rango.sabadoISO) return;
+        const val = parseFloat(a.monto);
+        if (!isNaN(val) && val > 0) totalUSD += val;
+      });
+      return { totalUSD: Math.round(totalUSD * 100) / 100, cantidadVentas };
+    }
+
+    const hoyISO = getTodayISOVisor();
+    if (hoyISO >= rango.lunesISO && hoyISO <= rango.sabadoISO && tienda.resumen_hoy) {
+      const r = tienda.resumen_hoy;
+      const tUSD = (r.totalFacturadoUSD !== undefined) ? (r.totalUSD || 0) : Math.max(0, (r.totalUSD || 0) - (r.credito || 0));
+      return { totalUSD: Math.round((parseFloat(tUSD) || 0) * 100) / 100, cantidadVentas: r.numVentas || 0 };
+    }
+    return { totalUSD: 0, cantidadVentas: 0 };
+  }
+
+  function evaluarMetasSedeVisor(sedeConfig, totalSemanalUSD) {
+    const venta = Math.max(0, parseFloat(totalSemanalUSD) || 0);
+    const metas = [...(sedeConfig?.metas || [])]
+      .filter(m => m && (parseFloat(m.montoUSD) || 0) > 0)
+      .sort((a, b) => a.montoUSD - b.montoUSD)
+      .map((m, i) => ({ nivel: m.nivel || (i + 1), montoUSD: parseFloat(m.montoUSD) || 0, bonoUSD: parseFloat(m.bonoUSD) || 0 }));
+
+    let metaAlcanzada = null;
+    let proximaMeta = null;
+    for (const m of metas) {
+      if (venta >= m.montoUSD) metaAlcanzada = m;
+      else if (!proximaMeta) proximaMeta = m;
+    }
+
+    const metaMaximaUSD = metas.length > 0 ? metas[metas.length - 1].montoUSD : 1;
+    const progresoPctGlobal = metaMaximaUSD > 0 ? Math.min(100, Math.max(0, Math.round((venta / metaMaximaUSD) * 1000) / 10)) : 0;
+    const faltanteProximaUSD = proximaMeta ? Math.max(0, Math.round((proximaMeta.montoUSD - venta) * 100) / 100) : 0;
+    const bonoPorEmpleadoUSD = metaAlcanzada ? metaAlcanzada.bonoUSD : 0;
+    const empleadosActivos = (sedeConfig?.empleados || []).filter(e => e && e.activo !== false && String(e.nombre || '').trim());
+    const totalBonoSedeUSD = Math.round((empleadosActivos.length * bonoPorEmpleadoUSD) * 100) / 100;
+    const hitos = metas.map(m => ({
+      ...m,
+      alcanzada: venta >= m.montoUSD,
+      pctPos: metaMaximaUSD > 0 ? Math.min(100, Math.max(0, (m.montoUSD / metaMaximaUSD) * 100)) : 0
+    }));
+    return { totalSemanalUSD: Math.round(venta * 100) / 100, metaAlcanzada, proximaMeta, metaMaximaUSD, progresoPctGlobal, faltanteProximaUSD, bonoPorEmpleadoUSD, empleadosActivos, totalBonoSedeUSD, hitos };
+  }
+
+  async function cargarMetasRefillVisor() {
+    try {
+      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent('refillh2o@gmail.com')}&select=visor_actividad`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0 && data[0].visor_actividad && data[0].visor_actividad.metas_refillh2o) {
+          metasRefillCacheVisor = normalizarMetasRefillVisor(data[0].visor_actividad.metas_refillh2o);
+          return metasRefillCacheVisor;
+        }
+      }
+    } catch (e) {
+      console.warn('[Visor] Error cargando metas Refill H2O:', e);
+    }
+    if (!metasRefillCacheVisor) metasRefillCacheVisor = getDefaultMetasRefillVisor();
+    return metasRefillCacheVisor;
+  }
+
+  function obtenerResumenMetasActualVisor() {
+    const cfg = normalizarMetasRefillVisor(metasRefillCacheVisor || getDefaultMetasRefillVisor());
+    const rango = getRangoSemanaLunSabVisor(semanaOffsetMetasVisor);
+    const sedesActivas = (cfg.sedes || []).filter(s => s && s.activa !== false);
+
+    let sedesConMeta = 0;
+    let totalEmpleadosConBono = 0;
+    let totalPagarUSD = 0;
+
+    const filas = sedesActivas.map(sede => {
+      const emailKey = (sede.email || '').trim().toLowerCase();
+      const tienda = emailKey ? cacheGlobalTiendas[emailKey] : null;
+      const ventaSem = calcularVentaRealSemanaTiendaVisor(tienda, rango);
+      const ev = evaluarMetasSedeVisor(sede, ventaSem.totalUSD);
+
+      if (ev.metaAlcanzada) {
+        sedesConMeta += 1;
+        totalEmpleadosConBono += ev.empleadosActivos.length;
+        totalPagarUSD += ev.totalBonoSedeUSD;
+      }
+
+      return { sede, tienda, ventaSem, ev };
+    });
+
+    return {
+      cfg,
+      rango,
+      filas,
+      sedesConMeta,
+      totalEmpleadosConBono,
+      totalPagarUSD: Math.round(totalPagarUSD * 100) / 100
+    };
+  }
+
+  window.cambiarSemanaMetasVisor = function(offset) {
+    semanaOffsetMetasVisor = offset;
+    const bAct = document.getElementById('btn-metas-sem-actual');
+    const bAnt = document.getElementById('btn-metas-sem-anterior');
+    if (bAct) bAct.classList.toggle('active', offset === 0);
+    if (bAnt) bAnt.classList.toggle('active', offset === -1);
+    renderizarReporteMetasVisor();
+  };
+
+  function renderizarReporteMetasVisor() {
+    const sec = document.getElementById('sec-metas-bonos-visor');
+    if (!sec) return;
+    const esRefill = esCuentaRefillH2O(currentStoreEmail) || esCuentaRefillH2O(localStorage.getItem('visor_owner_email') || '');
+    if (!esRefill) {
+      sec.style.display = 'none';
+      return;
+    }
+    sec.style.display = 'block';
+
+    const resumen = obtenerResumenMetasActualVisor();
+    const { rango, filas, sedesConMeta, totalEmpleadosConBono, totalPagarUSD } = resumen;
+
+    const lblRango = document.getElementById('txt-metas-rango-semana');
+    if (lblRango) {
+      lblRango.textContent = `${rango.etiquetaRango} · ${semanaOffsetMetasVisor === 0 ? (rango.esDomingo ? 'Semana recién cerrada' : `Día ${rango.diaActualIdx} de 6`) : 'Semana Anterior'}`;
+    }
+    const kpiOk = document.getElementById('kpi-metas-sedes-ok');
+    if (kpiOk) kpiOk.textContent = `${sedesConMeta} / ${filas.length}`;
+    const kpiEmp = document.getElementById('kpi-metas-emp-count');
+    if (kpiEmp) kpiEmp.textContent = `${totalEmpleadosConBono}`;
+    const kpiTotal = document.getElementById('kpi-metas-total-usd');
+    if (kpiTotal) kpiTotal.textContent = `$ ${totalPagarUSD.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+    const cont = document.getElementById('container-metas-sedes-visor');
+    if (!cont) return;
+
+    if (filas.length === 0) {
+      cont.innerHTML = `<div style="text-align:center; padding:14px; color:var(--neu-text-muted); font-size:0.82rem;">No hay sedes activas configuradas en Metas.</div>`;
+      return;
+    }
+
+    cont.innerHTML = filas.map(({ sede, ev }) => {
+      const logroBadge = ev.metaAlcanzada
+        ? `<span style="background:#DCFCE7; color:#166534; padding:3px 8px; border-radius:999px; font-size:0.7rem; font-weight:800;">✅ Meta ${ev.metaAlcanzada.nivel} (+$${ev.bonoPorEmpleadoUSD}/emp)</span>`
+        : `<span style="background:#F1F5F9; color:#64748B; padding:3px 8px; border-radius:999px; font-size:0.7rem; font-weight:700;">⏳ Sin meta aún</span>`;
+
+      const empsHtml = ev.empleadosActivos.length > 0
+        ? ev.empleadosActivos.map(e => `<span style="display:inline-flex; align-items:center; gap:3px; background:${ev.metaAlcanzada ? '#ECFDF5' : '#F8FAFC'}; border:1px solid ${ev.metaAlcanzada ? '#A7F3D0' : '#E2E8F0'}; color:#0F172A; padding:2px 7px; border-radius:999px; font-size:0.7rem; font-weight:700;">👤 ${escapeHtml(e.nombre)}${ev.metaAlcanzada ? ` ($${ev.bonoPorEmpleadoUSD})` : ''}</span>`).join('')
+        : `<span style="font-size:0.72rem; color:#94A3B8;">Sin empleados asignados (configurar en Supervisor)</span>`;
+
+      const ticksHtml = ev.hitos.map(h => `
+        <div style="position:absolute; left:${h.pctPos}%; top:0; bottom:0; width:2px; background:${h.alcanzada ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.2)'}; transform:translateX(-1px);"></div>
+      `).join('');
+
+      const clickAttr = sede.email ? `onclick="cambiarSedeRefillH2O('${sede.email}')" style="cursor:pointer;"` : '';
+
+      return `
+        <div class="card-login" ${clickAttr} style="background:var(--neu-surface); border:1px solid #fff; box-shadow:var(--neu-shadow-sm); border-radius:16px; padding:12px 14px; border-left:4px solid ${ev.metaAlcanzada ? '#10B981' : '#94A3B8'};">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+            <strong style="font-size:0.92rem; color:#0F172A;">🏪 ${escapeHtml(sede.nombre)}</strong>
+            ${logroBadge}
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:0.8rem; margin-bottom:6px;">
+            <span style="color:#0F172A;">Venta Lun–Sáb: <strong style="font-size:0.96rem;">$ ${ev.totalSemanalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+            <span style="font-size:0.72rem; color:#64748B;">${ev.proximaMeta ? `Meta ${ev.proximaMeta.nivel}: $${ev.proximaMeta.montoUSD.toLocaleString('en-US')} (-$${ev.faltanteProximaUSD.toFixed(0)})` : '🏆 Tope máximo'}</span>
+          </div>
+
+          <div style="position:relative; height:10px; background:#E2E8F0; border-radius:999px; overflow:hidden; margin-bottom:8px;">
+            <div style="width:${ev.progresoPctGlobal}%; height:100%; background:${ev.metaAlcanzada ? '#10B981' : '#7C3AED'}; border-radius:999px;"></div>
+            ${ticksHtml}
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:${ev.metaAlcanzada ? '6px' : '0'};">
+            ${empsHtml}
+          </div>
+
+          ${ev.metaAlcanzada ? `
+            <div style="font-size:0.76rem; font-weight:800; color:#047857; text-align:right;">
+              Subtotal Bonos Sede: $${ev.totalBonoSedeUSD.toFixed(2)} (${ev.empleadosActivos.length} × $${ev.bonoPorEmpleadoUSD})
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function construirTextoReporteMetasWhatsApp() {
+    const { cfg, rango, filas, sedesConMeta, totalEmpleadosConBono, totalPagarUSD } = obtenerResumenMetasActualVisor();
+    const ganadoras = filas.filter(f => f.ev.metaAlcanzada);
+    const pendientes = filas.filter(f => !f.ev.metaAlcanzada);
+
+    const lines = [
+      '🏆 *REPORTE DE METAS Y BONOS — REFILL H2O*',
+      `📅 Semana: *${rango.etiquetaRango}*`,
+      `👤 Para: *${cfg.nombreResponsablePagos || 'Responsable de Pagos'}*`,
+      ''
+    ];
+
+    if (ganadoras.length === 0) {
+      lines.push('⏳ *Ninguna tienda ha alcanzado la Meta 1 todavía en esta semana.*');
+    } else {
+      lines.push(`✅ *TIENDAS QUE ALCANZARON META (${sedesConMeta}):*`);
+      ganadoras.forEach(({ sede, ev }) => {
+        lines.push('');
+        lines.push(`🏪 *${sede.nombre}*`);
+        lines.push(`• Venta Lun–Sáb: *$${ev.totalSemanalUSD.toFixed(2)}*`);
+        lines.push(`• Logro: *Meta ${ev.metaAlcanzada.nivel}* → *$${ev.bonoPorEmpleadoUSD} c/u*`);
+        if (ev.empleadosActivos.length > 0) {
+          lines.push(`• Personal (${ev.empleadosActivos.length}):`);
+          ev.empleadosActivos.forEach(emp => {
+            lines.push(`  - ${emp.nombre}${emp.cargo ? ` (${emp.cargo})` : ''}: *$${ev.bonoPorEmpleadoUSD}*`);
+          });
+        } else {
+          lines.push('• Personal: _(Sin empleados asignados aún en el sistema)_');
+        }
+        lines.push(`• Subtotal Sede: *$${ev.totalBonoSedeUSD.toFixed(2)}*`);
+      });
+      lines.push('');
+      lines.push(`💰 *TOTAL GENERAL A PAGAR: $${totalPagarUSD.toFixed(2)}* (${totalEmpleadosConBono} empleado${totalEmpleadosConBono === 1 ? '' : 's'})`);
+    }
+
+    if (pendientes.length > 0) {
+      lines.push('');
+      lines.push('📌 *Sedes sin meta alcanzada:*');
+      pendientes.forEach(({ sede, ev }) => {
+        const m1 = ev.hitos[0];
+        lines.push(`• ${sede.nombre}: $${ev.totalSemanalUSD.toFixed(2)}${m1 ? ` / $${m1.montoUSD} (faltan $${ev.faltanteProximaUSD.toFixed(2)})` : ''}`);
+      });
+    }
+
+    return lines.join('\n');
+  }
+
+  window.enviarReporteMetasWhatsApp = function() {
+    const cfg = normalizarMetasRefillVisor(metasRefillCacheVisor || getDefaultMetasRefillVisor());
+    const texto = construirTextoReporteMetasWhatsApp();
+    const tel = String(cfg.whatsappPagos || '').replace(/\D/g, '');
+    const url = tel
+      ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
+  };
+
+  window.copiarReporteMetasTexto = function() {
+    const texto = construirTextoReporteMetasWhatsApp();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto)
+        .then(() => alert('✅ Reporte de metas y bonos copiado al portapapeles.'))
+        .catch(() => prompt('Copia el reporte manualmente:', texto));
+    } else {
+      prompt('Copia el reporte manualmente:', texto);
+    }
+  };
+
   // Auto-login: garantiza cuenta master Refill H2O con todas sus sedes sin pedir validación
   let savedEmail = localStorage.getItem('visor_owner_email');
   if (!savedEmail || savedEmail === 'viritoco@gmail.com') {
@@ -5160,7 +6095,26 @@ function cambiarTab(tabName) {
     localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
     localStorage.setItem('visor_sup_selected_sede', sedeActual);
 
-    window.location.href = './visor-supervisor.html?v=1.0.10';
+    window.location.href = './visor-supervisor.html?v=1.0.15';
+  };
+
+  window.abrirCrudMetasEnSupervisor = function() {
+    const sedesRefill = Object.keys(REFILLH2O_SEDES);
+    const sedeActual = (currentStoreEmail && sedesRefill.includes(currentStoreEmail)) ? currentStoreEmail : (localStorage.getItem('visor_refill_selected_sede') || 'refillh2o.lcf@gmail.com');
+
+    const supSession = {
+      usuario: 'refillh2o@gmail.com',
+      nombre: 'Supervisor General Refill H2O',
+      owner_email: 'refillh2o@gmail.com',
+      is_owner_admin: true,
+      sedes: sedesRefill
+    };
+
+    localStorage.setItem('visor_sup_session', JSON.stringify(supSession));
+    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
+    localStorage.setItem('visor_sup_selected_sede', sedeActual);
+
+    window.location.href = './visor-supervisor.html?v=1.0.15&tab=sedes';
   };
 
   window.abrirModalSupervisores = async function() {

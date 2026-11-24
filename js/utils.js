@@ -252,5 +252,84 @@ export const Utils = {
     const match = (item.nombre || '').match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|lts|litro|litros)\b/i)
       || (item.nombre || '').match(/(\d+)\s*(?:l|lt|lts|litro|litros)?/i);
     return match ? parseFloat(String(match[1]).replace(',', '.')) : 20;
+  },
+
+  // Calcular próxima fecha de mantenimiento de filtros sumando 3, 4 o 6 meses sin desbordar fin de mes
+  calcularProximaFechaMantenimiento(ultimaFechaISO, frecuencia = 'trimestral') {
+    if (!ultimaFechaISO || typeof ultimaFechaISO !== 'string') return '';
+    const partes = ultimaFechaISO.slice(0, 10).split('-').map(Number);
+    if (partes.length !== 3 || partes.some(n => isNaN(n))) return '';
+    const [anio, mes, dia] = partes;
+    const mesesMap = { trimestral: 3, cuatrimestral: 4, semestral: 6 };
+    const meses = mesesMap[frecuencia] || 3;
+    const totalMeses = (anio * 12 + (mes - 1)) + meses;
+    const anioDest = Math.floor(totalMeses / 12);
+    const mesDestIdx = totalMeses % 12;
+    const ultimoDiaMes = new Date(anioDest, mesDestIdx + 1, 0).getDate();
+    const diaDest = Math.min(dia, ultimoDiaMes);
+    return `${anioDest}-${String(mesDestIdx + 1).padStart(2, '0')}-${String(diaDest).padStart(2, '0')}`;
+  },
+
+  // Evaluar estado de mantenimiento de filtros y activar alerta cuando faltan <= 7 días (o ya venció)
+  evaluarEstadoMantenimientoFiltros(mant, hoyISO = null) {
+    const freqInfo = {
+      trimestral: { meses: 3, label: 'Trimestral' },
+      cuatrimestral: { meses: 4, label: 'Cuatrimestral' },
+      semestral: { meses: 6, label: 'Semestral' }
+    };
+    const rawFreq = mant && freqInfo[mant.frecuencia] ? mant.frecuencia : 'trimestral';
+    const info = freqInfo[rawFreq];
+    const ultimaFecha = mant && mant.ultimaFecha ? String(mant.ultimaFecha).slice(0, 10) : '';
+    const nota = mant && mant.nota ? String(mant.nota) : '';
+    const actualizadoEn = mant && mant.actualizadoEn ? String(mant.actualizadoEn) : '';
+
+    if (!ultimaFecha) {
+      return {
+        configurado: false,
+        ultimaFecha: '',
+        frecuencia: rawFreq,
+        frecuenciaLabel: info.label,
+        meses: info.meses,
+        proximaFecha: '',
+        diasRestantes: null,
+        mostrarAlerta: false,
+        vencido: false,
+        venceHoy: false,
+        porVencer: false,
+        nota,
+        actualizadoEn
+      };
+    }
+
+    const proximaFecha = this.calcularProximaFechaMantenimiento(ultimaFecha, rawFreq);
+    const hoy = hoyISO || this.todayISO();
+    const parseUTC = (iso) => {
+      const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+      return Date.UTC(y, m - 1, d);
+    };
+    const diasRestantes = proximaFecha
+      ? Math.round((parseUTC(proximaFecha) - parseUTC(hoy)) / 86400000)
+      : null;
+
+    const vencido = diasRestantes !== null && diasRestantes < 0;
+    const venceHoy = diasRestantes === 0;
+    const porVencer = diasRestantes !== null && diasRestantes > 0 && diasRestantes <= 7;
+    const mostrarAlerta = diasRestantes !== null && diasRestantes <= 7;
+
+    return {
+      configurado: true,
+      ultimaFecha,
+      frecuencia: rawFreq,
+      frecuenciaLabel: info.label,
+      meses: info.meses,
+      proximaFecha,
+      diasRestantes,
+      mostrarAlerta,
+      vencido,
+      venceHoy,
+      porVencer,
+      nota,
+      actualizadoEn
+    };
   }
 };

@@ -4,6 +4,7 @@
 
 import { store } from './store.js';
 import { Utils } from './utils.js';
+import { esCuentaRefillH2O, cargarMetasRefillDesdeNube } from './refill-metas.js?v=2.8.71';
 
 const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
@@ -25,6 +26,10 @@ export async function syncToCloud(isManual = false) {
     const user = JSON.parse(licenciaLocal);
     const email = user.email;
     if (!email) return;
+
+    if (esCuentaRefillH2O(email)) {
+      cargarMetasRefillDesdeNube(store, false).catch(() => {});
+    }
 
     const ventas = store.getAll('ventas') || [];
     const inventario = store.getInventarioActual();
@@ -581,7 +586,8 @@ export async function syncToCloud(isManual = false) {
       nivel_tanque: {
         litros: inventario.litros || 0,
         capacidadTanque: inventario.capacidadTanque || 30000,
-        nivelPct
+        nivelPct,
+        mantenimientoFiltros: store.getConfig('mantenimientoFiltros', null)
       },
       stock_productos: prodsFisicos,
       ultimos_movimientos: ultimosMovs.slice(0, 60),
@@ -731,9 +737,12 @@ export async function restoreFromCloud(emailParam = null) {
       return { success: false, message: 'Error al procesar el archivo de respaldo.' };
     }
 
-    // Restaurar nivel de tanque si está disponible
+    // Restaurar nivel de tanque y mantenimiento de filtros si están disponibles
     if (backupInfo.nivelTanque && backupInfo.nivelTanque.litros !== undefined) {
       store.setConfig('inventario', backupInfo.nivelTanque);
+    }
+    if (backupInfo.nivelTanque && backupInfo.nivelTanque.mantenimientoFiltros) {
+      store.setConfig('mantenimientoFiltros', backupInfo.nivelTanque.mantenimientoFiltros);
     }
 
     console.log('[CloudSync] ✅ Respaldo restaurado desde la nube exitosamente:', backupInfo);

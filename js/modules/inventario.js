@@ -3,10 +3,10 @@
 // ============================================
 
 import { store } from '../store.js';
-import { Utils } from '../utils.js';
+import { Utils } from '../utils.js?v=2.8.71';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { syncToCloud } from '../cloud-sync.js';
+import { syncToCloud } from '../cloud-sync.js?v=2.8.71';
 
 export function renderInventario(container) {
   const isOp = store.isOperario();
@@ -44,6 +44,9 @@ export function renderInventario(container) {
         <button class="btn btn-primary" id="btn-nueva-cisterna">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Registrar Cisterna
+        </button>
+        <button class="btn btn-secondary" id="btn-mantenimiento-filtros" style="background:#F0FDF4; color:#15803D; border-color:#BBF7D0; font-weight:600;">
+          🧪 Mantenimiento Filtros
         </button>
         ${!isOp ? `
           <button class="btn btn-secondary" id="btn-registrar-merma">
@@ -181,6 +184,8 @@ export function renderInventario(container) {
         </div>
       </div>
 
+      ${renderMantenimientoFiltrosCard()}
+
       <!-- Historial Cisternas -->
       <div class="card">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
@@ -251,6 +256,8 @@ export function renderInventario(container) {
   // Events
   container.querySelector('#btn-nueva-cisterna')?.addEventListener('click', () => openCisternaModal(null, () => renderInventario(container)));
   container.querySelector('#btn-nueva-cisterna-card')?.addEventListener('click', () => openCisternaModal(null, () => renderInventario(container)));
+  container.querySelector('#btn-mantenimiento-filtros')?.addEventListener('click', () => openMantenimientoFiltrosModal(() => renderInventario(container)));
+  container.querySelector('#btn-editar-filtros-card')?.addEventListener('click', () => openMantenimientoFiltrosModal(() => renderInventario(container)));
   container.querySelector('#btn-registrar-merma')?.addEventListener('click', () => openMermaModal());
   const btnConfigTanque = container.querySelector('#btn-config-tanque');
   if (btnConfigTanque) {
@@ -691,6 +698,186 @@ function openConfigTanqueModal() {
       closeModal();
       const main = document.querySelector('.main-content');
       if (main) renderInventario(main);
+    }
+  });
+}
+
+function getBadgeEstadoFiltros(est) {
+  if (!est.configurado) {
+    return { text: 'Sin configurar', bg: '#F1F5F9', color: '#475569', border: '#CBD5E1' };
+  }
+  if (est.vencido) {
+    const dias = Math.abs(est.diasRestantes);
+    return { text: `🚨 Vencido (${dias}d)`, bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5' };
+  }
+  if (est.venceHoy) {
+    return { text: '🚨 Vence hoy', bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5' };
+  }
+  if (est.porVencer) {
+    return { text: `⚠️ Faltan ${est.diasRestantes}d`, bg: '#FEF3C7', color: '#92400E', border: '#FCD34D' };
+  }
+  return { text: `✅ Al día (${est.diasRestantes}d)`, bg: '#DCFCE7', color: '#166534', border: '#86EFAC' };
+}
+
+function renderMantenimientoFiltrosCard() {
+  const mant = store.getConfig('mantenimientoFiltros', null);
+  const est = Utils.evaluarEstadoMantenimientoFiltros(mant);
+  const badge = getBadgeEstadoFiltros(est);
+
+  return `
+    <div class="card">
+      <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h3 class="card-title">🧪 Mantenimiento de Filtros</h3>
+        <span style="padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; background:${badge.bg}; color:${badge.color}; border:1px solid ${badge.border};">
+          ${badge.text}
+        </span>
+      </div>
+
+      ${est.configurado ? `
+        <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:12px;">
+          <div style="background:var(--color-bg); padding:10px; border-radius:var(--radius-md);">
+            <div class="text-muted" style="font-size:11px; font-weight:600;">Último cambio</div>
+            <div style="font-size:14px; font-weight:700; margin-top:2px;">${Utils.formatDate(est.ultimaFecha)}</div>
+          </div>
+          <div style="background:var(--color-bg); padding:10px; border-radius:var(--radius-md);">
+            <div class="text-muted" style="font-size:11px; font-weight:600;">Frecuencia</div>
+            <div style="font-size:14px; font-weight:700; margin-top:2px;">${est.frecuenciaLabel}</div>
+            <div class="text-muted" style="font-size:11px;">Cada ${est.meses} meses</div>
+          </div>
+          <div style="background:var(--color-bg); padding:10px; border-radius:var(--radius-md);">
+            <div class="text-muted" style="font-size:11px; font-weight:600;">Próximo cambio</div>
+            <div style="font-size:14px; font-weight:700; margin-top:2px; color:${est.mostrarAlerta ? badge.color : 'inherit'};">${Utils.formatDate(est.proximaFecha)}</div>
+          </div>
+        </div>
+        ${est.nota ? `
+          <div style="padding:8px 10px; background:var(--color-bg); border-radius:var(--radius-md); font-size:12px; margin-bottom:12px;">
+            <strong>Detalle:</strong> ${Utils.escapeHtml(est.nota)}
+          </div>
+        ` : ''}
+      ` : `
+        <p class="text-muted" style="font-size:var(--font-size-sm); margin-bottom:12px;">
+          Aún no se ha registrado la fecha de mantenimiento de filtros. Regístrala con ciclo trimestral, cuatrimestral o semestral para recibir avisos 7 días antes.
+        </p>
+      `}
+
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span class="text-muted" style="font-size:12px;">Alerta automática 7 días antes en Inicio y Visores</span>
+        <button class="btn btn-secondary btn-sm" id="btn-editar-filtros-card">
+          ${est.configurado ? '✏️ Editar / Registrar' : '➕ Registrar Mantenimiento'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+export function openMantenimientoFiltrosModal(onComplete = null) {
+  const actual = store.getConfig('mantenimientoFiltros', null);
+  const ultimaDefault = (actual && actual.ultimaFecha) ? String(actual.ultimaFecha).slice(0, 10) : Utils.todayISO();
+  const freqDefault = (actual && actual.frecuencia) ? actual.frecuencia : 'trimestral';
+  const notaDefault = (actual && actual.nota) ? String(actual.nota) : '';
+
+  const content = `
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="form-group">
+        <label class="form-label">Última fecha de mantenimiento *</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="date" id="mant-ultima-fecha" class="form-input" value="${ultimaDefault}" required style="flex:1;" />
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-mant-fecha-hoy">Hoy</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Frecuencia del mantenimiento *</label>
+        <select id="mant-frecuencia" class="form-select">
+          <option value="trimestral" ${freqDefault === 'trimestral' ? 'selected' : ''}>Trimestral (cada 3 meses)</option>
+          <option value="cuatrimestral" ${freqDefault === 'cuatrimestral' ? 'selected' : ''}>Cuatrimestral (cada 4 meses)</option>
+          <option value="semestral" ${freqDefault === 'semestral' ? 'selected' : ''}>Semestral (cada 6 meses)</option>
+        </select>
+      </div>
+
+      <div id="mant-preview-box" style="padding:12px; border-radius:var(--radius-md); background:#F8FAFC; border:1px solid #E2E8F0; font-size:13px;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nota / Detalle (opcional)</label>
+        <input type="text" id="mant-nota" class="form-input" maxlength="160" value="${Utils.escapeHtml(notaDefault)}" placeholder="Ej. Cambio de carbón activado, sedimentos y UV" />
+      </div>
+    </div>
+  `;
+
+  openModal({
+    title: '🧪 Mantenimiento de Filtros',
+    content,
+    saveLabel: 'Guardar Mantenimiento',
+    onOpen: (overlay) => {
+      const inpFecha = overlay.querySelector('#mant-ultima-fecha');
+      const selFreq = overlay.querySelector('#mant-frecuencia');
+      const previewBox = overlay.querySelector('#mant-preview-box');
+      const btnHoy = overlay.querySelector('#btn-mant-fecha-hoy');
+
+      const refreshPreview = () => {
+        const est = Utils.evaluarEstadoMantenimientoFiltros({
+          ultimaFecha: inpFecha.value,
+          frecuencia: selFreq.value
+        });
+        if (!est.configurado) {
+          previewBox.innerHTML = '<span class="text-muted">Selecciona una fecha válida para calcular el próximo mantenimiento.</span>';
+          return;
+        }
+        const badge = getBadgeEstadoFiltros(est);
+        previewBox.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:11px; color:#64748B; font-weight:600;">PRÓXIMO MANTENIMIENTO</div>
+              <div style="font-size:15px; font-weight:800; color:#0F172A;">${Utils.formatDate(est.proximaFecha)}</div>
+            </div>
+            <span style="padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; background:${badge.bg}; color:${badge.color}; border:1px solid ${badge.border};">
+              ${badge.text}
+            </span>
+          </div>
+          <div style="margin-top:6px; font-size:11.5px; color:#64748B;">
+            Se activará la notificación en Inicio y Visores cuando falten 7 días o menos.
+          </div>
+        `;
+      };
+
+      inpFecha.addEventListener('change', refreshPreview);
+      inpFecha.addEventListener('input', refreshPreview);
+      selFreq.addEventListener('change', refreshPreview);
+      btnHoy?.addEventListener('click', () => {
+        inpFecha.value = Utils.todayISO();
+        refreshPreview();
+      });
+      refreshPreview();
+    },
+    onSave: (overlay) => {
+      const ultimaFecha = overlay.querySelector('#mant-ultima-fecha')?.value;
+      const frecuencia = overlay.querySelector('#mant-frecuencia')?.value || 'trimestral';
+      const nota = (overlay.querySelector('#mant-nota')?.value || '').trim();
+
+      if (!ultimaFecha || !/^\d{4}-\d{2}-\d{2}$/.test(ultimaFecha)) {
+        showToast('Selecciona una fecha válida de mantenimiento', 'warning');
+        return;
+      }
+
+      const proximaFecha = Utils.calcularProximaFechaMantenimiento(ultimaFecha, frecuencia);
+      store.setConfig('mantenimientoFiltros', {
+        ultimaFecha,
+        frecuencia,
+        proximaFecha,
+        nota,
+        actualizadoEn: new Date().toISOString()
+      });
+      syncToCloud();
+      showToast('Mantenimiento de filtros guardado', 'success');
+      closeModal();
+
+      if (typeof onComplete === 'function') {
+        onComplete();
+      } else {
+        const main = document.querySelector('.main-content');
+        if (main) renderInventario(main);
+      }
     }
   });
 }

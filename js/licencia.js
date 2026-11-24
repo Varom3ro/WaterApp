@@ -377,6 +377,19 @@ export const Licencia = {
         }
       }
 
+      // 3. Ajuste remoto de mantenimiento de filtros (desde Visor Dueño / Supervisor)
+      if (ajustesRemotos.mantenimientoFiltros && ajustesRemotos.mantenimientoFiltros.ultimaFecha) {
+        const remMant = ajustesRemotos.mantenimientoFiltros;
+        const localMant = s.getConfig('mantenimientoFiltros', null);
+        const remTime = remMant.actualizadoEn ? new Date(remMant.actualizadoEn).getTime() : 0;
+        const localTime = (localMant && localMant.actualizadoEn) ? new Date(localMant.actualizadoEn).getTime() : 0;
+        if (!localMant || !localTime || remTime > localTime) {
+          s.setConfig('mantenimientoFiltros', remMant);
+          console.log('[Licencia] 🧪 Ajuste remoto de mantenimiento de filtros aplicado:', remMant);
+          huboCambios = true;
+        }
+      }
+
       localStorage.setItem('ultimo_ajuste_remoto_aplicado', String(lastAjusteTs));
       if (huboCambios && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('stock-remoto-actualizado'));
