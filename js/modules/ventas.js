@@ -1475,16 +1475,16 @@ export function renderNuevaVentaForm(container) {
           </div>
         </div>
         ${tanqueVacio || tanqueBajo ? `
-          <div id="banner-tanque-bajo-pv" style="margin-bottom: 8px; padding: 8px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: ${tanqueVacio ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${tanqueVacio ? '#EF4444' : '#F59E0B'}; color: ${tanqueVacio ? '#991B1B' : '#92400E'}; font-size: 12.5px;">
-            <div style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
-              <span style="font-size: 16px;">${tanqueVacio ? '🚨' : '⚠️'}</span>
+          <div id="banner-tanque-bajo-pv" style="margin-bottom: 6px; padding: 4px 12px; min-height: 42px; box-sizing: border-box; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: ${tanqueVacio ? '#FEF2F2' : '#FFFBEB'}; border: 1.5px solid ${tanqueVacio ? '#EF4444' : '#F59E0B'}; color: ${tanqueVacio ? '#991B1B' : '#92400E'}; font-size: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+              <span style="font-size: 14px; line-height: 1;">${tanqueVacio ? '🚨' : '⚠️'}</span>
               <span>
                 ${tanqueVacio
                   ? `<strong>Tanque en 0 L:</strong> ${bloquearSinAguaCfg ? 'Las recargas de agua están bloqueadas hasta cargar una cisterna o calibrar el tanque.' : 'Registra la cisterna o calibra el tanque (se pedirá confirmación al facturar recargas).'}`
                   : `<strong>Nivel de agua bajo (${Utils.formatNumber(litrosTanque)} L · ${pctTanque}%):</strong> Recuerda registrar la próxima cisterna o calibrar el tanque.`}
               </span>
             </div>
-            <button type="button" id="btn-cisterna-rapida-pv" class="btn btn-sm" style="background: ${tanqueVacio ? '#DC2626' : '#D97706'}; color: #fff; border: none; font-weight: 700; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+            <button type="button" id="btn-cisterna-rapida-pv" style="height: 30px; padding: 0 10px; line-height: 1; display: inline-flex; align-items: center; gap: 5px; background: ${tanqueVacio ? '#DC2626' : '#D97706'}; color: #fff; border: none; font-weight: 700; border-radius: 6px; font-size: 11.5px; cursor: pointer;">
               🚛 Registrar Cisterna
             </button>
           </div>
