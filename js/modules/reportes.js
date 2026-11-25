@@ -25,6 +25,11 @@ function isOperacionSinCobro(tipo) {
 }
 
 export function renderReportes(container) {
+  if (!store.isAdmin()) {
+    window.location.hash = '#/inicio';
+    return;
+  }
+
   const today = Utils.todayISO();
 
   container.innerHTML = `

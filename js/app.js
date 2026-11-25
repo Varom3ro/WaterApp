@@ -50,13 +50,12 @@ class App {
         const licenciaValida = await Licencia.validar();
         if (!licenciaValida) return;
 
-        Licencia.aplicarCatalogoRemotoSiExiste(store);
-        syncToCloud();
-
         if (!sessionStorage.getItem('isAuthenticated')) {
             this.renderLogin();
             return;
         }
+
+        Licencia.aplicarCatalogoRemotoSiExiste(store);
 
         // Si es operario e intenta entrar a una ruta restringida (reportes o configuracion), redirigir a Inicio (Punto de Venta)
         if (store.isOperario()) {
@@ -100,8 +99,10 @@ class App {
 
             // 🌐 Reintento automático de sincronización inmediata al recuperar conexión a Internet
             window.addEventListener('online', () => {
-                console.log('[WaterApp] Conexión a Internet reestablecida. Sincronizando con la nube...');
-                syncToCloud();
+                if (sessionStorage.getItem('isAuthenticated') === 'true') {
+                    console.log('[WaterApp] Conexión a Internet reestablecida. Sincronizando con la nube...');
+                    syncToCloud();
+                }
             });
         }
         this.updateActiveLink();

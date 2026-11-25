@@ -428,11 +428,16 @@ class Store {
     }
 
     getUserRole() {
-        return sessionStorage.getItem('userRole') || 'admin';
+        if (sessionStorage.getItem('isAuthenticated') !== 'true') return null;
+        return sessionStorage.getItem('userRole') === 'admin' ? 'admin' : 'operario';
     }
 
     setUserRole(role) {
-        sessionStorage.setItem('userRole', role === 'operario' ? 'operario' : 'admin');
+        if (role === 'admin' || role === 'operario') {
+            sessionStorage.setItem('userRole', role);
+        } else {
+            sessionStorage.removeItem('userRole');
+        }
     }
 
     isAdmin() {

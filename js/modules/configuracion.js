@@ -13,6 +13,11 @@ import {
 } from '../refill-metas.js';
 
 export function renderConfiguracion(container) {
+  if (!store.isAdmin()) {
+    window.location.hash = '#/inicio';
+    return;
+  }
+
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
   const repartidores = store.getConfig('repartidores') || [];
   const tarifasDelivery = store.getTarifasDelivery();

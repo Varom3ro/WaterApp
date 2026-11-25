@@ -1988,7 +1988,7 @@ body.hide-montos #cierre-digital-usd {
 <div class="app-container">
   
   <!-- 1. Pantalla de Acceso para el Dueño -->
-  <div id="auth-screen" style="display: none;">
+  <div id="auth-screen" style="display: flex;">
     <div class="login-brand">
       <div class="brand-icon">💧</div>
       <h1 class="brand-title">WaterApp Visor</h1>
@@ -2026,7 +2026,7 @@ body.hide-montos #cierre-digital-usd {
   </div>
 
   <!-- 2. Aplicación Principal del Dueño -->
-  <div id="main-app" style="display: block;">
+  <div id="main-app" style="display: none;">
     
     <!-- Top Header Desahogado y Reorganizado -->
     <header class="top-header">
@@ -2901,7 +2901,7 @@ body.hide-montos #cierre-digital-usd {
   function esCuentaAdmin(email) {
     if (!email) return false;
     const clean = email.trim().toLowerCase();
-    return clean === 'refillh2o@gmail.com' || clean === 'viritoco@gmail.com' || clean === 'admin@empresa.com' || clean === 'admin' || clean.startsWith('admin') || clean.includes('admin');
+    return clean === 'refillh2o@gmail.com' || clean === 'viritoco@gmail.com';
   }
 
   function obtenerInfoSedeRefill(email) {
@@ -3041,7 +3041,12 @@ body.hide-montos #cierre-digital-usd {
           'Authorization': `Bearer ${SUPABASE_KEY}`
         }
       });
-      if (!res.ok) return { ok: true };
+      if (!res.ok) {
+        if (pwd !== null) {
+          return { ok: false, razon: '⚠️ No se pudo verificar tu acceso con el servidor. Intenta nuevamente.' };
+        }
+        return { ok: true, offline: true };
+      }
       const data = await res.json();
       if (!data || data.length === 0) {
         return { ok: false, razon: '⚠️ Este correo no está registrado en el sistema WaterApp.' };
@@ -3059,20 +3064,21 @@ body.hide-montos #cierre-digital-usd {
         return { ok: false, razon: '📱 El acceso al Visor Móvil para esta cuenta ha sido deshabilitado.' };
       }
       if (pwd !== null) {
-        if (esCuentaAdmin(email)) {
-          return { ok: true, cliente: c };
+        const claveConfigurada = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : '';
+        if (!claveConfigurada) {
+          return { ok: false, razon: '🔑 Esta cuenta no tiene clave de Visor configurada. Configúrala en SuperAdmin.' };
         }
-        const claveConfigurada = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : 'admin';
-        const esRefill = esCuentaRefillH2O(email);
-        const claveValida = (pwd === claveConfigurada) || (esRefill && (pwd === 'admin' || pwd === '1234' || pwd === 'rh2o'));
-        if (!claveValida) {
+        if (pwd !== claveConfigurada) {
           return { ok: false, razon: '🔑 Clave de acceso incorrecta. Verifica la clave suministrada.' };
         }
       }
       return { ok: true, cliente: c };
     } catch (e) {
       console.warn('Error al verificar licencia:', e);
-      return { ok: true };
+      if (pwd !== null) {
+        return { ok: false, razon: '⚠️ No se pudo verificar tu acceso con el servidor. Intenta nuevamente.' };
+      }
+      return { ok: true, offline: true };
     }
   }
 
@@ -3201,24 +3207,18 @@ body.hide-montos #cierre-digital-usd {
     });
   }
 
+  let visorUrlActionPending = true;
+
   // Login
   document.getElementById('btn-login').addEventListener('click', async () => {
-    let email = document.getElementById('login-email').value.trim().toLowerCase();
+    const email = document.getElementById('login-email').value.trim().toLowerCase();
     const pwd = document.getElementById('login-pwd').value.trim();
     const errorBox = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
-    if (!email) {
-      email = localStorage.getItem('visor_owner_email') || 'refillh2o@gmail.com';
-      document.getElementById('login-email').value = email;
-    }
-
-    const esAdmin = esCuentaAdmin(email);
-
-    // Clientes regulares requieren clave; administradores pasan directo
-    if (!pwd && !esAdmin) {
+    if (!email || !pwd) {
       if (errorBox) {
-        errorBox.textContent = '⚠️ Introduce tu clave de acceso.';
+        errorBox.textContent = '⚠️ Introduce tu correo y clave de acceso.';
         errorBox.style.display = 'block';
       }
       return;
@@ -3230,8 +3230,8 @@ body.hide-montos #cierre-digital-usd {
     const btnOriginalText = btn.textContent;
     btn.textContent = '⏳ Verificando acceso...';
 
-    // Verificación de Licencia, Estado de la Cuenta y Clave (admin pasa directo)
-    const licCheck = await verificarLicencia(email, esAdmin ? null : pwd);
+    // Verificación obligatoria de Licencia, Estado de la Cuenta y Clave
+    const licCheck = await verificarLicencia(email, pwd);
     if (!licCheck.ok) {
       btn.disabled = false;
       btn.textContent = btnOriginalText;
@@ -3247,9 +3247,7 @@ body.hide-montos #cierre-digital-usd {
 
     // Comprobación de acceso aprobada
     localStorage.setItem('visor_owner_email', email);
-    if (pwd) {
-      localStorage.setItem('visor_owner_pwd', pwd);
-    }
+    localStorage.setItem('visor_owner_pwd', pwd);
 
     if (email === 'refillh2o@gmail.com' || esCuentaAdmin(email)) {
       supervisorAccount = 'refillh2o@gmail.com';
@@ -3274,6 +3272,17 @@ body.hide-montos #cierre-digital-usd {
     // Auto-refresco en vivo cada 5 segundos
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     autoRefreshInterval = setInterval(cargarDatosEnVivo, 5000);
+
+    // Acciones solicitadas por URL (solo tras autenticación válida, una única vez)
+    if (visorUrlActionPending) {
+      visorUrlActionPending = false;
+      const visorUrlParams = new URLSearchParams(window.location.search);
+      if (visorUrlParams.get('mode') === 'supervisor' || visorUrlParams.get('modo') === 'supervisor') {
+        setTimeout(() => { if (window.cambiarAModoSupervisor) window.cambiarAModoSupervisor(); }, 200);
+      } else if (visorUrlParams.get('modal') === 'supervisor' || visorUrlParams.get('modal') === 'supervisores') {
+        setTimeout(() => { if (window.abrirModalSupervisores) window.abrirModalSupervisores(); }, 300);
+      }
+    }
   });
 
   // Refrescar al volver a la pestaña/pantalla del teléfono
@@ -6050,23 +6059,15 @@ function cambiarTab(tabName) {
     }
   };
 
-  // Auto-login: garantiza cuenta master Refill H2O con todas sus sedes sin pedir validación
-  let savedEmail = localStorage.getItem('visor_owner_email');
-  if (!savedEmail || savedEmail === 'viritoco@gmail.com') {
-    savedEmail = 'refillh2o@gmail.com';
-    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
+  // Restaurar sesión solo si existen credenciales previas guardadas (validadas contra servidor en #btn-login)
+  const savedEmail = localStorage.getItem('visor_owner_email');
+  const savedPwd = localStorage.getItem('visor_owner_pwd');
+  if (savedEmail) {
+    document.getElementById('login-email').value = savedEmail;
   }
-
-  document.getElementById('login-email').value = savedEmail;
-  document.getElementById('btn-login').click();
-
-  // Soporte de apertura directa en modo supervisor o modal por URL
-  const visorUrlParams = new URLSearchParams(window.location.search);
-  if (visorUrlParams.get('mode') === 'supervisor' || visorUrlParams.get('modo') === 'supervisor') {
-    setTimeout(() => { if (window.cambiarAModoSupervisor) window.cambiarAModoSupervisor(); }, 500);
-  }
-  if (visorUrlParams.get('modal') === 'supervisor' || visorUrlParams.get('modal') === 'supervisores') {
-    setTimeout(() => { if (window.abrirModalSupervisores) window.abrirModalSupervisores(); }, 800);
+  if (savedEmail && savedPwd) {
+    document.getElementById('login-pwd').value = savedPwd;
+    document.getElementById('btn-login').click();
   }
 
   // ===================================================
@@ -6163,42 +6164,41 @@ function cambiarTab(tabName) {
     return localStorage.getItem('visor_owner_email') || currentStoreEmail || '';
   }
 
-  window.cambiarAModoSupervisor = function() {
+  function _abrirSupervisorDesdeVisor(tabParam = '') {
+    const ownerEmail = getOwnerMasterEmail().trim().toLowerCase();
+    const ownerPwd = localStorage.getItem('visor_owner_pwd');
+    if (!currentStoreEmail || !ownerEmail || !ownerPwd) {
+      alert('Debes iniciar sesión primero.');
+      return;
+    }
+
     const sedesRefill = Object.keys(REFILLH2O_SEDES);
-    const sedeActual = (currentStoreEmail && sedesRefill.includes(currentStoreEmail)) ? currentStoreEmail : (localStorage.getItem('visor_refill_selected_sede') || 'refillh2o.lcf@gmail.com');
+    const isMasterRefill = esCuentaAdmin(ownerEmail) || ownerEmail === 'refillh2o@gmail.com';
+    const sedeActual = (currentStoreEmail && sedesRefill.includes(currentStoreEmail))
+      ? currentStoreEmail
+      : (localStorage.getItem('visor_refill_selected_sede') || currentStoreEmail);
 
     const supSession = {
-      usuario: 'refillh2o@gmail.com',
-      nombre: 'Supervisor General Refill H2O',
-      owner_email: 'refillh2o@gmail.com',
-      is_owner_admin: true,
-      sedes: sedesRefill
+      usuario: ownerEmail,
+      nombre: isMasterRefill ? 'Supervisor General Refill H2O' : `Supervisor (${ownerEmail})`,
+      owner_email: ownerEmail,
+      is_owner_admin: esCuentaAdmin(ownerEmail) || esCuentaRefillH2O(ownerEmail) || ownerEmail === currentStoreEmail,
+      sedes: isMasterRefill ? sedesRefill : [currentStoreEmail]
     };
 
     localStorage.setItem('visor_sup_session', JSON.stringify(supSession));
-    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
     localStorage.setItem('visor_sup_selected_sede', sedeActual);
 
-    window.location.href = './visor-supervisor.html?v=1.0.15';
+    const qs = tabParam ? `?v=1.0.17&tab=${encodeURIComponent(tabParam)}` : '?v=1.0.17';
+    window.location.href = `./visor-supervisor.html${qs}`;
+  }
+
+  window.cambiarAModoSupervisor = function() {
+    _abrirSupervisorDesdeVisor('');
   };
 
   window.abrirCrudMetasEnSupervisor = function() {
-    const sedesRefill = Object.keys(REFILLH2O_SEDES);
-    const sedeActual = (currentStoreEmail && sedesRefill.includes(currentStoreEmail)) ? currentStoreEmail : (localStorage.getItem('visor_refill_selected_sede') || 'refillh2o.lcf@gmail.com');
-
-    const supSession = {
-      usuario: 'refillh2o@gmail.com',
-      nombre: 'Supervisor General Refill H2O',
-      owner_email: 'refillh2o@gmail.com',
-      is_owner_admin: true,
-      sedes: sedesRefill
-    };
-
-    localStorage.setItem('visor_sup_session', JSON.stringify(supSession));
-    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
-    localStorage.setItem('visor_sup_selected_sede', sedeActual);
-
-    window.location.href = './visor-supervisor.html?v=1.0.15&tab=sedes';
+    _abrirSupervisorDesdeVisor('sedes');
   };
 
   window.abrirModalSupervisores = async function() {

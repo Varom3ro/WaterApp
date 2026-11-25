@@ -788,9 +788,9 @@
 <div class="app-container">
 
   <!-- ========================================================================= -->
-  <!-- 1. PANTALLA DE LOGIN DEL SUPERVISOR (Oculta por defecto en modo directo)    -->
+  <!-- 1. PANTALLA DE LOGIN DEL SUPERVISOR                                        -->
   <!-- ========================================================================= -->
-  <div id="auth-screen" style="display: none;">
+  <div id="auth-screen" style="display: block;">
     <div class="login-brand">
       <div class="brand-icon">🛡️</div>
       <h1 class="brand-title">WaterApp Supervisor</h1>
@@ -828,7 +828,7 @@
   <!-- ========================================================================= -->
   <!-- 2. APLICACIÓN PRINCIPAL DEL SUPERVISOR (OPERATIVA)                         -->
   <!-- ========================================================================= -->
-  <div id="main-app" style="display: block;">
+  <div id="main-app" style="display: none;">
     
     <!-- Top Header -->
     <header class="top-header">
@@ -1412,19 +1412,12 @@
   // AUTENTICACIÓN DEL SUPERVISOR
   // =========================================================================
   document.getElementById('btn-login').addEventListener('click', async () => {
-    let userInp = document.getElementById('login-user').value.trim().toLowerCase();
+    const userInp = document.getElementById('login-user').value.trim().toLowerCase();
     const pwdInp = document.getElementById('login-pwd').value.trim();
     const errorBox = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
-    if (!userInp) {
-      userInp = 'refillh2o@gmail.com';
-      document.getElementById('login-user').value = userInp;
-    }
-
-    const esAdmin = (userInp === 'refillh2o@gmail.com' || userInp === 'viritoco@gmail.com' || userInp === 'admin' || userInp.includes('admin'));
-
-    if (!pwdInp && !esAdmin) {
+    if (!userInp || !pwdInp) {
       errorBox.textContent = '⚠️ Introduce tu usuario y clave de acceso.';
       errorBox.style.display = 'block';
       return;
@@ -1435,7 +1428,7 @@
     btn.textContent = '⏳ Verificando credenciales...';
 
     try {
-      const authResult = await autenticarSupervisor(userInp, esAdmin ? (pwdInp || 'admin') : pwdInp);
+      const authResult = await autenticarSupervisor(userInp, pwdInp);
       btn.disabled = false;
       btn.textContent = '🔐 Iniciar Sesión como Supervisor';
 
@@ -1448,6 +1441,10 @@
       // Guardar sesión
       supervisorSession = authResult.session;
       localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
+      if (supervisorSession.is_owner_admin) {
+        localStorage.setItem('visor_owner_email', supervisorSession.owner_email || supervisorSession.usuario);
+        localStorage.setItem('visor_owner_pwd', pwdInp);
+      }
 
       iniciarAplicacionSupervisor();
     } catch (err) {
@@ -1460,24 +1457,12 @@
 
   async function autenticarSupervisor(usuario, clave) {
     try {
-      // 1. Caso especial: Acceso directo con correo master de Refill H2O o cuenta admin
-      if (usuario === 'refillh2o@gmail.com' || usuario === 'viritoco@gmail.com' || usuario === 'admin' || usuario.includes('admin')) {
-        const sedesRefill = Object.keys(REFILLH2O_SEDES);
-        const emailMaster = (usuario === 'admin' || usuario.includes('admin')) ? 'refillh2o@gmail.com' : usuario;
-        return {
-          ok: true,
-          session: {
-            usuario: emailMaster,
-            nombre: 'Supervisor General (Administrador)',
-            owner_email: emailMaster,
-            is_owner_admin: true,
-            sedes: sedesRefill
-          }
-        };
+      if (!usuario || !clave) {
+        return { ok: false, razon: '⚠️ Introduce tu usuario y clave de acceso.' };
       }
 
-      // 2. Búsqueda de supervisor creado por los dueños en licencia_agua_clientes
-      const res = await fetch(`${SUPABASE_LIC_URL}?select=id,email,nombre_empresa,visor_actividad,activo,dias_prueba,fecha_registro`, {
+      // Búsqueda y validación real contra licencia_agua_clientes
+      const res = await fetch(`${SUPABASE_LIC_URL}?select=id,email,nombre_empresa,clave_visor,notas,visor_actividad,activo,dias_prueba,fecha_registro`, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -1486,65 +1471,63 @@
       if (!res.ok) throw new Error('Error al conectar con el servidor de licencias');
       const clientes = await res.json();
 
-      let supervisorEncontrado = null;
-      let ownerCuenta = null;
-
       for (const c of clientes) {
         if (!c.activo) continue;
+        const reg = new Date(c.fecha_registro);
+        const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 86400000));
+        if ((exp - new Date()) <= 0) continue;
+        if (c.notas && c.notas.includes('[BLOQUEO_VISOR]')) continue;
+
         const actividad = c.visor_actividad || {};
         const listaSupervisores = Array.isArray(actividad.supervisores) ? actividad.supervisores : [];
 
-        const match = listaSupervisores.find(s => 
+        const match = listaSupervisores.find(s =>
           (s.usuario && s.usuario.toLowerCase() === usuario) &&
           (s.clave === clave) &&
           (s.activo !== false)
         );
 
         if (match) {
-          supervisorEncontrado = match;
-          ownerCuenta = c;
-          break;
-        }
-
-        // Si el usuario ingresó el correo de la tienda y la clave_visor como supervisor directo
-        if (c.email && c.email.toLowerCase() === usuario && c.clave_visor === clave) {
-          supervisorEncontrado = {
-            id: 'owner_as_sup',
-            usuario: c.email,
-            nombre: `Supervisor (${c.nombre_empresa || 'Tienda'})`,
-            clave: clave,
-            sedes: (c.email === 'refillh2o@gmail.com' || c.email.startsWith('refillh2o.')) 
-              ? Object.keys(REFILLH2O_SEDES) 
-              : [c.email]
+          let sedesAsignadas = Array.isArray(match.sedes) ? match.sedes.filter(Boolean) : [];
+          if (sedesAsignadas.length === 0) {
+            if (c.email === 'refillh2o@gmail.com' || (c.email && c.email.startsWith('refillh2o.'))) {
+              sedesAsignadas = Object.keys(REFILLH2O_SEDES);
+            } else {
+              sedesAsignadas = [c.email];
+            }
+          }
+          return {
+            ok: true,
+            session: {
+              usuario: match.usuario,
+              nombre: match.nombre || 'Supervisor',
+              clave: clave,
+              owner_email: c.email,
+              is_owner_admin: false,
+              sedes: sedesAsignadas
+            }
           };
-          ownerCuenta = c;
-          break;
+        }
+
+        // Si el dueño ingresó su correo de cuenta y la clave_visor como supervisor directo
+        const claveVisor = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : '';
+        if (c.email && c.email.toLowerCase() === usuario && claveVisor && claveVisor === clave) {
+          const cleanEmail = c.email.toLowerCase();
+          const isMasterRefill = (cleanEmail === 'refillh2o@gmail.com' || cleanEmail === 'viritoco@gmail.com');
+          return {
+            ok: true,
+            session: {
+              usuario: cleanEmail,
+              nombre: isMasterRefill ? 'Supervisor General (Administrador)' : `Supervisor (${c.nombre_empresa || 'Tienda'})`,
+              owner_email: cleanEmail,
+              is_owner_admin: true,
+              sedes: isMasterRefill ? Object.keys(REFILLH2O_SEDES) : [cleanEmail]
+            }
+          };
         }
       }
 
-      if (!supervisorEncontrado || !ownerCuenta) {
-        return { ok: false, razon: '🔑 Usuario o clave incorrecta. Verifica con el dueño de la planta.' };
-      }
-
-      // Determinar sedes asignadas
-      let sedesAsignadas = supervisorEncontrado.sedes;
-      if (!Array.isArray(sedesAsignadas) || sedesAsignadas.length === 0) {
-        if (ownerCuenta.email === 'refillh2o@gmail.com' || ownerCuenta.email.startsWith('refillh2o.')) {
-          sedesAsignadas = Object.keys(REFILLH2O_SEDES);
-        } else {
-          sedesAsignadas = [ownerCuenta.email];
-        }
-      }
-
-      return {
-        ok: true,
-        session: {
-          usuario: supervisorEncontrado.usuario,
-          nombre: supervisorEncontrado.nombre || 'Supervisor',
-          owner_email: ownerCuenta.email,
-          sedes: sedesAsignadas
-        }
-      };
+      return { ok: false, razon: '🔑 Usuario o clave incorrecta. Verifica con el dueño de la planta.' };
     } catch (e) {
       console.error('Error en autenticación:', e);
       return { ok: false, razon: 'Error de conexión con la nube.' };
@@ -1555,53 +1538,53 @@
   // INICIO DE LA APLICACIÓN TRAS LOGIN
   // =========================================================================
   function iniciarAplicacionSupervisor() {
-    const sedesRefill = Object.keys(REFILLH2O_SEDES);
-    if (!supervisorSession) {
-      supervisorSession = {
-        usuario: 'refillh2o@gmail.com',
-        nombre: 'Supervisor General Refill H2O',
-        owner_email: 'refillh2o@gmail.com',
-        is_owner_admin: true,
-        sedes: sedesRefill
-      };
-      localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
-      localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
-    }
-
-    if (supervisorSession.is_owner_admin || supervisorSession.usuario === 'refillh2o@gmail.com' || supervisorSession.usuario === 'viritoco@gmail.com') {
-      supervisorSession.sedes = sedesRefill;
-      supervisorSession.is_owner_admin = true;
-    }
-
     const authScreen = document.getElementById('auth-screen');
     const mainApp = document.getElementById('main-app');
+    if (!supervisorSession) {
+      if (mainApp) mainApp.style.display = 'none';
+      if (authScreen) authScreen.style.display = 'block';
+      return;
+    }
+
+    const sedesRefill = Object.keys(REFILLH2O_SEDES);
+    const ownerClean = (supervisorSession.owner_email || '').trim().toLowerCase();
+    if (supervisorSession.is_owner_admin === true && (ownerClean === 'refillh2o@gmail.com' || ownerClean === 'viritoco@gmail.com')) {
+      supervisorSession.sedes = sedesRefill;
+    }
+
     if (authScreen) authScreen.style.display = 'none';
     if (mainApp) mainApp.style.display = 'block';
 
-    const esDueno = supervisorSession.is_owner_admin || !!localStorage.getItem('visor_owner_email');
+    const esDueno = supervisorSession.is_owner_admin === true;
     const wrapVolver = document.getElementById('wrap-volver-dueno');
     if (wrapVolver) {
       wrapVolver.style.display = esDueno ? 'block' : 'none';
     }
 
+    const badgeIcon = document.getElementById('badge-sup-icon');
+    const badgeSup = document.getElementById('badge-supervisor-user');
     if (esDueno) {
-      const badgeIcon = document.getElementById('badge-sup-icon');
       if (badgeIcon) badgeIcon.textContent = '👑';
-      const badgeSup = document.getElementById('badge-supervisor-user');
       if (badgeSup) {
         badgeSup.style.background = '#FEF3C7';
         badgeSup.style.color = '#B45309';
+      }
+    } else {
+      if (badgeIcon) badgeIcon.textContent = '🛡️';
+      if (badgeSup) {
+        badgeSup.style.background = '';
+        badgeSup.style.color = '';
       }
     }
 
     document.getElementById('txt-supervisor-name').textContent = supervisorSession.nombre;
 
-    // Seleccionar sede: última seleccionada o La California Sur por defecto
+    // Seleccionar sede: última seleccionada (si autorizada) o primera sede asignada
     const savedSede = localStorage.getItem('visor_sup_selected_sede') || localStorage.getItem('visor_refill_selected_sede');
-    if (savedSede && supervisorSession.sedes.includes(savedSede)) {
+    if (savedSede && Array.isArray(supervisorSession.sedes) && supervisorSession.sedes.includes(savedSede)) {
       currentStoreEmail = savedSede;
     } else {
-      currentStoreEmail = 'refillh2o.lcf@gmail.com';
+      currentStoreEmail = (Array.isArray(supervisorSession.sedes) && supervisorSession.sedes[0]) || ownerClean || '';
     }
     localStorage.setItem('visor_sup_selected_sede', currentStoreEmail);
 
@@ -3006,13 +2989,14 @@
 
   // Cerrar Sesión / Salir
   document.getElementById('btn-logout').addEventListener('click', () => {
-    const esDueno = (supervisorSession && supervisorSession.is_owner_admin) || !!localStorage.getItem('visor_owner_email');
+    const esDueno = !!(supervisorSession && supervisorSession.is_owner_admin === true);
     if (esDueno) {
       window.volverAModoDueno();
       return;
     }
     localStorage.removeItem('visor_sup_session');
     localStorage.removeItem('visor_sup_selected_sede');
+    supervisorSession = null;
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('auth-screen').style.display = 'block';
@@ -3023,8 +3007,7 @@
     if (currentStoreEmail) {
       localStorage.setItem('visor_refill_selected_sede', currentStoreEmail);
     }
-    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
-    window.location.href = './visor.html?v=1.0.25';
+    window.location.href = './visor.html?v=1.0.27';
   };
 
   // =========================================================================
@@ -3414,37 +3397,73 @@
   });
 
   // =========================================================================
-  // AUTO-LOGIN DIRECTO EN MODO SUPERVISOR (SIN PEDIR VALIDACIÓN)
+  // VALIDACIÓN OBLIGATORIA DE SESIÓN DE SUPERVISOR (SIN AUTO-LOGIN NI CACHE STALE)
   // =========================================================================
-  const sedesRefill = Object.keys(REFILLH2O_SEDES);
-  const savedSup = localStorage.getItem('visor_sup_session');
-  if (savedSup) {
-    try {
-      supervisorSession = JSON.parse(savedSup);
-    } catch (e) {
-      supervisorSession = null;
+  function mostrarLoginSupervisor(razon = '') {
+    localStorage.removeItem('visor_sup_session');
+    supervisorSession = null;
+    const authScreen = document.getElementById('auth-screen');
+    const mainApp = document.getElementById('main-app');
+    if (mainApp) mainApp.style.display = 'none';
+    if (authScreen) authScreen.style.display = 'block';
+    const errorBox = document.getElementById('login-error');
+    if (errorBox) {
+      if (razon) {
+        errorBox.textContent = razon;
+        errorBox.style.display = 'block';
+      } else {
+        errorBox.style.display = 'none';
+      }
     }
   }
 
-  // Garantizar sesión con todas las sedes de Refill H2O
-  if (!supervisorSession || supervisorSession.is_owner_admin || supervisorSession.usuario === 'refillh2o@gmail.com' || supervisorSession.usuario === 'viritoco@gmail.com' || !supervisorSession.sedes || supervisorSession.sedes.length <= 1) {
-    supervisorSession = {
-      usuario: 'refillh2o@gmail.com',
-      nombre: 'Supervisor General Refill H2O',
-      owner_email: 'refillh2o@gmail.com',
-      is_owner_admin: true,
-      sedes: sedesRefill
-    };
+  async function inicializarSesionSupervisor() {
+    const savedSup = localStorage.getItem('visor_sup_session');
+    if (!savedSup) {
+      mostrarLoginSupervisor();
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(savedSup);
+    } catch (e) {
+      parsed = null;
+    }
+    if (!parsed || typeof parsed !== 'object') {
+      mostrarLoginSupervisor();
+      return;
+    }
+
+    const checkUser = parsed.is_owner_admin
+      ? (parsed.owner_email || parsed.usuario || '')
+      : (parsed.usuario || '');
+    const checkPwd = parsed.is_owner_admin
+      ? (localStorage.getItem('visor_owner_pwd') || '')
+      : (parsed.clave || '');
+
+    if (!checkUser || !checkPwd) {
+      mostrarLoginSupervisor();
+      return;
+    }
+
+    const recheck = await autenticarSupervisor(String(checkUser).trim().toLowerCase(), String(checkPwd).trim());
+    if (!recheck.ok) {
+      mostrarLoginSupervisor(recheck.razon || 'Tu sesión de supervisor fue revocada o expiró.');
+      return;
+    }
+
+    supervisorSession = recheck.session;
     localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
-    localStorage.setItem('visor_owner_email', 'refillh2o@gmail.com');
+    iniciarAplicacionSupervisor();
+
+    const supUrlTabParam = new URLSearchParams(window.location.search).get('tab');
+    if (supUrlTabParam && typeof window.cambiarTab === 'function') {
+      window.cambiarTab(supUrlTabParam);
+    }
   }
 
-  iniciarAplicacionSupervisor();
-
-  const supUrlTabParam = new URLSearchParams(window.location.search).get('tab');
-  if (supUrlTabParam && typeof window.cambiarTab === 'function') {
-    window.cambiarTab(supUrlTabParam);
-  }
+  inicializarSesionSupervisor();
 
   // Registrar Service Worker Supervisor
   if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
