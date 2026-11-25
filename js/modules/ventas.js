@@ -4,11 +4,11 @@ import { openClienteModal, openAbonoClienteDirecto } from './clientes.js';
 // ============================================
 
 import { store } from '../store.js';
-import { Utils } from '../utils.js?v=2.8.71';
+import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { syncToCloud } from '../cloud-sync.js?v=2.8.71';
-import { openCisternaModal, openMantenimientoFiltrosModal } from './inventario.js?v=2.8.71';
+import { syncToCloud } from '../cloud-sync.js';
+import { openCisternaModal, openMantenimientoFiltrosModal } from './inventario.js';
 import {
   esCuentaRefillH2O,
   getEmailLicenciaActiva,
@@ -17,7 +17,7 @@ import {
   getRangoSemanaLunSab,
   calcularVentaRealSemana,
   evaluarProgresoMetasSede
-} from '../refill-metas.js?v=2.8.71';
+} from '../refill-metas.js';
 
 export function renderVentas(container, showFichas = true) {
   const isOp = store.isOperario();
@@ -881,7 +881,15 @@ export function openModalPedidosPendientes(onUpdate) {
   });
 }
 
+let posGlobalAbortCtrl = null;
+
 export function renderNuevaVentaForm(container) {
+  if (posGlobalAbortCtrl) {
+    posGlobalAbortCtrl.abort();
+  }
+  posGlobalAbortCtrl = new AbortController();
+  const posSignal = posGlobalAbortCtrl.signal;
+
   const clientes = store.getAll('clientes');
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
   const tarifasDelivery = store.getTarifasDelivery(true);
@@ -1504,29 +1512,31 @@ export function renderNuevaVentaForm(container) {
             <!-- Métodos de Pago -->
             <div id="seccion-pagos" style="margin-top: 2px;">
               <div id="container-btn-saldo-favor" style="display:none; margin-bottom: 4px;"></div>
-              <div id="pagos-list">
-                <div class="pago-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <label class="form-label" style="margin: 0; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
-                  <div class="form-group" style="margin-bottom: 0; flex: 1.3; min-width: 140px;">
-                    <select class="form-control pago-metodo" style="height: 34px; font-size: 12px;">
-                      ${metodosActivos.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
-                    </select>
-                  </div>
-                  <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 90px;">
-                    <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00" style="height: 34px; font-size: 12.5px; font-weight: 600;"/>
-                  </div>
-                  <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta" style="font-size: 12px; font-weight: 700; height: 34px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;" title="Añadir otro método de pago">+ Añadir</button>
-                  <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
-                    <div style="display: flex; gap: 8px; width: 100%;">
-                      <div style="flex: 1; min-width: 0;">
-                        <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11.5px; width: 100%;"/>
-                      </div>
-                      <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
-                        <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11.5px; width: 100%;"/>
+              <div style="display: flex; align-items: flex-start; gap: 8px;">
+                <div id="pagos-list" style="flex: 1; min-width: 0;">
+                  <div class="pago-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <label class="form-label" style="margin: 0; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">Métodos de Pago:</label>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1.3; min-width: 140px;">
+                      <select class="form-control pago-metodo" style="height: 34px; font-size: 12px;">
+                        ${metodosActivos.map(m => `<option value="${m.id}" ${m.id === 'punto' ? 'selected' : ''}>${formatMetodoOption(m)}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 90px;">
+                      <input type="number" class="form-control pago-monto" step="0.01" min="0" value="0.00" placeholder="0.00" style="height: 34px; font-size: 12.5px; font-weight: 600;"/>
+                    </div>
+                    <div class="form-group pago-ref-container" style="width: 100%; margin-top: 4px; display: none;">
+                      <div style="display: flex; gap: 8px; width: 100%;">
+                        <div style="flex: 1; min-width: 0;">
+                          <input type="text" class="form-control pago-referencia" placeholder="Nº de Referencia" style="height: 30px; font-size: 11.5px; width: 100%;"/>
+                        </div>
+                        <div class="pago-telefono-wrapper" style="flex: 1; min-width: 0;">
+                          <input type="text" class="form-control pago-telefono" placeholder="Nº de Teléfono" style="height: 30px; font-size: 11.5px; width: 100%;"/>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+                <button type="button" class="btn btn-xs btn-secondary" id="btn-add-pago-venta" style="font-size: 12px; font-weight: 700; height: 34px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;" title="Añadir otro método de pago">+ Añadir</button>
               </div>
 
               <!-- Calculadora de Vuelto -->
@@ -1748,7 +1758,7 @@ export function renderNuevaVentaForm(container) {
     });
 
     ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
-      document.addEventListener(evt, updateBtnState);
+      document.addEventListener(evt, updateBtnState, { signal: posSignal });
     });
     updateBtnState();
   }
@@ -1800,8 +1810,48 @@ export function renderNuevaVentaForm(container) {
   }
 
   const badgeDispTanquePV = modal.querySelector('#badge-disp-tanque-pv');
-  if (badgeDispTanquePV && (tanqueVacio || tanqueBajo)) {
-    badgeDispTanquePV.addEventListener('click', abrirCisternaDesdePV);
+  const actualizarBadgeTanquePV = () => {
+    const badge = modal.querySelector('#badge-disp-tanque-pv');
+    if (!badge) return;
+    const invAct = store.getInventarioActual();
+    const cap = parseFloat(invAct.capacidadTanque) || 30000;
+    const lit = parseFloat(invAct.litros) || 0;
+    const pct = cap > 0 ? Math.round((lit / cap) * 100) : 0;
+    const vacio = lit <= 0;
+    const bajo = !vacio && pct < 15;
+    badge.className = (vacio || bajo) ? 'alert-panel' : 'alert-panel info';
+    badge.style.background = vacio ? '#FEF2F2' : (bajo ? '#FFFBEB' : '');
+    badge.style.border = vacio ? '1.5px solid #EF4444' : (bajo ? '1.5px solid #F59E0B' : '');
+    badge.style.color = vacio ? '#B91C1C' : (bajo ? '#92400E' : '');
+    badge.style.cursor = (vacio || bajo) ? 'pointer' : '';
+    badge.title = vacio
+      ? 'Tanque vacío (0 L) - Clic para registrar cisterna'
+      : (bajo ? `Nivel bajo (${pct}%) - Clic para registrar cisterna` : 'Litros de agua disponibles en tanque');
+    badge.innerHTML = `
+      <span style="font-size: 14px;">${vacio ? '⚠️ Tanque:' : (bajo ? '⚠️ Disp:' : '💧 Disp:')}</span>
+      <strong style="font-size: 16px; margin-left: 2px;">${Utils.formatNumber(lit)} L${bajo ? ` (${pct}%)` : ''}</strong>
+    `;
+    badge.dataset.alertLow = (vacio || bajo) ? '1' : '0';
+  };
+  if (badgeDispTanquePV) {
+    badgeDispTanquePV.dataset.alertLow = (tanqueVacio || tanqueBajo) ? '1' : '0';
+    badgeDispTanquePV.addEventListener('click', () => {
+      if (badgeDispTanquePV.dataset.alertLow === '1') {
+        abrirCisternaDesdePV();
+      }
+    });
+  }
+
+  function sincronizarPreciosBsEnCarrito(tasaActual) {
+    const t = parseFloat(tasaActual) || getTasaActual();
+    carrito.forEach(item => {
+      if (!item || item.esCortesia || item.precioUnitario === 0) return;
+      if (item.monedaOriginal === 'VES' || item.monedaOriginal === 'Bs') {
+        const base = parseFloat(item.precioBase) || 0;
+        item.precioUnitario = t > 0 ? (base / t) : 0;
+        item.subtotal = item.cantidad * item.precioUnitario;
+      }
+    });
   }
   
   function parseTasaValue(valStr) {
@@ -1843,6 +1893,7 @@ export function renderNuevaVentaForm(container) {
       const val = parseTasaValue(inputTasa.value);
       if (val > 0) {
         store.setConfig('tasaCambio', val);
+        sincronizarPreciosBsEnCarrito(val);
         if (typeof renderPosFichas === 'function') {
           renderPosFichas();
         }
@@ -1857,6 +1908,7 @@ export function renderNuevaVentaForm(container) {
       if (val > 0) {
         store.setConfig('tasaCambio', val);
         inputTasa.value = Utils.formatNumber(val, true);
+        sincronizarPreciosBsEnCarrito(val);
         if (typeof renderPosFichas === 'function') {
           renderPosFichas();
         }
@@ -2359,6 +2411,7 @@ export function renderNuevaVentaForm(container) {
             litros: 0
           }];
         } else {
+          sincronizarPreciosBsEnCarrito(tasaCambio);
           detallesFinales = carrito.map(it => ({
             ...it,
             precioUnitario: isSinCobroFinal ? 0 : it.precioUnitario,
@@ -2453,9 +2506,10 @@ export function renderNuevaVentaForm(container) {
               monto: Math.round(excedente * 100) / 100,
               metodo: pagosFinales[0]?.metodo || 'efectivo_usd',
               tasa: tasaCambio,
+              esExcedenteVenta: true,
               referencia: 'Excedente de venta',
               telefono: pagosFinales[0]?.telefono || null,
-              fecha: Utils.nowISO()
+              fecha: fechaRegistro
             };
             store.save('abonos', abono);
             showToast(`Venta registrada y abono de ${Utils.formatCurrency(excedente)} acreditado`, 'success');
@@ -2497,7 +2551,11 @@ export function renderNuevaVentaForm(container) {
         if (hId) hId.value = '';
         actualizarBalanceBadge();
 
-        // Reset fichas y badges
+        // Reset fichas, badge del tanque y stock en pantalla
+        if (typeof renderPosFichas === 'function') {
+          renderPosFichas();
+        }
+        actualizarBadgeTanquePV();
         if (typeof actualizarBadgesFichas === 'function') {
           actualizarBadgesFichas();
         }
@@ -2985,7 +3043,7 @@ export function renderNuevaVentaForm(container) {
     if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
       resultsDiv.classList.remove('active');
     }
-  });
+  }, { signal: posSignal });
 
   function extraerLitrosDeNombre(nombre) {
     const match = (nombre || '').match(/(\d+)\s*(?:l|lt|lts|litro|litros)?/i);

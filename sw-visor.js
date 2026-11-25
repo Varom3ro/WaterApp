@@ -2,7 +2,7 @@
 // WaterApp - Service Worker Visor Ejecutivo Móvil
 // ============================================
 
-const CACHE_NAME = 'waterapp-visor-v1.0.25';
+const CACHE_NAME = 'waterapp-visor-v1.0.26';
 
 const ASSETS_TO_CACHE = [
   './visor.html',
@@ -65,7 +65,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Si no hay red, carga la versión en caché
-          return caches.match('./visor.html') || caches.match(event.request);
+          return caches.match(event.request).then((res) => res || caches.match('./visor.html'));
         })
     );
     return;

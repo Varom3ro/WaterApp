@@ -4,20 +4,19 @@
 
 import { router } from './router.js';
 import { store } from './store.js';
-import { Utils } from './utils.js?v=2.8.71';
-import { renderSidebar } from './components/sidebar.js?v=2.8.67';
-import { renderHeader } from './components/header.js';
+import { Utils } from './utils.js';
+import { renderSidebar } from './components/sidebar.js';
 import { Licencia } from './licencia.js';
-import { syncToCloud } from './cloud-sync.js?v=2.8.71';
+import { syncToCloud } from './cloud-sync.js';
 
 // Import modules
-import { renderDashboard } from './modules/dashboard.js?v=2.8.71';
-import { renderClientes } from './modules/clientes.js?v=2.8.67';
-import { renderVentas } from './modules/ventas.js?v=2.8.71';
-import { renderInventario } from './modules/inventario.js?v=2.8.71';
+import { renderDashboard } from './modules/dashboard.js';
+import { renderClientes } from './modules/clientes.js';
+import { renderVentas } from './modules/ventas.js';
+import { renderInventario } from './modules/inventario.js';
 import { renderReportes } from './modules/reportes.js';
-import { renderConfiguracion } from './modules/configuracion.js?v=2.8.71';
-import { renderCierreCaja } from './modules/cierre.js?v=2.8.71';
+import { renderConfiguracion } from './modules/configuracion.js';
+import { renderCierreCaja } from './modules/cierre.js';
 
 // 🛡️ Blindaje global contra cierre de ventana en PWA de escritorio Windows al presionar F5 o Ctrl+R:
 // Permite hard-refresh (Ctrl+Shift+R o Shift+F5) normalmente.
@@ -75,33 +74,37 @@ class App {
         syncToCloud();
         this.updateTitle();
 
-        // Update active state on route change
-        window.addEventListener('hashchange', () => {
-            if (store.isOperario()) {
-                const h = window.location.hash;
-                if (['#/reportes', '#/configuracion'].includes(h)) {
-                    window.location.hash = '#/inicio';
-                    return;
+        if (!this._globalListenersBound) {
+            this._globalListenersBound = true;
+
+            // Update active state on route change
+            window.addEventListener('hashchange', () => {
+                if (store.isOperario()) {
+                    const h = window.location.hash;
+                    if (['#/reportes', '#/configuracion'].includes(h)) {
+                        window.location.hash = '#/inicio';
+                        return;
+                    }
                 }
-            }
-            this.updateActiveLink();
-            this.updateTitle();
-            syncToCloud();
-        });
-        this.updateActiveLink();
-
-        // 💓 Latido y Sincronización en Vivo Periódica (cada 60 segundos si hay conexión)
-        setInterval(() => {
-            if (navigator.onLine && sessionStorage.getItem('isAuthenticated')) {
+                this.updateActiveLink();
+                this.updateTitle();
                 syncToCloud();
-            }
-        }, 60000);
+            });
 
-        // 🌐 Reintento automático de sincronización inmediata al recuperar conexión a Internet
-        window.addEventListener('online', () => {
-            console.log('[WaterApp] Conexión a Internet reestablecida. Sincronizando con la nube...');
-            syncToCloud();
-        });
+            // 💓 Latido y Sincronización en Vivo Periódica (cada 60 segundos si hay conexión)
+            setInterval(() => {
+                if (navigator.onLine && sessionStorage.getItem('isAuthenticated')) {
+                    syncToCloud();
+                }
+            }, 60000);
+
+            // 🌐 Reintento automático de sincronización inmediata al recuperar conexión a Internet
+            window.addEventListener('online', () => {
+                console.log('[WaterApp] Conexión a Internet reestablecida. Sincronizando con la nube...');
+                syncToCloud();
+            });
+        }
+        this.updateActiveLink();
     }
 
     renderLogin() {
@@ -271,17 +274,17 @@ class App {
             toggleSidebar(true);
         });
 
-        // Atajos de teclado: Ctrl+B / Alt+M (menú) y F5 / Ctrl+R (recarga protegida en PWA)
-        window.addEventListener('keydown', (e) => {
+        // Atajo de teclado para menú (Ctrl+B / Alt+M), reemplazando handler previo tras re-render
+        if (this._sidebarKeydownHandler) {
+            window.removeEventListener('keydown', this._sidebarKeydownHandler);
+        }
+        this._sidebarKeydownHandler = (e) => {
             if ((e.ctrlKey && e.key.toLowerCase() === 'b') || (e.altKey && e.key.toLowerCase() === 'm')) {
                 e.preventDefault();
                 toggleSidebar();
             }
-            if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
-                e.preventDefault();
-                window.location.reload();
-            }
-        });
+        };
+        window.addEventListener('keydown', this._sidebarKeydownHandler);
 
         // Al pulsar cualquier enlace del menú, ocultar automáticamente el sidebar
         document.querySelectorAll('.sidebar-nav-item').forEach(link => {

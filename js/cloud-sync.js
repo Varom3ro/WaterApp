@@ -4,12 +4,67 @@
 
 import { store } from './store.js';
 import { Utils } from './utils.js';
-import { esCuentaRefillH2O, cargarMetasRefillDesdeNube } from './refill-metas.js?v=2.8.71';
+import { esCuentaRefillH2O, cargarMetasRefillDesdeNube } from './refill-metas.js';
 
 const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
-export async function syncToCloud(isManual = false) {
+let _syncDebounceTimer = null;
+let _syncWaiters = [];
+let _syncInFlight = null;
+let _syncPendingAuto = false;
+
+async function _runSingleFlightSync(isManual) {
+  while (_syncInFlight) {
+    if (!isManual) {
+      _syncPendingAuto = true;
+      return _syncInFlight;
+    }
+    await _syncInFlight.catch(() => {});
+  }
+  const run = (async () => {
+    try {
+      let ok = await _executeSyncToCloud(isManual);
+      while (_syncPendingAuto) {
+        _syncPendingAuto = false;
+        ok = await _executeSyncToCloud(false);
+      }
+      return ok;
+    } finally {
+      _syncInFlight = null;
+    }
+  })();
+  _syncInFlight = run;
+  return run;
+}
+
+export function syncToCloud(isManual = false) {
+  if (isManual) {
+    if (_syncDebounceTimer) {
+      clearTimeout(_syncDebounceTimer);
+      _syncDebounceTimer = null;
+    }
+    const waiters = _syncWaiters;
+    _syncWaiters = [];
+    const p = _runSingleFlightSync(true);
+    waiters.forEach(w => p.then(w.resolve, w.reject));
+    return p;
+  }
+
+  return new Promise((resolve, reject) => {
+    _syncWaiters.push({ resolve, reject });
+    if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+    _syncDebounceTimer = setTimeout(() => {
+      _syncDebounceTimer = null;
+      const waiters = _syncWaiters;
+      _syncWaiters = [];
+      const p = _runSingleFlightSync(false);
+      waiters.forEach(w => p.then(w.resolve, w.reject));
+    }, 600);
+  });
+}
+
+async function _executeSyncToCloud(isManual = false) {
   const licenciaLocal = localStorage.getItem('licencia_usuario');
   if (!licenciaLocal) return;
 
@@ -175,6 +230,7 @@ export async function syncToCloud(isManual = false) {
 
     // Sumar abonos cobrados hoy al dinero real ingresado y a sus métodos de pago
     abonosHoy.forEach(a => {
+      if (!a || a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
       const m = parseFloat(a.monto) || 0;
       if (m <= 0) return;
       const currentTasa = parseFloat(a.tasa) || tasa;
@@ -498,9 +554,9 @@ export async function syncToCloud(isManual = false) {
           // Inyectar arqueos y turnos en la configuración del respaldo para que persistan en la nube
           try {
             const arqs = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
-            const trns = JSON.parse(localStorage.getItem('tuempresa_turnos_caja') || '[]');
+            const trns = JSON.parse(localStorage.getItem('tuempresa_turnos') || localStorage.getItem('tuempresa_turnos_caja') || '[]');
             respaldoObj.configuracion.push({ id: 'tuempresa_arqueos', value: arqs });
-            respaldoObj.configuracion.push({ id: 'tuempresa_turnos_caja', value: trns });
+            respaldoObj.configuracion.push({ id: 'tuempresa_turnos', value: trns });
           } catch(e) {}
         }
       } catch (bErr) {
@@ -513,7 +569,7 @@ export async function syncToCloud(isManual = false) {
     let turnosLocales = [];
     try {
       arqueosLocales = JSON.parse(localStorage.getItem('tuempresa_arqueos') || '[]');
-      turnosLocales = JSON.parse(localStorage.getItem('tuempresa_turnos_caja') || '[]');
+      turnosLocales = JSON.parse(localStorage.getItem('tuempresa_turnos') || localStorage.getItem('tuempresa_turnos_caja') || '[]');
     } catch(e) {}
 
     const hoy = hoyLocalStr;
@@ -633,12 +689,22 @@ export async function syncToCloud(isManual = false) {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify(payload)
       });
-      // Fallback a POST solo si la tienda es nueva y aún no existe fila previa en Supabase
-      if (!res.ok && res.status === 404) {
+      // Fallback a POST solo si la tienda es nueva y aún no existe fila previa en Supabase (200 [] o 404)
+      let needsPostFallback = !res.ok && res.status === 404;
+      if (res.ok && !needsPostFallback) {
+        try {
+          const patchedRows = await res.clone().json();
+          if (Array.isArray(patchedRows) && patchedRows.length === 0) {
+            needsPostFallback = true;
+          }
+        } catch (_) {}
+      }
+      if (needsPostFallback) {
         res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
           method: 'POST',
           headers: {

@@ -15,6 +15,16 @@ class Store {
         this.cache = {};
         COLLECTIONS.forEach(c => this.cache[c] = []);
         this.isReady = false;
+        this._suppressCloudSync = false;
+    }
+
+    _toLocalDateISO(val) {
+        if (!val) return '';
+        const str = String(val).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        const d = new Date(str);
+        if (isNaN(d.getTime())) return '';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
     async init() {
@@ -26,7 +36,7 @@ class Store {
         if (totalItems === 0 && typeof Android !== 'undefined' && typeof Android.hasBackup === 'function' && Android.hasBackup()) {
             const backupJson = Android.loadBackup();
             if (backupJson) {
-                this.importData(backupJson);
+                await this.importData(backupJson);
                 console.log('[Store] Auto-restaurado desde backup nativo de Android');
             }
         }
@@ -44,7 +54,7 @@ class Store {
             const existingIds = new Set(ventasDb.map(v => v.id));
             let recovered = 0;
             mirror.forEach(v => {
-                if (v && v.id && v.fecha && v.fecha.startsWith(todayISO) && !existingIds.has(v.id)) {
+                if (v && v.id && v.fecha && this._toLocalDateISO(v.fecha) === todayISO && !existingIds.has(v.id)) {
                     this.cache['ventas'].push(v);
                     this._putDB('ventas', v);
                     recovered++;
@@ -120,6 +130,7 @@ class Store {
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
+                tx.oncomplete = () => resolve(true);
                 tx.onerror = (err) => {
                     console.error(`[Store] ❌ Error en transacción IndexedDB (${storeName}):`, err);
                     resolve(false);
@@ -129,10 +140,8 @@ class Store {
                     resolve(false);
                 };
                 const req = tx.objectStore(storeName).put(item);
-                req.onsuccess = () => resolve(true);
                 req.onerror = (err) => {
                     console.error(`[Store] ❌ Error guardando en IndexedDB (${storeName}):`, err);
-                    resolve(false);
                 };
             } catch (e) {
                 console.error(`[Store] ❌ Excepción al escribir en IndexedDB (${storeName}):`, e);
@@ -146,10 +155,10 @@ class Store {
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
+                tx.oncomplete = () => resolve(true);
                 tx.onerror = () => resolve(false);
                 tx.onabort = () => resolve(false);
                 const req = tx.objectStore(storeName).delete(id);
-                req.onsuccess = () => resolve(true);
                 req.onerror = () => resolve(false);
             } catch (e) {
                 resolve(false);
@@ -173,7 +182,7 @@ class Store {
         try {
             const todayISO = Utils.todayISO();
             let mirror = JSON.parse(localStorage.getItem('waterapp_mirror_ventas_hoy') || '[]');
-            mirror = mirror.filter(v => v && v.fecha && v.fecha.startsWith(todayISO));
+            mirror = mirror.filter(v => v && v.fecha && this._toLocalDateISO(v.fecha) === todayISO);
 
             if (removeId) {
                 mirror = mirror.filter(v => v.id !== removeId);
@@ -232,6 +241,7 @@ class Store {
     }
 
     _triggerCloudSync(collection) {
+        if (this._suppressCloudSync) return;
         if (['ventas', 'cisternas', 'mermas', 'configuracion', 'abonos'].includes(collection)) {
             if (typeof window !== 'undefined' && typeof window.syncToCloud === 'function') {
                 try {
@@ -263,9 +273,9 @@ class Store {
         return [...recargas, ...prods];
     }
 
-    getConfig(key) {
+    getConfig(key, defaultValue = null) {
         const conf = this.getById('configuracion', key);
-        let val = conf ? conf.value : null;
+        let val = conf ? conf.value : defaultValue;
         if (key === 'tiposBotellon' && Array.isArray(val)) {
             return this._sortTiposBotellon(val);
         }
@@ -502,7 +512,7 @@ class Store {
 
     agregarCisterna(capacidad) {
         const inv = this.getInventarioActual();
-        inv.litros += capacidad;
+        inv.litros = Math.max(0, (parseFloat(inv.litros) || 0) + (parseFloat(capacidad) || 0));
         this.setConfig('inventario', inv);
         return inv;
     }
@@ -779,14 +789,18 @@ class Store {
             }
         }
 
+        const cierreSistema = info.cierreSistema || {};
+        const { ventasDetalle: _vd, abonosDetalle: _ad, propinasDetalle: _pd, ...sistemaCompacto } = cierreSistema;
+
         const nuevoTurno = {
             id: 'turno_' + Utils.generateId(),
             fecha: target,
             numeroTurno: info.numeroTurno,
             inicio: info.inicio,
             fin: Utils.nowISO(),
+            estado: 'cerrado',
             declaracion: declaracion,
-            sistema: info.cierreSistema,
+            sistema: sistemaCompacto,
             observaciones: observaciones,
             cerradoPor: this.getUserRole() || 'operario',
             fechaHora: Utils.nowISO(),
@@ -795,7 +809,17 @@ class Store {
 
         turnos.push(nuevoTurno);
         this.cache['turnosCaja'] = turnos;
-        localStorage.setItem('tuempresa_turnos', JSON.stringify(turnos));
+        try {
+            localStorage.setItem('tuempresa_turnos', JSON.stringify(turnos));
+        } catch (eQuota) {
+            try {
+                const trimmed = turnos.slice(-60);
+                this.cache['turnosCaja'] = trimmed;
+                localStorage.setItem('tuempresa_turnos', JSON.stringify(trimmed));
+            } catch (e2) {
+                console.warn('[Store] No se pudo persistir tuempresa_turnos en localStorage:', e2);
+            }
+        }
 
         this._sincronizarArqueoConsolidado(target);
         return nuevoTurno;
@@ -1029,6 +1053,7 @@ class Store {
 
         // Procesar cobros de créditos (abonos) realizados hoy
         for (const a of abonos) {
+            if (a.esExcedenteVenta || a.referencia === 'Excedente de venta') continue;
             const monto = parseFloat(a.monto) || 0;
             cierre.cobros_credito += monto;
             cierre.real_ingresado += monto;
@@ -1121,15 +1146,38 @@ class Store {
             if (!this.db) {
                 this.db = await this._openDB();
             }
+            if (Array.isArray(data.configuracion) && typeof localStorage !== 'undefined') {
+                const arqsEntry = data.configuracion.find(c => c && c.id === 'tuempresa_arqueos');
+                const trnsEntry = data.configuracion.find(c => c && c.id === 'tuempresa_turnos')
+                    || data.configuracion.find(c => c && c.id === 'tuempresa_turnos_caja');
+                try {
+                    if (arqsEntry && Array.isArray(arqsEntry.value)) {
+                        localStorage.setItem('tuempresa_arqueos', JSON.stringify(arqsEntry.value));
+                    }
+                    if (trnsEntry && Array.isArray(trnsEntry.value)) {
+                        localStorage.setItem('tuempresa_turnos', JSON.stringify(trnsEntry.value));
+                    }
+                } catch (lsErr) {
+                    console.warn('[Store] No se pudieron restaurar arqueos/turnos en localStorage:', lsErr);
+                }
+            }
             for (const col of COLLECTIONS) {
                 if (!Array.isArray(data[col])) continue;
-                this.cache[col] = data[col];
-                // Flush cada item a IndexedDB
+                const items = col === 'configuracion'
+                    ? data[col].filter(c => c && !['tuempresa_arqueos', 'tuempresa_turnos', 'tuempresa_turnos_caja'].includes(c.id))
+                    : data[col];
+                this.cache[col] = items;
+                // Flush cada item a IndexedDB y esperar confirmación de la transacción
                 if (this.db && this.db.objectStoreNames.contains(col)) {
-                    const tx = this.db.transaction(col, 'readwrite');
-                    const os = tx.objectStore(col);
-                    os.clear();
-                    data[col].forEach(item => os.put(item));
+                    await new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(col, 'readwrite');
+                        const os = tx.objectStore(col);
+                        os.clear();
+                        items.forEach(item => os.put(item));
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => reject(tx.error || new Error(`Error al importar colección ${col}`));
+                        tx.onabort = () => reject(tx.error || new Error(`Transacción abortada en ${col}`));
+                    });
                 }
             }
             this.isReady = true;
@@ -1253,22 +1301,22 @@ class Store {
             ]);
             this.setConfig('initialized', true);
         }
-        if (this.getConfig('tasaCambio') === undefined) {
+        if (this.getConfig('tasaCambio') === null) {
             this.setConfig('tasaCambio', 40.00);
         }
-        if (this.getConfig('moduloCaudalimetro') === undefined) {
+        if (this.getConfig('moduloCaudalimetro') === null) {
             this.setConfig('moduloCaudalimetro', false);
         }
-        if (this.getConfig('unidadCaudalimetro') === undefined) {
+        if (this.getConfig('unidadCaudalimetro') === null) {
             this.setConfig('unidadCaudalimetro', 'L');
         }
-        if (this.getConfig('moduloMermaLavado') === undefined) {
+        if (this.getConfig('moduloMermaLavado') === null) {
             this.setConfig('moduloMermaLavado', true);
         }
-        if (this.getConfig('mermaLavadoBase20L') === undefined) {
+        if (this.getConfig('mermaLavadoBase20L') === null) {
             this.setConfig('mermaLavadoBase20L', 1.0);
         }
-        if (this.getConfig('operarioPassword') === undefined) {
+        if (this.getConfig('operarioPassword') === null) {
             this.setConfig('operarioPassword', '1234');
         }
     }

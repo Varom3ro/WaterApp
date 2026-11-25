@@ -2,7 +2,7 @@
 // Tu Empresa - Service Worker (PWA Offline)
 // ============================================
 
-const CACHE_NAME = 'waterapp-cache-v2.8.72';
+const CACHE_NAME = 'waterapp-cache-v2.8.73';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -18,9 +18,9 @@ const ASSETS_TO_CACHE = [
   './js/utils.js',
   './js/licencia.js',
   './js/cloud-sync.js',
+  './js/refill-metas.js',
   './js/qrcode.min.js',
   './js/html2pdf.bundle.min.js',
-  './js/components/header.js',
   './js/components/sidebar.js',
   './js/components/modal.js',
   './js/components/toast.js',
@@ -38,19 +38,19 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Cacheando recursos de la app v2.8.39');
+      console.log('[SW] Cacheando recursos de la app', CACHE_NAME);
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
 });
 
-// Activación: Limpiar cachés antiguos
+// Activación: Limpiar cachés antiguos propios del POS (sin borrar cachés de los Visores)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key.startsWith('waterapp-cache-') && key !== CACHE_NAME) {
             console.log('[SW] Eliminando caché antigua:', key);
             return caches.delete(key);
           }

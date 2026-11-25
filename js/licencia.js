@@ -334,69 +334,88 @@ export const Licencia = {
     const s = storeInstance || (typeof store !== 'undefined' ? store : window.__app_store);
     if (!s) return false;
 
-    const lastAjusteTs = ajustesRemotos.timestamp || 0;
-    const localAjusteTs = parseInt(localStorage.getItem('ultimo_ajuste_remoto_aplicado') || '0');
+    const legacyTopTs = parseInt(ajustesRemotos.timestamp || '0') || 0;
+    const legacyLocalTs = parseInt(localStorage.getItem('ultimo_ajuste_remoto_aplicado') || '0') || 0;
 
-    if (lastAjusteTs > localAjusteTs) {
-      let huboCambios = false;
+    let huboCambios = false;
+    const prevSuppress = s._suppressCloudSync;
+    s._suppressCloudSync = true;
 
-      // 1. Tanque de agua
+    try {
+      // 1. Tanque de agua (con timestamp independiente por sección)
       if (ajustesRemotos.tanque && typeof ajustesRemotos.tanque === 'object') {
-        const { litros, capacidadTanque } = ajustesRemotos.tanque;
-        if (litros !== undefined && capacidadTanque !== undefined) {
-          s.setConfig('inventario', { litros, capacidadTanque });
-          console.log('[Licencia] 💧 Ajuste remoto de tanque inyectado desde Visor Supervisor:', litros, capacidadTanque);
-          huboCambios = true;
+        const tanqueTs = parseInt(ajustesRemotos.tanque.timestamp || '0') || legacyTopTs;
+        const localTanqueTs = parseInt(localStorage.getItem('ultimo_ajuste_tanque_aplicado') || '0') || legacyLocalTs;
+        if (tanqueTs > localTanqueTs) {
+          const { litros, capacidadTanque } = ajustesRemotos.tanque;
+          if (litros !== undefined && capacidadTanque !== undefined) {
+            s.setConfig('inventario', { litros, capacidadTanque });
+            localStorage.setItem('ultimo_ajuste_tanque_aplicado', String(tanqueTs));
+            console.log('[Licencia] 💧 Ajuste remoto de tanque inyectado desde Visor Supervisor:', litros, capacidadTanque);
+            huboCambios = true;
+          }
         }
       }
 
-      // 2. Stock físico de productos
+      // 2. Stock físico de productos (con timestamp independiente por sección)
       if (ajustesRemotos.stock && typeof ajustesRemotos.stock === 'object') {
-        const remoteStocks = ajustesRemotos.stock.stocks || {};
-        const currentTipos = s.getConfig('tiposBotellon') || [];
-        let modificado = false;
+        const stockTs = parseInt(ajustesRemotos.stock.timestamp || '0') || legacyTopTs;
+        const localStockTs = parseInt(localStorage.getItem('ultimo_ajuste_stock_aplicado') || '0') || legacyLocalTs;
+        if (stockTs > localStockTs) {
+          const remoteStocks = ajustesRemotos.stock.stocks || {};
+          const currentTipos = s.getConfig('tiposBotellon') || [];
+          let modificado = false;
 
-        const updatedTipos = currentTipos.map(item => {
-          if (item.categoria === 'producto') {
-            const norm = (item.nombre || '').toLowerCase().trim();
-            if (remoteStocks[norm] !== undefined) {
-              const nuevoVal = parseInt(remoteStocks[norm]);
-              if (!isNaN(nuevoVal) && item.stock !== nuevoVal) {
-                console.log(`[Licencia] 📦 Ajuste remoto de stock aplicado a ${item.nombre}: ${item.stock} -> ${nuevoVal}`);
-                modificado = true;
-                return { ...item, stock: nuevoVal };
+          const updatedTipos = currentTipos.map(item => {
+            if (item.categoria === 'producto') {
+              const norm = (item.nombre || '').toLowerCase().trim();
+              if (remoteStocks[norm] !== undefined) {
+                const nuevoVal = parseInt(remoteStocks[norm]);
+                if (!isNaN(nuevoVal) && item.stock !== nuevoVal) {
+                  console.log(`[Licencia] 📦 Ajuste remoto de stock aplicado a ${item.nombre}: ${item.stock} -> ${nuevoVal}`);
+                  modificado = true;
+                  return { ...item, stock: nuevoVal };
+                }
               }
             }
-          }
-          return item;
-        });
+            return item;
+          });
 
-        if (modificado) {
-          s.setConfig('tiposBotellon', updatedTipos);
-          huboCambios = true;
+          if (modificado) {
+            s.setConfig('tiposBotellon', updatedTipos);
+            huboCambios = true;
+          }
+          localStorage.setItem('ultimo_ajuste_stock_aplicado', String(stockTs));
         }
       }
 
       // 3. Ajuste remoto de mantenimiento de filtros (desde Visor Dueño / Supervisor)
       if (ajustesRemotos.mantenimientoFiltros && ajustesRemotos.mantenimientoFiltros.ultimaFecha) {
         const remMant = ajustesRemotos.mantenimientoFiltros;
+        const filtrosTs = parseInt(remMant.timestamp || '0') || (remMant.actualizadoEn ? new Date(remMant.actualizadoEn).getTime() : 0) || legacyTopTs;
+        const localFiltrosTs = parseInt(localStorage.getItem('ultimo_ajuste_filtros_aplicado') || '0') || legacyLocalTs;
         const localMant = s.getConfig('mantenimientoFiltros', null);
         const remTime = remMant.actualizadoEn ? new Date(remMant.actualizadoEn).getTime() : 0;
         const localTime = (localMant && localMant.actualizadoEn) ? new Date(localMant.actualizadoEn).getTime() : 0;
-        if (!localMant || !localTime || remTime > localTime) {
+        if (filtrosTs > localFiltrosTs && (!localMant || !localTime || remTime > localTime)) {
           s.setConfig('mantenimientoFiltros', remMant);
+          localStorage.setItem('ultimo_ajuste_filtros_aplicado', String(filtrosTs));
           console.log('[Licencia] 🧪 Ajuste remoto de mantenimiento de filtros aplicado:', remMant);
           huboCambios = true;
         }
       }
 
-      localStorage.setItem('ultimo_ajuste_remoto_aplicado', String(lastAjusteTs));
-      if (huboCambios && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('stock-remoto-actualizado'));
+      if (legacyTopTs > legacyLocalTs) {
+        localStorage.setItem('ultimo_ajuste_remoto_aplicado', String(legacyTopTs));
       }
-      return huboCambios;
+    } finally {
+      s._suppressCloudSync = prevSuppress;
     }
-    return false;
+
+    if (huboCambios && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('stock-remoto-actualizado'));
+    }
+    return huboCambios;
   },
 
   async verificarAjustesRemotosEnCaliente(storeInstance = null) {

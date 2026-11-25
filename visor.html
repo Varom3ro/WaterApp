@@ -2756,6 +2756,37 @@ body.hide-montos #cierre-digital-usd {
   </div>
 </div>
 
+<!-- Banner flotante de instalación PWA -->
+<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
+  <div class="pwa-banner-content">
+    <div class="pwa-banner-icon">💧</div>
+    <div class="pwa-banner-text">
+      <strong>Instalar Visor Móvil</strong>
+      <span>Acceso rápido sin barra de navegador</span>
+    </div>
+  </div>
+  <div class="pwa-banner-actions">
+    <button id="btn-pwa-banner-install" class="btn-pwa-action">Instalar</button>
+    <button id="btn-pwa-banner-close" class="btn-pwa-dismiss" title="Cerrar">✕</button>
+  </div>
+</div>
+
+<!-- Modal de instrucciones para iPhone / iOS -->
+<div id="ios-pwa-modal" class="ios-modal-overlay" style="display: none;">
+  <div class="ios-modal-card">
+    <div style="font-size: 2.2rem; margin-bottom: 8px;">📲</div>
+    <h3 style="color: #fff; font-size: 1.1rem; margin-bottom: 8px; font-weight: 800;">Instalar en tu iPhone</h3>
+    <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px;">
+      Para tener el Visor como una aplicación nativa en tu pantalla de inicio:
+    </p>
+    <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; color: #E2E8F0; margin-bottom: 16px; border: 1px solid var(--border);">
+      <div style="margin-bottom: 10px;">1️⃣ Toca el botón <strong>Compartir</strong> <span style="font-size: 1.1rem;">📤</span> en la barra inferior de Safari.</div>
+      <div>2️⃣ Desliza hacia abajo y pulsa <strong>"Agregar al inicio"</strong> <span style="font-size: 1.1rem;">➕</span>.</div>
+    </div>
+    <button id="btn-close-ios-modal" class="btn btn-primary" style="width: 100%;">Entendido</button>
+  </div>
+</div>
+
 <script>
   const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
   const SUPABASE_LIC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
@@ -3268,7 +3299,7 @@ body.hide-montos #cierre-digital-usd {
   document.getElementById('btn-sync-now').addEventListener('click', async () => {
     const btn = document.getElementById('btn-sync-now');
     btn.style.transform = 'rotate(180deg)';
-    await cargarDatosEnVivo();
+    await cargarDatosEnVivo(true);
     setTimeout(() => { btn.style.transform = 'rotate(0deg)'; }, 300);
   });
 
@@ -3337,8 +3368,8 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
   const ventas = (tienda.respaldo_completo && Array.isArray(tienda.respaldo_completo.ventas)) ? tienda.respaldo_completo.ventas : [];
   const abonos = (tienda.respaldo_completo && Array.isArray(tienda.respaldo_completo.abonos)) ? tienda.respaldo_completo.abonos : [];
   const now = new Date();
-  const hoyStr = now.toISOString().substring(0, 10);
-  const mesStr = now.toISOString().substring(0, 7);
+  const hoyStr = getTodayISOVisor();
+  const mesStr = hoyStr.substring(0, 7);
   const sieteDiasAtras = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   let tasa = (r.totalUSD > 0 && r.totalBs > 0) ? (r.totalBs / r.totalUSD) : 890;
@@ -3395,7 +3426,8 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
             if (m.includes('efectivo') && m.includes('usd')) {
               efUSD += pMonto;
             } else if (m.includes('efectivo')) {
-              efBs += (p.montoBs || p.monto || 0);
+              const vTasa = parseFloat(v.tasa) || tasa;
+              efBs += (p.montoBs || (pMonto * vTasa));
             } else {
               digUSD += pMonto;
             }
@@ -3406,6 +3438,7 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
         }
       });
       abonosSemana.forEach(a => {
+        if (!a || a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
         const mVal = parseFloat(a.monto) || 0;
         if (mVal <= 0) return;
         tUSD += mVal;
@@ -3448,8 +3481,8 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
   }
 
   if (periodo === 'mes') {
-    const ventasMes = ventas.filter(v => v.fecha && v.fecha.startsWith(mesStr));
-    const abonosMes = abonos.filter(a => a.fecha && a.fecha.startsWith(mesStr));
+    const ventasMes = ventas.filter(v => v.fecha && (toLocalISOFromAnyVisor(v.fecha) || '').startsWith(mesStr));
+    const abonosMes = abonos.filter(a => a.fecha && (toLocalISOFromAnyVisor(a.fecha) || '').startsWith(mesStr));
     let tUSD = 0, credUSD = 0, efUSD = 0, efBs = 0, digUSD = 0, bots = 0, lts = 0;
 
     if (ventasMes.length > 0 || abonosMes.length > 0) {
@@ -3475,7 +3508,8 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
             if (m.includes('efectivo') && m.includes('usd')) {
               efUSD += pMonto;
             } else if (m.includes('efectivo')) {
-              efBs += (p.montoBs || p.monto || 0);
+              const vTasa = parseFloat(v.tasa) || tasa;
+              efBs += (p.montoBs || (pMonto * vTasa));
             } else {
               digUSD += pMonto;
             }
@@ -3486,6 +3520,7 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
         }
       });
       abonosMes.forEach(a => {
+        if (!a || a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
         const mVal = parseFloat(a.monto) || 0;
         if (mVal <= 0) return;
         tUSD += mVal;
@@ -3602,34 +3637,54 @@ function aplicarPeriodoVentas(storeData, periodo) {
 }
 
 // Cargar todas las tiendas para supervisión simultánea (Cierres + Consolidado)
-async function cargarTodasLasSedesRefill() {
+let _lastSedesFetchTs = 0;
+let _sedesInFlightPromise = null;
+
+async function cargarTodasLasSedesRefill(force = false) {
+  const now = Date.now();
+  if (!force && _lastSedesFetchTs > 0 && (now - _lastSedesFetchTs) < 30000 && Object.keys(cacheGlobalTiendas).length > 0) {
+    return;
+  }
+  if (_sedesInFlightPromise) {
+    return _sedesInFlightPromise;
+  }
+
+  _sedesInFlightPromise = (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}?select=*`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!res.ok) return;
+      const allData = await res.json();
+
+      // Guardar en cache global de tiendas
+      allData.forEach(tienda => {
+        if (tienda.empresa_email) {
+          cacheGlobalTiendas[tienda.empresa_email.toLowerCase()] = tienda;
+        }
+      });
+      _lastSedesFetchTs = Date.now();
+
+      renderizarConsolidadoYRankingMultisede(periodoConsolidadoMultisede);
+      if (typeof cargarMetasRefillVisor === 'function') {
+        await cargarMetasRefillVisor();
+      }
+      if (typeof renderizarReporteMetasVisor === 'function') {
+        renderizarReporteMetasVisor();
+      }
+
+    } catch(e) {
+      console.warn('[Visor] Error al cargar todas las sedes:', e);
+    }
+  })();
+
   try {
-    const res = await fetch(`${SUPABASE_URL}?select=*`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
-    });
-    if (!res.ok) return;
-    const allData = await res.json();
-
-    // Guardar en cache global de tiendas
-    allData.forEach(tienda => {
-      if (tienda.empresa_email) {
-        cacheGlobalTiendas[tienda.empresa_email.toLowerCase()] = tienda;
-      }
-    });
-
-    renderizarConsolidadoYRankingMultisede(periodoConsolidadoMultisede);
-    if (typeof cargarMetasRefillVisor === 'function') {
-      await cargarMetasRefillVisor();
-    }
-    if (typeof renderizarReporteMetasVisor === 'function') {
-      renderizarReporteMetasVisor();
-    }
-
-  } catch(e) {
-    console.warn('[Visor] Error al cargar todas las sedes:', e);
+    return await _sedesInFlightPromise;
+  } finally {
+    _sedesInFlightPromise = null;
   }
 }
 
@@ -3644,7 +3699,7 @@ function renderizarConsolidadoYRankingMultisede(periodo = 'hoy') {
   });
 
   const sedesKeys = Object.keys(REFILLH2O_SEDES);
-  const hoyStr = new Date().toISOString().substring(0, 10);
+  const hoyStr = getTodayISOVisor();
 
   let sumTotalUSD = 0;
   let sumTotalBs = 0;
@@ -4016,12 +4071,24 @@ function cambiarTab(tabName) {
   }
 
   // Cargar Datos de Supabase
-  async function cargarDatosEnVivo() {
+  let _isFetchingLiveVisor = false;
+
+  async function cargarDatosEnVivo(force = false) {
+    if (!currentStoreEmail || _isFetchingLiveVisor) return;
+    _isFetchingLiveVisor = true;
+    try {
+      return await _ejecutarCargaDatosEnVivo(force);
+    } finally {
+      _isFetchingLiveVisor = false;
+    }
+  }
+
+  async function _ejecutarCargaDatosEnVivo(force = false) {
     if (!currentStoreEmail) return;
 
     if (currentStoreEmail === 'todas') {
       try {
-        await cargarTodasLasSedesRefill();
+        await cargarTodasLasSedesRefill(force);
         renderizarConsolidadoEnPantallaPrincipal();
       } catch (err) {
         console.warn('Error al consolidar sedes:', err);
@@ -4813,7 +4880,7 @@ function cambiarTab(tabName) {
     if (lblSede) lblSede.textContent = sedeNombre;
 
     const r = storeData.resumen_hoy || {};
-    const hoyStr = new Date().toISOString().substring(0, 10);
+    const hoyStr = getTodayISOVisor();
 
     // 1. Detectar si hoy ya cerró o sigue en operación
     let arqHoy = null;
@@ -4973,7 +5040,8 @@ function cambiarTab(tabName) {
     const abonos = storeData.respaldo_completo?.abonos || [];
     ventas.forEach(v => {
       if (!v.fecha) return;
-      const dia = v.fecha.substring(0, 10);
+      const dia = toLocalISOFromAnyVisor(v.fecha);
+      if (!dia) return;
       // Excluir el día de hoy si aún no ha cerrado caja para mantener los 5 cierres pasados finalizados
       if (dia === hoyStr && !arqHoy) return;
 
@@ -5019,7 +5087,8 @@ function cambiarTab(tabName) {
           if (met.includes('efectivo') && met.includes('usd')) {
             d.efectivoUSD += pMonto;
           } else if (met.includes('efectivo')) {
-            d.efectivoBs += (p.montoBs || p.monto || 0);
+            const vTasa = parseFloat(v.tasa) || (parseFloat(storeData.resumen_hoy?.tasa) || 890);
+            d.efectivoBs += (p.montoBs || (pMonto * vTasa));
           } else {
             d.digitalUSD += pMonto;
           }
@@ -5030,8 +5099,9 @@ function cambiarTab(tabName) {
     });
 
     abonos.forEach(a => {
-      if (!a.fecha) return;
-      const dia = a.fecha.substring(0, 10);
+      if (!a || !a.fecha || a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
+      const dia = toLocalISOFromAnyVisor(a.fecha);
+      if (!dia) return;
       if (dia === hoyStr && !arqHoy) return;
       if (!ventasPorDia[dia]) return;
       const d = ventasPorDia[dia];
@@ -5186,7 +5256,12 @@ function cambiarTab(tabName) {
 
   function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   // =========================================================================
@@ -5496,12 +5571,14 @@ function cambiarTab(tabName) {
       return;
     }
 
+    const tsMant = Date.now();
     const mantObj = {
       ultimaFecha,
       frecuencia,
       proximaFecha: calcularProximaFechaFiltrosVisor(ultimaFecha, frecuencia),
       nota,
-      actualizadoEn: new Date().toISOString()
+      actualizadoEn: new Date().toISOString(),
+      timestamp: tsMant
     };
 
     const btn = document.getElementById('btn-guardar-mant-visor');
@@ -5525,7 +5602,7 @@ function cambiarTab(tabName) {
       } catch (_) {}
 
       const nuevoNT = { ...baseNT, mantenimientoFiltros: mantObj };
-      await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(targetEmail)}`, {
+      const resPatchNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(targetEmail)}`, {
         method: 'PATCH',
         headers: {
           'apikey': SUPABASE_KEY,
@@ -5537,37 +5614,44 @@ function cambiarTab(tabName) {
           ultima_actualizacion: new Date().toISOString()
         })
       });
+      if (!resPatchNT.ok) {
+        throw new Error(`HTTP ${resPatchNT.status} guardando filtros en tienda`);
+      }
 
       // 2. Enviar comando remoto para el POS en licencia_agua_clientes
       const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(targetEmail)}&select=id,visor_actividad`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-      if (resLic.ok) {
-        const list = await resLic.json();
-        if (list && list.length > 0) {
-          const c = list[0];
-          const act = c.visor_actividad || {};
-          const prevAj = act.ajustes_remotos || {};
-          await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-            method: 'PATCH',
-            headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              visor_actividad: {
-                ...act,
-                ajustes_remotos: {
-                  ...prevAj,
-                  mantenimientoFiltros: mantObj,
-                  motivo: `Mantenimiento de filtros (${frecuencia})`,
-                  supervisor: 'Dueño (Visor)',
-                  timestamp: Date.now()
-                }
+      if (!resLic.ok) {
+        throw new Error(`HTTP ${resLic.status} consultando licencia para filtros`);
+      }
+      const list = await resLic.json();
+      if (list && list.length > 0) {
+        const c = list[0];
+        const act = c.visor_actividad || {};
+        const prevAj = act.ajustes_remotos || {};
+        const resPatchLic = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            visor_actividad: {
+              ...act,
+              ajustes_remotos: {
+                ...prevAj,
+                mantenimientoFiltros: mantObj,
+                motivo: `Mantenimiento de filtros (${frecuencia})`,
+                supervisor: 'Dueño (Visor)',
+                timestamp: tsMant
               }
-            })
-          });
+            }
+          })
+        });
+        if (!resPatchLic.ok) {
+          throw new Error(`HTTP ${resPatchLic.status} enviando ajuste remoto de filtros`);
         }
       }
 
@@ -5712,7 +5796,7 @@ function cambiarTab(tabName) {
         }
       });
       abonos.forEach(a => {
-        if (!a) return;
+        if (!a || a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
         const iso = toLocalISOFromAnyVisor(a.fecha);
         if (!iso || iso < rango.lunesISO || iso > rango.sabadoISO) return;
         const val = parseFloat(a.monto);
@@ -6461,37 +6545,6 @@ function cambiarTab(tabName) {
     }
   });
 </script>
-
-<!-- Banner flotante de instalación PWA -->
-<div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
-  <div class="pwa-banner-content">
-    <div class="pwa-banner-icon">💧</div>
-    <div class="pwa-banner-text">
-      <strong>Instalar Visor Móvil</strong>
-      <span>Acceso rápido sin barra de navegador</span>
-    </div>
-  </div>
-  <div class="pwa-banner-actions">
-    <button id="btn-pwa-banner-install" class="btn-pwa-action">Instalar</button>
-    <button id="btn-pwa-banner-close" class="btn-pwa-dismiss" title="Cerrar">✕</button>
-  </div>
-</div>
-
-<!-- Modal de instrucciones para iPhone / iOS -->
-<div id="ios-pwa-modal" class="ios-modal-overlay" style="display: none;">
-  <div class="ios-modal-card">
-    <div style="font-size: 2.2rem; margin-bottom: 8px;">📲</div>
-    <h3 style="color: #fff; font-size: 1.1rem; margin-bottom: 8px; font-weight: 800;">Instalar en tu iPhone</h3>
-    <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px;">
-      Para tener el Visor como una aplicación nativa en tu pantalla de inicio:
-    </p>
-    <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; color: #E2E8F0; margin-bottom: 16px; border: 1px solid var(--border);">
-      <div style="margin-bottom: 10px;">1️⃣ Toca el botón <strong>Compartir</strong> <span style="font-size: 1.1rem;">📤</span> en la barra inferior de Safari.</div>
-      <div>2️⃣ Desliza hacia abajo y pulsa <strong>"Agregar al inicio"</strong> <span style="font-size: 1.1rem;">➕</span>.</div>
-    </div>
-    <button id="btn-close-ios-modal" class="btn btn-primary" style="width: 100%;">Entendido</button>
-  </div>
-</div>
 
 </body>
 </html>

@@ -1,6 +1,6 @@
 import { store } from '../store.js';
-import { Utils } from '../utils.js?v=2.8.71';
-import { renderNuevaVentaForm, renderVentas } from './ventas.js?v=2.8.71';
+import { Utils } from '../utils.js';
+import { renderNuevaVentaForm, renderVentas } from './ventas.js';
 import { getCumpleanerosHoy, getWhatsAppBirthdayUrl } from './clientes.js';
 
 export function renderDashboard(container) {

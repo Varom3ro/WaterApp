@@ -494,6 +494,15 @@ function renderDetalleTurnoCerrado(turno, methods, fecha, esUltimoTurno) {
   `;
 }
 
+function toLocalDateISO(val) {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function renderConsolidadoZ(turnos, fecha, methods) {
   const cierreGlobal = store.getCierreCaja(fecha);
   const arqueoConsolidado = store.getArqueo(fecha);
@@ -501,14 +510,14 @@ function renderConsolidadoZ(turnos, fecha, methods) {
   const unidadCaudalimetro = store.getConfig('unidadCaudalimetro') || 'L';
   const lecturaCaud = store.getLecturaCaudalimetro(fecha);
 
-  const ventasDia = (store.getAll('ventas') || []).filter(v => v.fecha && v.fecha.startsWith(fecha));
+  const ventasDia = (store.getAll('ventas') || []).filter(v => v && toLocalDateISO(v.fecha) === fecha);
   const litrosFacturados = ventasDia.reduce((s, v) => s + (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0), 0);
   const mermasLavadoDia = ventasDia.reduce((s, v) => {
     if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
     const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
     return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
   }, 0);
-  const mermasDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
+  const mermasDia = (store.getAll('mermas') || []).filter(m => m && toLocalDateISO(m.fecha) === fecha);
   const litrosMermas = mermasDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
   const totalAguaSistema = Math.round((litrosFacturados + mermasLavadoDia + litrosMermas) * 100) / 100;
   const diffAgua = Math.round((lecturaCaud.litrosReloj - totalAguaSistema) * 100) / 100;
@@ -1314,7 +1323,7 @@ export function getReporteTxtString(fecha) {
 
   // Ventas del día
   const allVentas = store.getAll('ventas') || [];
-  const ventasDia = allVentas.filter(v => v && v.fecha && v.fecha.startsWith(fecha));
+  const ventasDia = allVentas.filter(v => v && toLocalDateISO(v.fecha) === fecha);
 
   // Consolidado de productos
   const productoResumen = {};
@@ -1550,9 +1559,13 @@ export function getReporteTxtString(fecha) {
     lines.push(`${padRight('Agua Total según Reloj Físico:', 42)} ${padLeft((lecturaCaud.litrosReloj || 0).toLocaleString('es-VE') + ' L', 29)}`);
     lines.push(`${padRight('Agua en Ventas Despachadas:', 42)} ${padLeft(Math.round(totalLitrosVendidos).toLocaleString('es-VE') + ' L', 29)}`);
 
-    const mermasDia = (store.getAll('mermas') || []).filter(m => m.fecha && m.fecha.startsWith(fecha));
+    const mermasDia = (store.getAll('mermas') || []).filter(m => m && toLocalDateISO(m.fecha) === fecha);
     const litrosMermas = mermasDia.reduce((s, m) => s + (parseInt(m.litros) || 0), 0);
-    const mermasLavado = Math.round(totalLitrosVendidos * 0.05);
+    const mermasLavado = Math.round(ventasDia.reduce((s, v) => {
+      if (v.litrosMermaLavado !== undefined) return s + (parseFloat(v.litrosMermaLavado) || 0);
+      const nominal = (parseFloat(v.litrosTotales) || (parseInt(v.botellones) || 0) * 20 || 0);
+      return s + (store.calcularMermaLavado ? store.calcularMermaLavado(nominal) : (nominal * 0.05));
+    }, 0) * 100) / 100;
     lines.push(`${padRight('Mermas de Lavado / Higienización (estimadas):', 42)} ${padLeft(mermasLavado.toLocaleString('es-VE') + ' L', 29)}`);
     if (litrosMermas > 0) {
       lines.push(`${padRight('Otras Mermas Registradas:', 42)} ${padLeft(litrosMermas.toLocaleString('es-VE') + ' L', 29)}`);

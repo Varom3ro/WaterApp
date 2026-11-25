@@ -3,10 +3,10 @@
 // ============================================
 
 import { store } from '../store.js';
-import { Utils } from '../utils.js?v=2.8.71';
+import { Utils } from '../utils.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
-import { syncToCloud } from '../cloud-sync.js?v=2.8.71';
+import { syncToCloud } from '../cloud-sync.js';
 
 export function renderInventario(container) {
   const isOp = store.isOperario();
@@ -684,10 +684,10 @@ function openConfigTanqueModal() {
     onSave: (overlay) => {
       const form = overlay.querySelector('#form-config-tanque');
       const fd = new FormData(form);
-      const capacidadTanque = parseInt(fd.get('capacidadTanque'));
-      const litros = parseInt(fd.get('litros'));
+      const capacidadTanque = parseInt(fd.get('capacidadTanque'), 10);
+      const litros = parseInt(fd.get('litros'), 10);
 
-      if (!capacidadTanque || litros < 0) {
+      if (isNaN(capacidadTanque) || capacidadTanque <= 0 || isNaN(litros) || litros < 0) {
         showToast('Valores inválidos', 'error');
         return;
       }

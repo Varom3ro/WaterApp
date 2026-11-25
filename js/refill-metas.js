@@ -293,6 +293,7 @@ export function calcularVentaRealSemana(ventas = [], abonos = [], rangoSemana) {
 
   (Array.isArray(abonos) ? abonos : []).forEach(a => {
     if (!a) return;
+    if (a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
     const dayISO = toLocalDateISO(a.fecha);
     if (!dayISO || dayISO < rangoSemana.lunesISO || dayISO > rangoSemana.sabadoISO) return;
     const val = parseFloat(a.monto);

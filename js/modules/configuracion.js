@@ -2,7 +2,7 @@ import { store } from '../store.js';
 import { Utils } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js?v=2.8.71';
+import { syncToCloud, getCloudBackup, restoreFromCloud, backupToCloudNow } from '../cloud-sync.js';
 import { renderSidebar } from '../components/sidebar.js';
 import { Licencia } from '../licencia.js';
 import {
@@ -10,7 +10,7 @@ import {
   getMetasRefillConfigLocal,
   cargarMetasRefillDesdeNube,
   guardarMetasRefillEnNube
-} from '../refill-metas.js?v=2.8.71';
+} from '../refill-metas.js';
 
 export function renderConfiguracion(container) {
   const tipos = store.getConfig('tiposBotellon') || [{ id: '20l', nombre: 'Botellón 20 Litros', litros: 20, precio: 1.50 }];
@@ -490,6 +490,7 @@ export function renderConfiguracion(container) {
 
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text-secondary); line-height: 1.4;">
           💡 <em>Al estar <strong>Activado</strong>, al seleccionar cualquier botellón de la lista de productos en el Punto de Venta se incluirá el agua de cortesía gratis (descontando los litros de agua del tanque sin costo extra) y con la opción de quitarla en el carrito. Al estar <strong>Desactivado</strong>, los botellones se venderán como envases vacíos normales sin recarga de agua.</em>
+        </div>
       </div>
 
       <!-- Merma de Agua por Lavado de Botellones -->
@@ -892,10 +893,20 @@ export function renderConfiguracion(container) {
 
       showToast('Datos de la empresa actualizados correctamente', 'success');
 
-      // Actualizar inmediatamente el Sidebar en el DOM
+      // Actualizar inmediatamente el Sidebar en el DOM sin destruir sus event listeners
       const sidebarContainer = document.querySelector('.sidebar');
       if (sidebarContainer) {
-        sidebarContainer.outerHTML = renderSidebar();
+        const nombreActual = store.getConfig('empresaNombre') || 'Tu Empresa';
+        const logoActual = store.getConfig('empresaLogo') || './img/logo.png';
+        const logoImg = sidebarContainer.querySelector('.sidebar-logo img.logo-img');
+        if (logoImg) {
+          logoImg.src = logoActual;
+          logoImg.alt = nombreActual;
+        }
+        const titleEl = sidebarContainer.querySelector('.sidebar-logo h1');
+        if (titleEl) {
+          titleEl.textContent = nombreActual;
+        }
       }
       if (typeof syncToCloud === 'function') syncToCloud(true);
     });

@@ -551,7 +551,7 @@ function viewClienteDetail(id) {
             if (typeof syncToCloud === 'function') syncToCloud();
             closeModal();
             showToast('Abono anulado con éxito', 'success');
-            openDetalleClienteModal(id);
+            viewClienteDetail(id);
             const container = document.querySelector('.main-content');
             if (container) renderClientes(container);
           }
