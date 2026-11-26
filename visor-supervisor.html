@@ -1367,17 +1367,31 @@
 <!-- JAVASCRIPT DEL VISOR DE SUPERVISORES                                      -->
 <!-- ========================================================================= -->
 <script>
-  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
-  const SUPABASE_LIC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
   // Sesión y Estado del Supervisor
+  let supAuthToken = localStorage.getItem('visor_sup_token') || localStorage.getItem('visor_auth_token') || '';
   let supervisorSession = null;
   let currentStoreEmail = '';
   let cacheGlobalTiendas = {};
   let currentCatalogo = [];
   let autoRefreshInterval = null;
   let filtroCatalogoActual = 'todos';
+
+  async function callSupRpc(fnName, params) {
+    const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params || {})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }
 
   // Configuración de Sedes Refill H2O conocidas
   const REFILLH2O_SEDES = {
@@ -1438,12 +1452,15 @@
         return;
       }
 
-      // Guardar sesión
+      // Guardar sesión con token de servidor (sin persistir contraseña)
+      supAuthToken = authResult.token;
       supervisorSession = authResult.session;
+      localStorage.setItem('visor_sup_token', supAuthToken);
       localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
+      localStorage.removeItem('visor_owner_pwd');
       if (supervisorSession.is_owner_admin) {
+        localStorage.setItem('visor_auth_token', supAuthToken);
         localStorage.setItem('visor_owner_email', supervisorSession.owner_email || supervisorSession.usuario);
-        localStorage.setItem('visor_owner_pwd', pwdInp);
       }
 
       iniciarAplicacionSupervisor();
@@ -1461,73 +1478,14 @@
         return { ok: false, razon: '⚠️ Introduce tu usuario y clave de acceso.' };
       }
 
-      // Búsqueda y validación real contra licencia_agua_clientes
-      const res = await fetch(`${SUPABASE_LIC_URL}?select=id,email,nombre_empresa,clave_visor,notas,visor_actividad,activo,dias_prueba,fecha_registro`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      const res = await callSupRpc('rpc_supervisor_login', {
+        p_usuario: usuario,
+        p_clave: clave
       });
-      if (!res.ok) throw new Error('Error al conectar con el servidor de licencias');
-      const clientes = await res.json();
-
-      for (const c of clientes) {
-        if (!c.activo) continue;
-        const reg = new Date(c.fecha_registro);
-        const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 86400000));
-        if ((exp - new Date()) <= 0) continue;
-        if (c.notas && c.notas.includes('[BLOQUEO_VISOR]')) continue;
-
-        const actividad = c.visor_actividad || {};
-        const listaSupervisores = Array.isArray(actividad.supervisores) ? actividad.supervisores : [];
-
-        const match = listaSupervisores.find(s =>
-          (s.usuario && s.usuario.toLowerCase() === usuario) &&
-          (s.clave === clave) &&
-          (s.activo !== false)
-        );
-
-        if (match) {
-          let sedesAsignadas = Array.isArray(match.sedes) ? match.sedes.filter(Boolean) : [];
-          if (sedesAsignadas.length === 0) {
-            if (c.email === 'refillh2o@gmail.com' || (c.email && c.email.startsWith('refillh2o.'))) {
-              sedesAsignadas = Object.keys(REFILLH2O_SEDES);
-            } else {
-              sedesAsignadas = [c.email];
-            }
-          }
-          return {
-            ok: true,
-            session: {
-              usuario: match.usuario,
-              nombre: match.nombre || 'Supervisor',
-              clave: clave,
-              owner_email: c.email,
-              is_owner_admin: false,
-              sedes: sedesAsignadas
-            }
-          };
-        }
-
-        // Si el dueño ingresó su correo de cuenta y la clave_visor como supervisor directo
-        const claveVisor = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : '';
-        if (c.email && c.email.toLowerCase() === usuario && claveVisor && claveVisor === clave) {
-          const cleanEmail = c.email.toLowerCase();
-          const isMasterRefill = (cleanEmail === 'refillh2o@gmail.com' || cleanEmail === 'viritoco@gmail.com');
-          return {
-            ok: true,
-            session: {
-              usuario: cleanEmail,
-              nombre: isMasterRefill ? 'Supervisor General (Administrador)' : `Supervisor (${c.nombre_empresa || 'Tienda'})`,
-              owner_email: cleanEmail,
-              is_owner_admin: true,
-              sedes: isMasterRefill ? Object.keys(REFILLH2O_SEDES) : [cleanEmail]
-            }
-          };
-        }
+      if (!res || !res.ok) {
+        return { ok: false, razon: res?.razon || '🔑 Usuario o clave incorrecta. Verifica con el dueño de la planta.' };
       }
-
-      return { ok: false, razon: '🔑 Usuario o clave incorrecta. Verifica con el dueño de la planta.' };
+      return res;
     } catch (e) {
       console.error('Error en autenticación:', e);
       return { ok: false, razon: 'Error de conexión con la nube.' };
@@ -1657,63 +1615,49 @@
   // CARGA DE DATOS EN VIVO (OPERATIVA, SIN DINERO)
   // =========================================================================
   async function cargarDatosEnVivoSupervisor() {
-    if (!currentStoreEmail) return;
+    if (!currentStoreEmail || !supAuthToken) return;
 
     try {
-      // 1. Obtener datos de tienda_sync_cloud
-      const resSync = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      const rpcRes = await callSupRpc('rpc_visor_get_store_data', {
+        p_token: supAuthToken,
+        p_store_email: currentStoreEmail
       });
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes && ['unauthorized', 'expired', 'revoked', 'license_invalid'].includes(rpcRes.error)) {
+          mostrarLoginSupervisor(rpcRes.razon || 'Tu sesión expiró o fue revocada.');
+        }
+        return;
+      }
 
       let liveStockMap = {};
-      if (resSync.ok) {
-        const list = await resSync.json();
-        if (list && list.length > 0) {
-          const storeData = list[0];
-          cacheGlobalTiendas[currentStoreEmail] = storeData;
-          renderizarDatosOperativos(storeData);
-          if (Array.isArray(storeData.stock_productos)) {
-            storeData.stock_productos.forEach(sp => {
-              if (sp && sp.nombre) {
-                liveStockMap[sp.nombre.toLowerCase().trim()] = parseInt(sp.stock) || 0;
-              }
-            });
-          }
+      if (rpcRes.sync) {
+        const storeData = rpcRes.sync;
+        cacheGlobalTiendas[currentStoreEmail] = storeData;
+        renderizarDatosOperativos(storeData);
+        if (Array.isArray(storeData.stock_productos)) {
+          storeData.stock_productos.forEach(sp => {
+            if (sp && sp.nombre) {
+              liveStockMap[sp.nombre.toLowerCase().trim()] = parseInt(sp.stock) || 0;
+            }
+          });
         }
       }
 
-      // 2. Obtener catálogo y ajustes de licencia_agua_clientes
-      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=catalogo_inicial,nombre_empresa,visor_actividad`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      });
-
-      if (resLic.ok) {
-        const licList = await resLic.json();
-        if (licList && licList.length > 0) {
-          const lData = licList[0];
-          if (Array.isArray(lData.catalogo_inicial)) {
-            // 🛡️ Fusionar con el stock en tiempo real reportado por el punto de venta en tienda_sync_cloud
-            currentCatalogo = lData.catalogo_inicial.map(item => {
-              if (item.categoria === 'producto') {
-                const norm = (item.nombre || '').toLowerCase().trim();
-                const realStock = liveStockMap[norm];
-                return {
-                  ...item,
-                  stock: (realStock !== undefined && realStock !== null) ? realStock : (parseInt(item.stock) || 0)
-                };
-              }
-              return item;
-            });
-            renderizarCatalogo(currentCatalogo);
-            renderizarStockFisico(currentCatalogo);
+      if (Array.isArray(rpcRes.catalogo_inicial)) {
+        // 🛡️ Fusionar con el stock en tiempo real reportado por el punto de venta en tienda_sync_cloud
+        currentCatalogo = rpcRes.catalogo_inicial.map(item => {
+          if (item.categoria === 'producto') {
+            const norm = (item.nombre || '').toLowerCase().trim();
+            const realStock = liveStockMap[norm];
+            return {
+              ...item,
+              stock: (realStock !== undefined && realStock !== null) ? realStock : (parseInt(item.stock) || 0)
+            };
           }
-        }
+          return item;
+        });
+        renderizarCatalogo(currentCatalogo);
+        renderizarStockFisico(currentCatalogo);
       }
 
       // Si tiene varias sedes, actualizar la auditoría de sedes
@@ -2132,54 +2076,17 @@
         cacheGlobalTiendas[currentStoreEmail].nivel_tanque = nivelPayload;
       }
 
-      // 1. Actualizar tienda_sync_cloud preservando mantenimientoFiltros
-      const resNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          nivel_tanque: nivelPayload,
-          ultima_actualizacion: new Date().toISOString()
-        })
+      const rpcRes = await callSupRpc('rpc_supervisor_save_tanque', {
+        p_token: supAuthToken,
+        p_store_email: currentStoreEmail,
+        p_nivel_tanque: nivelPayload,
+        p_ajuste_tanque: { litros, capacidadTanque: cap, timestamp: ts },
+        p_motivo: motivoTexto,
+        p_supervisor: supervisorSession?.nombre || 'Supervisor',
+        p_ts: ts
       });
-      if (!resNT.ok) throw new Error(`HTTP ${resNT.status} al actualizar tanque`);
-
-      // 2. Registrar comando remoto en licencia_agua_clientes para el POS
-      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=id,visor_actividad`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (!resLic.ok) throw new Error(`HTTP ${resLic.status} al consultar licencia`);
-      const list = await resLic.json();
-      if (list && list.length > 0) {
-        const c = list[0];
-        const act = c.visor_actividad || {};
-        const prevAj = act.ajustes_remotos || {};
-        const prevMantRemoto = prevAj.mantenimientoFiltros || currentMant;
-        const nuevosAjustes = {
-          ...act,
-          ajustes_remotos: {
-            ...prevAj,
-            tanque: { litros, capacidadTanque: cap, timestamp: ts },
-            ...(prevMantRemoto ? { mantenimientoFiltros: prevMantRemoto } : {}),
-            motivo: motivoTexto,
-            supervisor: supervisorSession?.nombre || 'Supervisor',
-            timestamp: ts
-          }
-        };
-
-        const resPatchLic = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ visor_actividad: nuevosAjustes })
-        });
-        if (!resPatchLic.ok) throw new Error(`HTTP ${resPatchLic.status} al registrar ajuste de tanque`);
+      if (!rpcRes || !rpcRes.ok) {
+        throw new Error(rpcRes?.error || 'Error guardando ajuste de tanque');
       }
     } catch (e) {
       console.warn('Error aplicando ajuste de tanque:', e);
@@ -2467,31 +2374,18 @@
         } else {
           // 🛡️ REPLICACIÓN INTELIGENTE A OTRAS SEDES:
           // NO sobrescribir el catálogo completo de la otra sede.
-          // Obtenemos el catálogo propio de esa sede y SOLO incorporamos/actualizamos el itemModificado.
+          // Obtenemos el catálogo y stock propios de esa sede mediante RPC y SOLO incorporamos el itemModificado.
           try {
-            const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}&select=catalogo_inicial`, {
-              headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            const curRes = await callSupRpc('rpc_supervisor_get_catalogo_stock', {
+              p_token: supAuthToken,
+              p_store_email: sedeEmail
             });
-            let sedeCat = [];
-            if (resLic.ok) {
-              const licData = await resLic.json();
-              if (licData && licData.length > 0 && Array.isArray(licData[0].catalogo_inicial)) {
-                sedeCat = licData[0].catalogo_inicial;
-              }
-            }
-
-            // Consultar stock físico existente en tienda_sync_cloud de esa sede
-            const resStock = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}&select=stock_productos`, {
-              headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-            });
+            const sedeCat = (curRes && curRes.ok && Array.isArray(curRes.catalogo_inicial)) ? curRes.catalogo_inicial : [];
             const stockExistenteMap = {};
-            if (resStock.ok) {
-              const rowsStock = await resStock.json();
-              if (rowsStock && rowsStock.length > 0 && Array.isArray(rowsStock[0].stock_productos)) {
-                rowsStock[0].stock_productos.forEach(sp => {
-                  if (sp && sp.nombre) stockExistenteMap[sp.nombre.toLowerCase().trim()] = parseInt(sp.stock) || 0;
-                });
-              }
+            if (curRes && curRes.ok && Array.isArray(curRes.stock_productos)) {
+              curRes.stock_productos.forEach(sp => {
+                if (sp && sp.nombre) stockExistenteMap[sp.nombre.toLowerCase().trim()] = parseInt(sp.stock) || 0;
+              });
             }
 
             if (itemModificado) {
@@ -2499,7 +2393,6 @@
               const idx = sedeCat.findIndex(x => (x.id && x.id === itemModificado.id) || ((x.nombre || '').toLowerCase().trim() === normTarget));
 
               if (idx !== -1) {
-                // Producto ya existía en esa sede: actualizar precio/nombre pero PRESERVAR su stock físico real
                 const stockPropio = stockExistenteMap[normTarget] !== undefined ? stockExistenteMap[normTarget] : (sedeCat[idx].stock || 0);
                 sedeCat[idx] = {
                   ...sedeCat[idx],
@@ -2512,7 +2405,6 @@
                   stock: (itemModificado.categoria === 'producto') ? stockPropio : null
                 };
               } else {
-                // Producto NUEVO para esa sede: agregarlo conservando todos los ítems y recargas previas de esa sede
                 sedeCat.push({ ...itemModificado });
               }
             }
@@ -2540,83 +2432,31 @@
         catalogoParaSede = ordenarCatalogo(catalogoParaSede);
         prodsFisicosParaSede = [...prodsFisicosParaSede].sort(compararNombreEs);
 
-        // 1. Guardar en licencia_agua_clientes (para inyección al POS de planta)
-        const resLicPatch = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            catalogo_inicial: catalogoParaSede
-          })
-        });
-        if (!resLicPatch.ok) {
-          throw new Error(`HTTP ${resLicPatch.status} guardando catálogo en licencia (${sedeEmail})`);
-        }
-
-        // 2. Guardar en tienda_sync_cloud
-        const resCloudPatch = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(sedeEmail)}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            stock_productos: prodsFisicosParaSede,
-            ultima_actualizacion: new Date().toISOString()
-          })
-        });
-        if (!resCloudPatch.ok) {
-          throw new Error(`HTTP ${resCloudPatch.status} actualizando stock (${sedeEmail})`);
-        }
-
-        // 3. 📡 Registrar comando de ajuste remoto de stock si aplica
+        let ajusteStockObj = null;
         if (esAjusteStock) {
-          const resAct = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(sedeEmail)}&select=id,visor_actividad`, {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+          const stockMapAjustes = {};
+          prodsFisicosParaSede.forEach(p => {
+            stockMapAjustes[(p.nombre || '').toLowerCase().trim()] = p.stock;
           });
-          if (!resAct.ok) {
-            throw new Error(`HTTP ${resAct.status} consultando licencia para ajuste de stock (${sedeEmail})`);
-          }
-          const rowsAct = await resAct.json();
-          if (rowsAct && rowsAct.length > 0) {
-            const c = rowsAct[0];
-            const act = c.visor_actividad || {};
-            const prevAjustes = act.ajustes_remotos || {};
-            const stockMapAjustes = {};
-            prodsFisicosParaSede.forEach(p => {
-              stockMapAjustes[(p.nombre || '').toLowerCase().trim()] = p.stock;
-            });
-            const ts = Date.now();
-            const nuevosAjustes = {
-              ...act,
-              ajustes_remotos: {
-                ...prevAjustes,
-                stock: {
-                  stocks: stockMapAjustes,
-                  supervisor: supervisorSession?.nombre || 'Supervisor',
-                  timestamp: ts
-                },
-                timestamp: ts
-              }
-            };
-            const resCmdPatch = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-              method: 'PATCH',
-              headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ visor_actividad: nuevosAjustes })
-            });
-            if (!resCmdPatch.ok) {
-              throw new Error(`HTTP ${resCmdPatch.status} emitiendo ajuste remoto de stock (${sedeEmail})`);
-            }
-            console.log('[Supervisor] 📡 Comando de ajuste remoto de stock emitido hacia la tablet:', sedeEmail);
-          }
+          ajusteStockObj = {
+            stocks: stockMapAjustes,
+            supervisor: supervisorSession?.nombre || 'Supervisor',
+            timestamp: Date.now()
+          };
+        }
+
+        const saveRes = await callSupRpc('rpc_supervisor_save_catalogo_stock', {
+          p_token: supAuthToken,
+          p_store_email: sedeEmail,
+          p_catalogo: catalogoParaSede,
+          p_stock_productos: prodsFisicosParaSede,
+          p_ajuste_stock: ajusteStockObj
+        });
+        if (!saveRes || !saveRes.ok) {
+          throw new Error(saveRes?.error || `Error guardando catálogo/stock (${sedeEmail})`);
+        }
+        if (esAjusteStock) {
+          console.log('[Supervisor] 📡 Comando de ajuste remoto de stock emitido hacia la tablet:', sedeEmail);
         }
       }
     } catch (e) {
@@ -2899,69 +2739,18 @@
     }
 
     try {
-      let baseNT = { ...(cacheGlobalTiendas[currentStoreEmail]?.nivel_tanque || {}) };
-      try {
-        const resNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}&select=nivel_tanque`, {
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
-        if (resNT.ok) {
-          const rows = await resNT.json();
-          if (rows && rows[0] && rows[0].nivel_tanque) baseNT = { ...rows[0].nivel_tanque };
-        }
-      } catch (_) {}
-
-      const nuevoNT = { ...baseNT, mantenimientoFiltros: mantObj };
-      const resPatchNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          nivel_tanque: nuevoNT,
-          ultima_actualizacion: new Date().toISOString()
-        })
+      const rpcRes = await callSupRpc('rpc_visor_save_filtros', {
+        p_token: supAuthToken,
+        p_store_email: currentStoreEmail,
+        p_mant_obj: mantObj,
+        p_motivo: `Mantenimiento de filtros (${frecuencia})`,
+        p_supervisor: supervisorSession?.nombre || 'Supervisor',
+        p_ts: tsMant
       });
-      if (!resPatchNT.ok) {
-        throw new Error(`HTTP ${resPatchNT.status} guardando filtros en tienda`);
+      if (!rpcRes || !rpcRes.ok) {
+        throw new Error(rpcRes?.error || 'Error guardando ajuste remoto de filtros');
       }
-
-      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=id,visor_actividad`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (!resLic.ok) {
-        throw new Error(`HTTP ${resLic.status} consultando licencia para filtros`);
-      }
-      const list = await resLic.json();
-      if (list && list.length > 0) {
-        const c = list[0];
-        const act = c.visor_actividad || {};
-        const prevAj = act.ajustes_remotos || {};
-        const resPatchLic = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            visor_actividad: {
-              ...act,
-              ajustes_remotos: {
-                ...prevAj,
-                mantenimientoFiltros: mantObj,
-                motivo: `Mantenimiento de filtros (${frecuencia})`,
-                supervisor: supervisorSession?.nombre || 'Supervisor',
-                timestamp: tsMant
-              }
-            }
-          })
-        });
-        if (!resPatchLic.ok) {
-          throw new Error(`HTTP ${resPatchLic.status} guardando ajuste remoto de filtros`);
-        }
-      }
+      const nuevoNT = rpcRes.nivel_tanque || { ...(cacheGlobalTiendas[currentStoreEmail]?.nivel_tanque || {}), mantenimientoFiltros: mantObj };
 
       if (!cacheGlobalTiendas[currentStoreEmail]) cacheGlobalTiendas[currentStoreEmail] = {};
       cacheGlobalTiendas[currentStoreEmail].nivel_tanque = nuevoNT;
@@ -2994,6 +2783,11 @@
       window.volverAModoDueno();
       return;
     }
+    if (supAuthToken) {
+      callSupRpc('rpc_visor_logout', { p_token: supAuthToken }).catch(() => {});
+    }
+    supAuthToken = '';
+    localStorage.removeItem('visor_sup_token');
     localStorage.removeItem('visor_sup_session');
     localStorage.removeItem('visor_sup_selected_sede');
     supervisorSession = null;
@@ -3007,7 +2801,7 @@
     if (currentStoreEmail) {
       localStorage.setItem('visor_refill_selected_sede', currentStoreEmail);
     }
-    window.location.href = './visor.html?v=1.0.27';
+    window.location.href = './visor.html?v=1.0.28';
   };
 
   // =========================================================================
@@ -3134,13 +2928,12 @@
   async function cargarYRenderizarMetasSup() {
     if (!esSesionRefillSup()) return;
     try {
-      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent('refillh2o@gmail.com')}&select=visor_actividad`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0 && data[0].visor_actividad && data[0].visor_actividad.metas_refillh2o) {
-          metasRefillSupCache = normalizarMetasRefillSup(data[0].visor_actividad.metas_refillh2o);
+      if (supAuthToken) {
+        const res = await callSupRpc('rpc_visor_get_metas_refill', {
+          p_token: supAuthToken
+        });
+        if (res && res.ok && res.metas) {
+          metasRefillSupCache = normalizarMetasRefillSup(res.metas);
         }
       }
     } catch (e) {
@@ -3158,30 +2951,13 @@
     metasRefillSupCache = norm;
     renderizarMetasSedesSupUI();
 
-    const resGet = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent('refillh2o@gmail.com')}&select=id,visor_actividad`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    const res = await callSupRpc('rpc_visor_save_metas_refill', {
+      p_token: supAuthToken,
+      p_metas: norm
     });
-    if (!resGet.ok) throw new Error(`HTTP ${resGet.status}`);
-    const list = await resGet.json();
-    if (!list || list.length === 0) throw new Error('Cuenta maestra no encontrada');
-
-    const row = list[0];
-    const prevAct = row.visor_actividad || {};
-    const resPatch = await fetch(`${SUPABASE_LIC_URL}?id=eq.${row.id}`, {
-      method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        visor_actividad: {
-          ...prevAct,
-          metas_refillh2o: norm
-        }
-      })
-    });
-    if (!resPatch.ok) throw new Error(`PATCH HTTP ${resPatch.status}`);
+    if (!res || !res.ok) {
+      throw new Error(res?.error || 'Error guardando metas en la nube');
+    }
     return norm;
   }
 
@@ -3400,6 +3176,8 @@
   // VALIDACIÓN OBLIGATORIA DE SESIÓN DE SUPERVISOR (SIN AUTO-LOGIN NI CACHE STALE)
   // =========================================================================
   function mostrarLoginSupervisor(razon = '') {
+    supAuthToken = '';
+    localStorage.removeItem('visor_sup_token');
     localStorage.removeItem('visor_sup_session');
     supervisorSession = null;
     const authScreen = document.getElementById('auth-screen');
@@ -3418,48 +3196,44 @@
   }
 
   async function inicializarSesionSupervisor() {
-    const savedSup = localStorage.getItem('visor_sup_session');
-    if (!savedSup) {
+    const token = localStorage.getItem('visor_sup_token') || localStorage.getItem('visor_auth_token') || '';
+    if (!token) {
       mostrarLoginSupervisor();
       return;
     }
 
-    let parsed = null;
     try {
-      parsed = JSON.parse(savedSup);
+      const recheck = await callSupRpc('rpc_visor_check_session', { p_token: token });
+      if (!recheck || !recheck.ok) {
+        mostrarLoginSupervisor(recheck?.razon || 'Tu sesión de supervisor fue revocada o expiró.');
+        return;
+      }
+
+      supAuthToken = token;
+      localStorage.setItem('visor_sup_token', supAuthToken);
+      localStorage.removeItem('visor_owner_pwd');
+      supervisorSession = {
+        usuario: recheck.principal,
+        nombre: recheck.nombre || 'Supervisor',
+        owner_email: recheck.owner_email,
+        is_owner_admin: Boolean(recheck.is_owner_admin),
+        sedes: Array.isArray(recheck.sedes) ? recheck.sedes : []
+      };
+      localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
+      if (supervisorSession.is_owner_admin) {
+        localStorage.setItem('visor_auth_token', supAuthToken);
+        localStorage.setItem('visor_owner_email', supervisorSession.owner_email);
+      }
+
+      iniciarAplicacionSupervisor();
+
+      const supUrlTabParam = new URLSearchParams(window.location.search).get('tab');
+      if (supUrlTabParam && typeof window.cambiarTab === 'function') {
+        window.cambiarTab(supUrlTabParam);
+      }
     } catch (e) {
-      parsed = null;
-    }
-    if (!parsed || typeof parsed !== 'object') {
-      mostrarLoginSupervisor();
-      return;
-    }
-
-    const checkUser = parsed.is_owner_admin
-      ? (parsed.owner_email || parsed.usuario || '')
-      : (parsed.usuario || '');
-    const checkPwd = parsed.is_owner_admin
-      ? (localStorage.getItem('visor_owner_pwd') || '')
-      : (parsed.clave || '');
-
-    if (!checkUser || !checkPwd) {
-      mostrarLoginSupervisor();
-      return;
-    }
-
-    const recheck = await autenticarSupervisor(String(checkUser).trim().toLowerCase(), String(checkPwd).trim());
-    if (!recheck.ok) {
-      mostrarLoginSupervisor(recheck.razon || 'Tu sesión de supervisor fue revocada o expiró.');
-      return;
-    }
-
-    supervisorSession = recheck.session;
-    localStorage.setItem('visor_sup_session', JSON.stringify(supervisorSession));
-    iniciarAplicacionSupervisor();
-
-    const supUrlTabParam = new URLSearchParams(window.location.search).get('tab');
-    if (supUrlTabParam && typeof window.cambiarTab === 'function') {
-      window.cambiarTab(supUrlTabParam);
+      console.warn('[Supervisor] Error validando sesión guardada:', e);
+      mostrarLoginSupervisor('No se pudo validar tu sesión con el servidor.');
     }
   }
 

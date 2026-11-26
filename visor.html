@@ -2788,13 +2788,27 @@ body.hide-montos #cierre-digital-usd {
 </div>
 
 <script>
-  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
-  const SUPABASE_LIC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
+  let visorAuthToken = localStorage.getItem('visor_auth_token') || '';
   let currentStoreEmail = '';
   let supervisorAccount = localStorage.getItem('visor_supervisor_email') || '';
   let autoRefreshInterval = null;
+
+  async function callVisorRpc(fnName, params) {
+    const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params || {})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }
 
   // =========================================================================
   // CONTROL DE VISIBILIDAD DE MONTOS / VENTAS (PRIVACIDAD)
@@ -3032,47 +3046,31 @@ body.hide-montos #cierre-digital-usd {
     }
   }
 
-  // Verificación de estado de cuenta, licencia y clave en tiempo real (controlado desde superadmin.html)
+  // Verificación de estado de cuenta, licencia y clave en tiempo real mediante RPC
   async function verificarLicencia(email, pwd = null) {
     try {
-      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(email)}`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      });
-      if (!res.ok) {
-        if (pwd !== null) {
-          return { ok: false, razon: '⚠️ No se pudo verificar tu acceso con el servidor. Intenta nuevamente.' };
-        }
-        return { ok: true, offline: true };
-      }
-      const data = await res.json();
-      if (!data || data.length === 0) {
-        return { ok: false, razon: '⚠️ Este correo no está registrado en el sistema WaterApp.' };
-      }
-      const c = data[0];
-      if (!c.activo) {
-        return { ok: false, razon: '🚫 Acceso suspendido por administración. Comunícate con soporte.' };
-      }
-      const reg = new Date(c.fecha_registro);
-      const exp = new Date(reg.getTime() + ((c.dias_prueba || 0) * 24 * 60 * 60 * 1000));
-      if ((exp - new Date()) <= 0) {
-        return { ok: false, razon: '⏳ Tu suscripción ha vencido. Contacta a administración para renovarla.' };
-      }
-      if (c.notas && c.notas.includes('[BLOQUEO_VISOR]')) {
-        return { ok: false, razon: '📱 El acceso al Visor Móvil para esta cuenta ha sido deshabilitado.' };
-      }
       if (pwd !== null) {
-        const claveConfigurada = (c.clave_visor && c.clave_visor.trim()) ? c.clave_visor.trim() : '';
-        if (!claveConfigurada) {
-          return { ok: false, razon: '🔑 Esta cuenta no tiene clave de Visor configurada. Configúrala en SuperAdmin.' };
+        const res = await callVisorRpc('rpc_visor_login', {
+          p_email: (email || '').trim().toLowerCase(),
+          p_clave: pwd
+        });
+        if (!res || !res.ok) {
+          return { ok: false, razon: res?.razon || '🔑 Clave o cuenta no válida.' };
         }
-        if (pwd !== claveConfigurada) {
-          return { ok: false, razon: '🔑 Clave de acceso incorrecta. Verifica la clave suministrada.' };
-        }
+        return res;
       }
-      return { ok: true, cliente: c };
+
+      if (!visorAuthToken) {
+        return { ok: false, razon: '🔑 Sesión no iniciada.' };
+      }
+
+      const sess = await callVisorRpc('rpc_visor_check_session', {
+        p_token: visorAuthToken
+      });
+      if (!sess || !sess.ok) {
+        return { ok: false, razon: sess?.razon || '🔑 Tu sesión expiró o fue revocada.' };
+      }
+      return { ok: true, cliente: sess };
     } catch (e) {
       console.warn('Error al verificar licencia:', e);
       if (pwd !== null) {
@@ -3093,9 +3091,9 @@ body.hide-montos #cierre-digital-usd {
 
   let presenciaInterval = null;
 
-  // Registrar actividad y presencia en tiempo real del visor en Supabase
+  // Registrar actividad y presencia en tiempo real del visor en Supabase mediante RPC
   async function registrarActividadVisor(email, evento = 'heartbeat') {
-    if (!email) return;
+    if (!email || !visorAuthToken) return;
 
     try {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -3113,68 +3111,14 @@ body.hide-montos #cierre-digital-usd {
       else if (ua.includes('Safari')) navegador = 'Safari';
       else if (ua.includes('Firefox')) navegador = 'Firefox';
 
-      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(email)}&select=id,visor_actividad`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      });
-      if (!res.ok) return;
-      const list = await res.json();
-      if (!list || list.length === 0) return;
-
-      const c = list[0];
-      const prev = c.visor_actividad || {};
-      const ahoraISO = new Date().toISOString();
-      const ahoraMs = Date.now();
-      const myDeviceId = obtenerDeviceIdVisor();
-
-      // Mantener mapa de sesiones activas (purgando inactivas > 90s)
-      const sesionesActivas = {};
-      if (prev.sesiones && typeof prev.sesiones === 'object') {
-        Object.entries(prev.sesiones).forEach(([sId, sData]) => {
-          if (sData && sData.last_seen) {
-            const diff = ahoraMs - new Date(sData.last_seen).getTime();
-            if (diff < 90000 && sId !== myDeviceId) {
-              sesionesActivas[sId] = sData;
-            }
-          }
-        });
-      }
-
-      // Actualizar la sesión de este dispositivo
-      sesionesActivas[myDeviceId] = {
-        id: myDeviceId,
-        plataforma: plataforma,
-        navegador: navegador,
-        modo: isStandalone ? 'App PWA' : 'Navegador Web',
-        dispositivo: `${plataforma} · ${isStandalone ? 'App PWA' : navegador}`,
-        last_seen: ahoraISO
-      };
-
-      const esNuevoIngreso = (evento === 'acceso');
-      const nuevaActividad = {
-        ...prev,
-        instalado: (evento === 'instalado' || isStandalone || prev.instalado) ? true : false,
-        plataforma: plataforma,
-        navegador: navegador,
-        modo: isStandalone ? 'App PWA' : 'Navegador Web',
-        dispositivo: `${plataforma} · ${isStandalone ? 'App PWA' : navegador}`,
-        primer_acceso: prev.primer_acceso || ahoraISO,
-        ultimo_acceso: ahoraISO,
-        total_accesos: (prev.total_accesos || 0) + (esNuevoIngreso ? 1 : 0),
-        fecha_instalacion: (evento === 'instalado' || (isStandalone && !prev.fecha_instalacion)) ? ahoraISO : (prev.fecha_instalacion || null),
-        sesiones: sesionesActivas
-      };
-
-      await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ visor_actividad: nuevaActividad })
+      await callVisorRpc('rpc_visor_heartbeat', {
+        p_token: visorAuthToken,
+        p_store_email: email,
+        p_device_id: obtenerDeviceIdVisor(),
+        p_plataforma: plataforma,
+        p_navegador: navegador,
+        p_modo: isStandalone ? 'App PWA' : 'Navegador Web',
+        p_evento: evento
       });
     } catch (e) {
       console.warn('[Visor] Presencia no enviada:', e);
@@ -3209,6 +3153,39 @@ body.hide-montos #cierre-digital-usd {
 
   let visorUrlActionPending = true;
 
+  async function completarAccesoVisor(email, isMasterRefill) {
+    if (isMasterRefill || email === 'refillh2o@gmail.com' || esCuentaAdmin(email)) {
+      supervisorAccount = 'refillh2o@gmail.com';
+      localStorage.setItem('visor_supervisor_email', 'refillh2o@gmail.com');
+      const savedSede = localStorage.getItem('visor_refill_selected_sede');
+      currentStoreEmail = (savedSede && REFILLH2O_SEDES[savedSede]) ? savedSede : 'refillh2o.lcf@gmail.com';
+    } else {
+      supervisorAccount = '';
+      localStorage.removeItem('visor_supervisor_email');
+      currentStoreEmail = email;
+    }
+
+    iniciarPresenciaEnVivo(email);
+
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+
+    await cargarDatosEnVivo();
+
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(cargarDatosEnVivo, 5000);
+
+    if (visorUrlActionPending) {
+      visorUrlActionPending = false;
+      const visorUrlParams = new URLSearchParams(window.location.search);
+      if (visorUrlParams.get('mode') === 'supervisor' || visorUrlParams.get('modo') === 'supervisor') {
+        setTimeout(() => { if (window.cambiarAModoSupervisor) window.cambiarAModoSupervisor(); }, 200);
+      } else if (visorUrlParams.get('modal') === 'supervisor' || visorUrlParams.get('modal') === 'supervisores') {
+        setTimeout(() => { if (window.abrirModalSupervisores) window.abrirModalSupervisores(); }, 300);
+      }
+    }
+  }
+
   // Login
   document.getElementById('btn-login').addEventListener('click', async () => {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
@@ -3230,11 +3207,11 @@ body.hide-montos #cierre-digital-usd {
     const btnOriginalText = btn.textContent;
     btn.textContent = '⏳ Verificando acceso...';
 
-    // Verificación obligatoria de Licencia, Estado de la Cuenta y Clave
     const licCheck = await verificarLicencia(email, pwd);
+    btn.disabled = false;
+    btn.textContent = btnOriginalText;
+
     if (!licCheck.ok) {
-      btn.disabled = false;
-      btn.textContent = btnOriginalText;
       if (errorBox) {
         errorBox.textContent = licCheck.razon;
         errorBox.style.display = 'block';
@@ -3242,47 +3219,14 @@ body.hide-montos #cierre-digital-usd {
       return;
     }
 
-    btn.disabled = false;
-    btn.textContent = btnOriginalText;
+    // Guardar token de servidor (sin persistir contraseña en localStorage)
+    const loggedEmail = licCheck.email || email;
+    visorAuthToken = licCheck.token;
+    localStorage.setItem('visor_auth_token', visorAuthToken);
+    localStorage.setItem('visor_owner_email', loggedEmail);
+    localStorage.removeItem('visor_owner_pwd');
 
-    // Comprobación de acceso aprobada
-    localStorage.setItem('visor_owner_email', email);
-    localStorage.setItem('visor_owner_pwd', pwd);
-
-    if (email === 'refillh2o@gmail.com' || esCuentaAdmin(email)) {
-      supervisorAccount = 'refillh2o@gmail.com';
-      localStorage.setItem('visor_supervisor_email', 'refillh2o@gmail.com');
-      // Iniciar en la última sede seleccionada o por defecto La California Sur
-      const savedSede = localStorage.getItem('visor_refill_selected_sede');
-      currentStoreEmail = (savedSede && REFILLH2O_SEDES[savedSede]) ? savedSede : 'refillh2o.lcf@gmail.com';
-    } else {
-      supervisorAccount = '';
-      localStorage.removeItem('visor_supervisor_email');
-      currentStoreEmail = email;
-    }
-
-    // Iniciar presencia en vivo y telemetría de sesiones activas
-    iniciarPresenciaEnVivo(email);
-
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('main-app').style.display = 'block';
-
-    await cargarDatosEnVivo();
-
-    // Auto-refresco en vivo cada 5 segundos
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(cargarDatosEnVivo, 5000);
-
-    // Acciones solicitadas por URL (solo tras autenticación válida, una única vez)
-    if (visorUrlActionPending) {
-      visorUrlActionPending = false;
-      const visorUrlParams = new URLSearchParams(window.location.search);
-      if (visorUrlParams.get('mode') === 'supervisor' || visorUrlParams.get('modo') === 'supervisor') {
-        setTimeout(() => { if (window.cambiarAModoSupervisor) window.cambiarAModoSupervisor(); }, 200);
-      } else if (visorUrlParams.get('modal') === 'supervisor' || visorUrlParams.get('modal') === 'supervisores') {
-        setTimeout(() => { if (window.abrirModalSupervisores) window.abrirModalSupervisores(); }, 300);
-      }
-    }
+    await completarAccesoVisor(loggedEmail, Boolean(licCheck.is_master_refill));
   });
 
   // Refrescar al volver a la pestaña/pantalla del teléfono
@@ -3295,10 +3239,18 @@ body.hide-montos #cierre-digital-usd {
 
   // Logout
   document.getElementById('btn-logout').addEventListener('click', () => {
+    const tok = visorAuthToken || localStorage.getItem('visor_auth_token');
+    if (tok) {
+      callVisorRpc('rpc_visor_logout', { p_token: tok }).catch(() => {});
+    }
+    visorAuthToken = '';
+    localStorage.removeItem('visor_auth_token');
     localStorage.removeItem('visor_owner_email');
     localStorage.removeItem('visor_owner_pwd');
     localStorage.removeItem('visor_supervisor_email');
     localStorage.removeItem('visor_refill_selected_sede');
+    localStorage.removeItem('visor_sup_session');
+    localStorage.removeItem('visor_sup_token');
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     if (presenciaInterval) clearInterval(presenciaInterval);
     location.reload();
@@ -3660,14 +3612,12 @@ async function cargarTodasLasSedesRefill(force = false) {
 
   _sedesInFlightPromise = (async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}?select=*`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      if (!visorAuthToken) return;
+      const res = await callVisorRpc('rpc_visor_get_all_allowed_stores', {
+        p_token: visorAuthToken
       });
-      if (!res.ok) return;
-      const allData = await res.json();
+      if (!res || !res.ok || !Array.isArray(res.stores)) return;
+      const allData = res.stores;
 
       // Guardar en cache global de tiendas
       allData.forEach(tienda => {
@@ -4108,7 +4058,10 @@ function cambiarTab(tabName) {
     // Verificar en caliente si la cuenta sigue activa o fue suspendida por el admin
     const licCheck = await verificarLicencia(currentStoreEmail);
     if (!licCheck.ok) {
+      visorAuthToken = '';
+      localStorage.removeItem('visor_auth_token');
       localStorage.removeItem('visor_owner_email');
+      localStorage.removeItem('visor_owner_pwd');
       if (autoRefreshInterval) clearInterval(autoRefreshInterval);
       document.getElementById('main-app').style.display = 'none';
       document.getElementById('auth-screen').style.display = 'flex';
@@ -4121,58 +4074,61 @@ function cambiarTab(tabName) {
     }
 
     try {
-      const res = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(currentStoreEmail)}`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      if (!visorAuthToken) return;
+      const rpcRes = await callVisorRpc('rpc_visor_get_store_data', {
+        p_token: visorAuthToken,
+        p_store_email: currentStoreEmail
       });
-      if (!res.ok) throw new Error('Error de conexión con la nube');
-      const data = await res.json();
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes && ['unauthorized', 'expired', 'revoked', 'license_invalid'].includes(rpcRes.error)) {
+          visorAuthToken = '';
+          localStorage.removeItem('visor_auth_token');
+          localStorage.removeItem('visor_owner_pwd');
+          if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+          document.getElementById('main-app').style.display = 'none';
+          document.getElementById('auth-screen').style.display = 'flex';
+        }
+        return;
+      }
 
-      let storeData = (data && data.length > 0) ? data[0] : {};
+      const hasSyncData = Boolean(rpcRes.sync);
+      let storeData = rpcRes.sync ? { ...rpcRes.sync } : {};
 
       // Sincronizar catálogo/stock más reciente de licencia_agua_clientes
       try {
-        const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(currentStoreEmail)}&select=catalogo_inicial`, {
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
-        if (resLic.ok) {
-          const licList = await resLic.json();
-          if (licList && licList.length > 0 && Array.isArray(licList[0].catalogo_inicial)) {
-            const prodsCat = licList[0].catalogo_inicial
-              .filter(item => item.categoria === 'producto')
-              .map(p => ({
-                nombre: p.nombre,
-                stock: parseInt(p.stock) || 0,
-                precio: parseFloat(p.precio) || 0
-              }));
-            if (prodsCat.length > 0) {
-              // 🛡️ Blindaje de Inventario: Preservar el stock físico real reportado por la tienda
-              const stockRealMap = {};
-              if (Array.isArray(storeData.stock_productos)) {
-                storeData.stock_productos.forEach(sp => {
-                  if (sp && sp.nombre) {
-                    stockRealMap[sp.nombre.toLowerCase().trim()] = sp.stock;
-                  }
-                });
-              }
-              storeData.stock_productos = prodsCat.map(p => {
-                const normName = (p.nombre || '').toLowerCase().trim();
-                const realStock = stockRealMap[normName];
-                return {
-                  ...p,
-                  stock: (realStock !== undefined && realStock !== null) ? realStock : (p.stock || 0)
-                };
+        if (Array.isArray(rpcRes.catalogo_inicial)) {
+          const prodsCat = rpcRes.catalogo_inicial
+            .filter(item => item.categoria === 'producto')
+            .map(p => ({
+              nombre: p.nombre,
+              stock: parseInt(p.stock) || 0,
+              precio: parseFloat(p.precio) || 0
+            }));
+          if (prodsCat.length > 0) {
+            // 🛡️ Blindaje de Inventario: Preservar el stock físico real reportado por la tienda
+            const stockRealMap = {};
+            if (Array.isArray(storeData.stock_productos)) {
+              storeData.stock_productos.forEach(sp => {
+                if (sp && sp.nombre) {
+                  stockRealMap[sp.nombre.toLowerCase().trim()] = sp.stock;
+                }
               });
             }
+            storeData.stock_productos = prodsCat.map(p => {
+              const normName = (p.nombre || '').toLowerCase().trim();
+              const realStock = stockRealMap[normName];
+              return {
+                ...p,
+                stock: (realStock !== undefined && realStock !== null) ? realStock : (p.stock || 0)
+              };
+            });
           }
         }
       } catch (errLic) {
         console.warn('Error cargando catalogo_inicial:', errLic);
       }
 
-      if (data && data.length > 0) {
+      if (hasSyncData) {
         renderDashboard(storeData);
       } else {
         // Datos de muestra si aún no ha sincronizado
@@ -4236,43 +4192,41 @@ function cambiarTab(tabName) {
       });
     }
 
-    // Registrar en metodosMap cualquier método personalizado conocido que aún no esté
-    Object.keys(fallbackCustomMap).forEach(fId => {
-      if (!metodosMap[fId]) {
-        const item = fallbackCustomMap[fId];
-        metodosMap[fId] = {
-          id: fId,
-          label: item.label,
-          icon: item.icon,
-          color: item.color,
-          moneda: item.moneda,
-          totalUSD: 0,
-          totalBs: 0,
-          sub: item.moneda === 'Bs' ? '' : 'En USD'
-        };
-      }
-    });
-
     // Si viene desglose_metodos precalculado en resumen_hoy, cargar valores
-    if (r.desglose_metodos && Array.isArray(r.desglose_metodos)) {
+    let tieneDesgloseValido = false;
+    if (r.desglose_metodos && Array.isArray(r.desglose_metodos) && r.desglose_metodos.length > 0) {
       r.desglose_metodos.forEach(m => {
         let mId = m.id;
         if (mId === 'saldo_favor') return;
         if (mId === 'punto_venta') mId = 'punto';
+        const fb = fallbackCustomMap[mId] || {};
         if (!metodosMap[mId]) {
-          metodosMap[mId] = { ...m };
+          metodosMap[mId] = {
+            id: mId,
+            label: m.label || fb.label || (mId.startsWith('custom_') ? 'Punto de Venta (B)' : mId),
+            icon: m.icon || fb.icon || '💳',
+            color: m.color || fb.color || '#3B82F6',
+            moneda: m.moneda || fb.moneda || 'Bs',
+            totalUSD: m.totalUSD || 0,
+            totalBs: m.totalBs || 0,
+            sub: (m.moneda || fb.moneda) === 'USD' ? 'En USD' : ''
+          };
           customMethodsOrder.push(mId);
         } else {
           metodosMap[mId].totalUSD = m.totalUSD || 0;
           metodosMap[mId].totalBs = m.totalBs || 0;
           if (m.label) metodosMap[mId].label = m.label;
+          else if (fb.label) metodosMap[mId].label = fb.label;
           if (m.icon) metodosMap[mId].icon = m.icon;
+          else if (fb.icon) metodosMap[mId].icon = fb.icon;
         }
       });
+      // Verificamos si realmente trajo montos
+      tieneDesgloseValido = Object.values(metodosMap).some(m => (m.totalUSD || 0) > 0);
     }
 
-    // Calcular o complementar desde las ventas de hoy del respaldo
-    if (backup && Array.isArray(backup.ventas) && backup.ventas.length > 0) {
+    // Calcular o complementar desde las ventas de hoy del respaldo SOLO si resumen_hoy NO trajo desglose válido
+    if (!tieneDesgloseValido && backup && Array.isArray(backup.ventas) && backup.ventas.length > 0) {
       let tasa = 800;
       if (Array.isArray(backup.configuracion)) {
         const tasaConf = backup.configuracion.find(c => c.id === 'tasaCambio');
@@ -4284,7 +4238,7 @@ function cambiarTab(tabName) {
       const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
 
       let sumUSD = Object.values(metodosMap).reduce((s, m) => s + (m.totalUSD || 0), 0);
-      if (sumUSD === 0 || (r.totalUSD && sumUSD < (r.totalUSD - 0.05))) {
+      if (sumUSD === 0) {
         Object.keys(metodosMap).forEach(k => {
           metodosMap[k].totalUSD = 0;
           metodosMap[k].totalBs = 0;
@@ -5598,71 +5552,18 @@ function cambiarTab(tabName) {
     }
 
     try {
-      // 1. Obtener nivel_tanque actual y actualizar preservando agua/capacidad
-      let baseNT = { ...(cacheGlobalTiendas[targetEmail]?.nivel_tanque || {}) };
-      try {
-        const resNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(targetEmail)}&select=nivel_tanque`, {
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
-        if (resNT.ok) {
-          const rows = await resNT.json();
-          if (rows && rows[0] && rows[0].nivel_tanque) baseNT = { ...rows[0].nivel_tanque };
-        }
-      } catch (_) {}
-
-      const nuevoNT = { ...baseNT, mantenimientoFiltros: mantObj };
-      const resPatchNT = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(targetEmail)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          nivel_tanque: nuevoNT,
-          ultima_actualizacion: new Date().toISOString()
-        })
+      const rpcRes = await callVisorRpc('rpc_visor_save_filtros', {
+        p_token: visorAuthToken,
+        p_store_email: targetEmail,
+        p_mant_obj: mantObj,
+        p_motivo: `Mantenimiento de filtros (${frecuencia})`,
+        p_supervisor: 'Dueño (Visor)',
+        p_ts: tsMant
       });
-      if (!resPatchNT.ok) {
-        throw new Error(`HTTP ${resPatchNT.status} guardando filtros en tienda`);
+      if (!rpcRes || !rpcRes.ok) {
+        throw new Error(rpcRes?.error || 'Error guardando filtros en la nube');
       }
-
-      // 2. Enviar comando remoto para el POS en licencia_agua_clientes
-      const resLic = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(targetEmail)}&select=id,visor_actividad`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (!resLic.ok) {
-        throw new Error(`HTTP ${resLic.status} consultando licencia para filtros`);
-      }
-      const list = await resLic.json();
-      if (list && list.length > 0) {
-        const c = list[0];
-        const act = c.visor_actividad || {};
-        const prevAj = act.ajustes_remotos || {};
-        const resPatchLic = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            visor_actividad: {
-              ...act,
-              ajustes_remotos: {
-                ...prevAj,
-                mantenimientoFiltros: mantObj,
-                motivo: `Mantenimiento de filtros (${frecuencia})`,
-                supervisor: 'Dueño (Visor)',
-                timestamp: tsMant
-              }
-            }
-          })
-        });
-        if (!resPatchLic.ok) {
-          throw new Error(`HTTP ${resPatchLic.status} enviando ajuste remoto de filtros`);
-        }
-      }
+      const nuevoNT = rpcRes.nivel_tanque || { ...(cacheGlobalTiendas[targetEmail]?.nivel_tanque || {}), mantenimientoFiltros: mantObj };
 
       if (!cacheGlobalTiendas[targetEmail]) cacheGlobalTiendas[targetEmail] = {};
       cacheGlobalTiendas[targetEmail].nivel_tanque = nuevoNT;
@@ -5853,13 +5754,12 @@ function cambiarTab(tabName) {
 
   async function cargarMetasRefillVisor() {
     try {
-      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent('refillh2o@gmail.com')}&select=visor_actividad`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0 && data[0].visor_actividad && data[0].visor_actividad.metas_refillh2o) {
-          metasRefillCacheVisor = normalizarMetasRefillVisor(data[0].visor_actividad.metas_refillh2o);
+      if (visorAuthToken) {
+        const res = await callVisorRpc('rpc_visor_get_metas_refill', {
+          p_token: visorAuthToken
+        });
+        if (res && res.ok && res.metas) {
+          metasRefillCacheVisor = normalizarMetasRefillVisor(res.metas);
           return metasRefillCacheVisor;
         }
       }
@@ -6059,16 +5959,38 @@ function cambiarTab(tabName) {
     }
   };
 
-  // Restaurar sesión solo si existen credenciales previas guardadas (validadas contra servidor en #btn-login)
-  const savedEmail = localStorage.getItem('visor_owner_email');
-  const savedPwd = localStorage.getItem('visor_owner_pwd');
-  if (savedEmail) {
-    document.getElementById('login-email').value = savedEmail;
-  }
-  if (savedEmail && savedPwd) {
-    document.getElementById('login-pwd').value = savedPwd;
-    document.getElementById('btn-login').click();
-  }
+  // Restaurar sesión con token de servidor (o migrar credenciales previas una única vez sin dejar contraseña guardada)
+  (async function inicializarVisorSesion() {
+    const savedEmail = localStorage.getItem('visor_owner_email');
+    const savedPwd = localStorage.getItem('visor_owner_pwd');
+    const savedToken = localStorage.getItem('visor_auth_token');
+
+    if (savedEmail) {
+      document.getElementById('login-email').value = savedEmail;
+    }
+
+    if (savedToken) {
+      try {
+        const sess = await callVisorRpc('rpc_visor_check_session', { p_token: savedToken });
+        if (sess && sess.ok && sess.role === 'owner') {
+          visorAuthToken = savedToken;
+          localStorage.removeItem('visor_owner_pwd');
+          localStorage.setItem('visor_owner_email', sess.owner_email || sess.principal);
+          await completarAccesoVisor(sess.owner_email || sess.principal, Boolean(sess.is_master_refill));
+          return;
+        }
+      } catch (e) {
+        console.warn('[Visor] Error validando sesión guardada:', e);
+      }
+      visorAuthToken = '';
+      localStorage.removeItem('visor_auth_token');
+    }
+
+    if (savedEmail && savedPwd) {
+      document.getElementById('login-pwd').value = savedPwd;
+      document.getElementById('btn-login').click();
+    }
+  })();
 
   // ===================================================
   // Soporte PWA (Service Worker e Instalación en Móvil)
@@ -6165,9 +6087,9 @@ function cambiarTab(tabName) {
   }
 
   function _abrirSupervisorDesdeVisor(tabParam = '') {
+    const tok = visorAuthToken || localStorage.getItem('visor_auth_token');
     const ownerEmail = getOwnerMasterEmail().trim().toLowerCase();
-    const ownerPwd = localStorage.getItem('visor_owner_pwd');
-    if (!currentStoreEmail || !ownerEmail || !ownerPwd) {
+    if (!currentStoreEmail || !ownerEmail || !tok) {
       alert('Debes iniciar sesión primero.');
       return;
     }
@@ -6186,10 +6108,11 @@ function cambiarTab(tabName) {
       sedes: isMasterRefill ? sedesRefill : [currentStoreEmail]
     };
 
+    localStorage.setItem('visor_sup_token', tok);
     localStorage.setItem('visor_sup_session', JSON.stringify(supSession));
     localStorage.setItem('visor_sup_selected_sede', sedeActual);
 
-    const qs = tabParam ? `?v=1.0.17&tab=${encodeURIComponent(tabParam)}` : '?v=1.0.17';
+    const qs = tabParam ? `?v=1.0.18&tab=${encodeURIComponent(tabParam)}` : '?v=1.0.18';
     window.location.href = `./visor-supervisor.html${qs}`;
   }
 
@@ -6378,29 +6301,17 @@ function cambiarTab(tabName) {
   };
 
   async function cargarSupervisoresDeCuenta() {
-    const ownerEmail = getOwnerMasterEmail();
     const cont = document.getElementById('lista-supervisores-items');
     if (!cont) return;
 
     cont.innerHTML = '<div style="text-align:center; padding: 12px; color: var(--neu-text-muted); font-size: 0.85rem;">⏳ Cargando supervisores...</div>';
 
     try {
-      const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(ownerEmail)}&select=id,visor_actividad`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      const rpcRes = await callVisorRpc('rpc_owner_get_supervisores', {
+        p_token: visorAuthToken
       });
-      if (!res.ok) throw new Error('Error al conectar con la base de datos');
-      const data = await res.json();
-      if (!data || data.length === 0) {
-        cont.innerHTML = '<div style="text-align:center; padding: 12px; color: var(--neu-text-muted); font-size: 0.85rem;">No se encontró la cuenta.</div>';
-        return;
-      }
-
-      const client = data[0];
-      const actividad = client.visor_actividad || {};
-      listaSupervisoresOwner = Array.isArray(actividad.supervisores) ? actividad.supervisores : [];
+      if (!rpcRes || !rpcRes.ok) throw new Error(rpcRes?.razon || 'Error al cargar supervisores');
+      listaSupervisoresOwner = Array.isArray(rpcRes.supervisores) ? rpcRes.supervisores : [];
 
       renderListaSupervisores();
     } catch (err) {
@@ -6499,36 +6410,12 @@ function cambiarTab(tabName) {
   }
 
   async function sincronizarSupervisoresSupabase() {
-    const ownerEmail = getOwnerMasterEmail();
     try {
-      const resGet = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(ownerEmail)}&select=id,visor_actividad`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      const rpcRes = await callVisorRpc('rpc_owner_save_supervisores', {
+        p_token: visorAuthToken,
+        p_supervisores: listaSupervisoresOwner
       });
-      if (!resGet.ok) return false;
-      const data = await resGet.json();
-      if (!data || data.length === 0) return false;
-
-      const c = data[0];
-      const prevAct = c.visor_actividad || {};
-      const newAct = {
-        ...prevAct,
-        supervisores: listaSupervisoresOwner
-      };
-
-      const resPatch = await fetch(`${SUPABASE_LIC_URL}?id=eq.${c.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ visor_actividad: newAct })
-      });
-
-      return resPatch.ok;
+      return Boolean(rpcRes && rpcRes.ok);
     } catch (e) {
       console.error('Error al sincronizar supervisores:', e);
       return false;

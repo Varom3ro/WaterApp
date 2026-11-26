@@ -415,13 +415,30 @@
 </div>
 
 <script>
-  // Hash Criptográfico SHA-256 de la Clave Maestra de Seguridad
-  const MASTER_HASH = 'd02e5de5bb9bf153e7ef0b2d6b14b44b1fe22fc86a925022437377764d04f437';
-
-  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
   let productos = [];
+
+  async function callAdminRpc(fnName, params) {
+    const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params || {})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  function handleUnauthorized() {
+    sessionStorage.removeItem('superadmin_token');
+    sessionStorage.removeItem('admin_master_unlocked');
+    checkAuth();
+  }
 
   // Función para calcular SHA-256 en el navegador
   async function sha256(text) {
@@ -434,7 +451,8 @@
 
   // Comprobar autenticación de Administrador
   function checkAuth() {
-    if (sessionStorage.getItem('admin_master_unlocked') === 'true') {
+    sessionStorage.removeItem('admin_master_unlocked');
+    if (sessionStorage.getItem('superadmin_token')) {
       document.getElementById('auth-overlay').style.display = 'none';
       document.getElementById('admin-app').style.display = 'block';
       initApp();
@@ -451,20 +469,36 @@
   document.getElementById('btn-auth-unlock').addEventListener('click', async () => {
     const inputPwd = document.getElementById('input-admin-auth-pwd').value;
     const errorMsg = document.getElementById('auth-error-msg');
-    
-    const computedHash = await sha256(inputPwd);
-    if (computedHash === MASTER_HASH) {
-      sessionStorage.setItem('admin_master_unlocked', 'true');
-      errorMsg.style.display = 'none';
-      checkAuth();
-    } else {
+    const btn = document.getElementById('btn-auth-unlock');
+
+    btn.disabled = true;
+    try {
+      const computedHash = await sha256(inputPwd);
+      const res = await callAdminRpc('rpc_superadmin_login', {
+        p_password_sha256: computedHash
+      });
+      if (res && res.ok && res.token) {
+        sessionStorage.setItem('superadmin_token', res.token);
+        errorMsg.style.display = 'none';
+        checkAuth();
+      } else {
+        errorMsg.style.display = 'block';
+        document.getElementById('input-admin-auth-pwd').value = '';
+        document.getElementById('input-admin-auth-pwd').focus();
+      }
+    } catch (e) {
       errorMsg.style.display = 'block';
-      document.getElementById('input-admin-auth-pwd').value = '';
-      document.getElementById('input-admin-auth-pwd').focus();
+    } finally {
+      btn.disabled = false;
     }
   });
 
-  document.getElementById('btn-lock-session').addEventListener('click', () => {
+  document.getElementById('btn-lock-session').addEventListener('click', async () => {
+    const tok = sessionStorage.getItem('superadmin_token');
+    if (tok) {
+      await callAdminRpc('rpc_superadmin_logout', { p_token: tok }).catch(() => {});
+    }
+    sessionStorage.removeItem('superadmin_token');
     sessionStorage.removeItem('admin_master_unlocked');
     location.reload();
   });
@@ -479,18 +513,20 @@
     { id: 'tapa', categoria: 'producto', nombre: 'Tapa con Precinto', litros: 0, precio: 0.50, stock: 100, moneda: 'USD' }
   ];
 
-  // Cargar clientes desde Supabase
+  // Cargar clientes desde Supabase mediante RPC
   async function cargarClientes() {
     const select = document.getElementById('select-cliente');
     try {
-      const res = await fetch(SUPABASE_URL, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callAdminRpc('rpc_superadmin_list_clientes', { p_token: token });
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') {
+          handleUnauthorized();
+          return;
         }
-      });
-      if (!res.ok) throw new Error('Error al conectar con Supabase');
-      const data = await res.json();
+        throw new Error(rpcRes?.error || 'Error al conectar con Supabase');
+      }
+      const data = Array.isArray(rpcRes.clientes) ? rpcRes.clientes : [];
       
       select.innerHTML = '<option value="">-- Seleccionar cliente registrado --</option>';
       data.forEach(c => {
@@ -630,31 +666,30 @@
     btn.textContent = '⏳ Inyectando a Supabase...';
 
     try {
-      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify({
-          catalogo_inicial: productos
-        })
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callAdminRpc('rpc_superadmin_update_cliente', {
+        p_token: token,
+        p_id: null,
+        p_email: email,
+        p_patch: { catalogo_inicial: productos }
       });
 
-      if (!res.ok) throw new Error('No se pudo actualizar el registro en Supabase.');
-      const data = await res.json();
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') {
+          handleUnauthorized();
+          return;
+        }
+        if (rpcRes?.error === 'not_found') {
+          throw new Error('El correo no fue encontrado en Supabase. Asegúrate de registrar la cuenta primero.');
+        }
+        throw new Error('No se pudo actualizar el registro en Supabase.');
+      }
 
-      if (data && data.length > 0) {
-        mostrarAlerta(`
+      mostrarAlerta(`
           🎉 <strong>¡MAGIA COMPLETADA!</strong><br/>
           Se inyectaron <strong>${productos.length} productos</strong> a la cuenta <strong>${email}</strong>.<br/>
           Cuando abran la App en la tablet o teléfono con esa cuenta, <strong>todos los productos, precios y stocks se cargarán automáticamente al instante</strong>.
         `, 'success');
-      } else {
-        throw new Error('El correo no fue encontrado en Supabase. Asegúrate de registrar la cuenta primero.');
-      }
     } catch (e) {
       mostrarAlerta(`❌ Error: ${e.message}`, 'danger');
     } finally {

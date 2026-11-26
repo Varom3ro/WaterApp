@@ -726,13 +726,30 @@
 <div id="toast-box"></div>
 
 <script>
-  // Hash Criptográfico SHA-256 de la Clave Maestra de Seguridad
-  const MASTER_HASH = 'd02e5de5bb9bf153e7ef0b2d6b14b44b1fe22fc86a925022437377764d04f437';
-
-  const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+  const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
   let clientes = [];
+
+  async function callSuperAdminRpc(fnName, params) {
+    const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params || {})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  function handleUnauthorized() {
+    sessionStorage.removeItem('superadmin_token');
+    sessionStorage.removeItem('superadmin_unlocked');
+    checkAuth();
+  }
 
   // Función para calcular SHA-256 en el navegador
   async function sha256(text) {
@@ -747,13 +764,14 @@
 
   // Comprobar autenticación
   function checkAuth() {
-    if (sessionStorage.getItem('superadmin_unlocked') === 'true') {
+    sessionStorage.removeItem('superadmin_unlocked');
+    if (sessionStorage.getItem('superadmin_token')) {
       document.getElementById('auth-overlay').style.display = 'none';
       document.getElementById('admin-app').style.display = 'block';
       cargarClientes();
       if (!adminLiveRefreshInterval) {
         adminLiveRefreshInterval = setInterval(() => {
-          if (!document.hidden && sessionStorage.getItem('superadmin_unlocked') === 'true') {
+          if (!document.hidden && sessionStorage.getItem('superadmin_token')) {
             cargarClientes(true);
           }
         }, 20000);
@@ -775,20 +793,36 @@
   document.getElementById('btn-auth-unlock').addEventListener('click', async () => {
     const inputPwd = document.getElementById('input-admin-auth-pwd').value;
     const errorMsg = document.getElementById('auth-error-msg');
-    
-    const computedHash = await sha256(inputPwd);
-    if (computedHash === MASTER_HASH) {
-      sessionStorage.setItem('superadmin_unlocked', 'true');
-      errorMsg.style.display = 'none';
-      checkAuth();
-    } else {
-      errorMsg.style.display = 'block';
-      document.getElementById('input-admin-auth-pwd').value = '';
-      document.getElementById('input-admin-auth-pwd').focus();
+    const btn = document.getElementById('btn-auth-unlock');
+
+    btn.disabled = true;
+    try {
+      const computedHash = await sha256(inputPwd);
+      const res = await callSuperAdminRpc('rpc_superadmin_login', {
+        p_password_sha256: computedHash
+      });
+      if (res && res.ok && res.token) {
+        sessionStorage.setItem('superadmin_token', res.token);
+        errorMsg.style.display = 'none';
+        checkAuth();
+      } else {
+        errorMsg.style.display = 'block';
+        document.getElementById('input-admin-auth-pwd').value = '';
+        document.getElementById('input-admin-auth-pwd').focus();
+      }
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    } finally {
+      btn.disabled = false;
     }
   });
 
-  document.getElementById('btn-lock-session').addEventListener('click', () => {
+  document.getElementById('btn-lock-session').addEventListener('click', async () => {
+    const tok = sessionStorage.getItem('superadmin_token');
+    if (tok) {
+      await callSuperAdminRpc('rpc_superadmin_logout', { p_token: tok }).catch(() => {});
+    }
+    sessionStorage.removeItem('superadmin_token');
     sessionStorage.removeItem('superadmin_unlocked');
     location.reload();
   });
@@ -819,17 +853,19 @@
     return list;
   }
 
-  // Cargar Clientes desde Supabase
+  // Cargar Clientes desde Supabase mediante RPC
   async function cargarClientes(silencioso = false) {
     try {
-      const res = await fetch(`${SUPABASE_URL}?order=created_at.desc`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callSuperAdminRpc('rpc_superadmin_list_clientes', { p_token: token });
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') {
+          handleUnauthorized();
+          return;
         }
-      });
-      if (!res.ok) throw new Error('Error al cargar datos desde Supabase');
-      clientes = await res.json();
+        throw new Error(rpcRes?.error || 'Error al cargar datos desde Supabase');
+      }
+      clientes = Array.isArray(rpcRes.clientes) ? rpcRes.clientes : [];
       renderMetrics();
       renderClientes();
     } catch (e) {
@@ -1168,19 +1204,20 @@
 
     const nuevosDias = (c.dias_prueba || 0) + diasToAdd;
     try {
-      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callSuperAdminRpc('rpc_superadmin_update_cliente', {
+        p_token: token,
+        p_id: id,
+        p_email: null,
+        p_patch: {
           dias_prueba: nuevosDias,
           activo: true
-        })
+        }
       });
-      if (!res.ok) throw new Error('Error al actualizar en Supabase');
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') { handleUnauthorized(); return; }
+        throw new Error(rpcRes?.error || 'Error al actualizar en Supabase');
+      }
       showToast(`✨ Se añadieron +${diasToAdd} días a ${c.nombre_empresa || c.email}`, 'success');
       cargarClientes();
     } catch (e) {
@@ -1191,16 +1228,17 @@
   // Activar / Suspender
   async function toggleActivo(id, nuevoEstado) {
     try {
-      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ activo: nuevoEstado })
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callSuperAdminRpc('rpc_superadmin_update_cliente', {
+        p_token: token,
+        p_id: id,
+        p_email: null,
+        p_patch: { activo: nuevoEstado }
       });
-      if (!res.ok) throw new Error('Error al cambiar estado en Supabase');
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') { handleUnauthorized(); return; }
+        throw new Error(rpcRes?.error || 'Error al cambiar estado en Supabase');
+      }
       showToast(nuevoEstado ? '▶️ Licencia Reactivada' : '⏸️ Licencia Suspendida', 'success');
       cargarClientes();
     } catch (e) {
@@ -1222,16 +1260,17 @@
     }
 
     try {
-      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ notas })
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callSuperAdminRpc('rpc_superadmin_update_cliente', {
+        p_token: token,
+        p_id: id,
+        p_email: null,
+        p_patch: { notas }
       });
-      if (!res.ok) throw new Error('Error al actualizar en Supabase');
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') { handleUnauthorized(); return; }
+        throw new Error(rpcRes?.error || 'Error al actualizar en Supabase');
+      }
       showToast(yaBloqueado ? '📱 Visor Móvil Habilitado' : '🚫 Visor Móvil Bloqueado', yaBloqueado ? 'success' : 'warning');
       cargarClientes();
     } catch (e) {
@@ -1245,14 +1284,15 @@
       return;
     }
     try {
-      const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      const token = sessionStorage.getItem('superadmin_token') || '';
+      const rpcRes = await callSuperAdminRpc('rpc_superadmin_delete_cliente', {
+        p_token: token,
+        p_id: id
       });
-      if (!res.ok) throw new Error('Error al eliminar en Supabase');
+      if (!rpcRes || !rpcRes.ok) {
+        if (rpcRes?.error === 'unauthorized') { handleUnauthorized(); return; }
+        throw new Error(rpcRes?.error || 'Error al eliminar en Supabase');
+      }
       showToast('🗑️ Licencia eliminada con éxito', 'success');
       cargarClientes();
     } catch (e) {
@@ -1318,16 +1358,14 @@
     btn.textContent = 'Guardando...';
 
     try {
+      const token = sessionStorage.getItem('superadmin_token') || '';
       if (id) {
         // Actualizar
-        const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+        const rpcRes = await callSuperAdminRpc('rpc_superadmin_update_cliente', {
+          p_token: token,
+          p_id: id,
+          p_email: null,
+          p_patch: {
             nombre_empresa: empresa,
             email,
             telefono,
@@ -1335,20 +1373,18 @@
             plan,
             dias_prueba: dias,
             notas
-          })
+          }
         });
-        if (!res.ok) throw new Error('Error al actualizar');
+        if (!rpcRes || !rpcRes.ok) {
+          if (rpcRes?.error === 'unauthorized') { handleUnauthorized(); return; }
+          throw new Error(rpcRes?.error || 'Error al actualizar');
+        }
         showToast('✅ Licencia actualizada exitosamente');
       } else {
         // Crear
-        const res = await fetch(SUPABASE_URL, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+        const rpcRes = await callSuperAdminRpc('rpc_superadmin_create_cliente', {
+          p_token: token,
+          p_data: {
             nombre_empresa: empresa,
             email,
             telefono,
@@ -1358,9 +1394,12 @@
             notas,
             activo: true,
             fecha_registro: new Date().toISOString()
-          })
+          }
         });
-        if (!res.ok) throw new Error('Error al registrar. Verifica que el correo no esté duplicado.');
+        if (!rpcRes || !rpcRes.ok) {
+          if (rpcRes?.error === 'unauthorized') { handleUnauthorized(); return; }
+          throw new Error(rpcRes?.error === 'duplicate_email' ? 'Error al registrar. Verifica que el correo no esté duplicado.' : (rpcRes?.error || 'Error al registrar.'));
+        }
         showToast('🎉 ¡Licencia creada exitosamente!');
       }
 

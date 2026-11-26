@@ -5,16 +5,31 @@
 import { Utils } from './utils.js';
 import { getCloudBackup, restoreFromCloud } from './cloud-sync.js';
 
-const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
 export const Licencia = {
-  isDev() {
-    const host = window.location.hostname;
-    return ['localhost', '127.0.0.1'].includes(host) ||
-           host.startsWith('192.168.') ||
-           host.startsWith('10.') ||
-           host.startsWith('172.');
+  async _callRpc(fnName, params, timeoutMs = 6000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params || {}),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
   },
 
   // Identificador único persistente para este navegador / equipo
@@ -42,7 +57,7 @@ export const Licencia = {
         const checkLocal = localStorage.getItem('licencia_usuario');
         if (checkLocal) {
           const u = JSON.parse(checkLocal);
-          if (!this.isDev() && u.device_id && u.device_id !== localDeviceId) return false;
+          if (u.device_id && u.device_id !== localDeviceId) return false;
           if (!u.activo || this._checkExpirado(u.fecha_registro, u.dias_prueba)) return false;
         }
       }
@@ -51,7 +66,7 @@ export const Licencia = {
       const freshUser = JSON.parse(freshLocal);
 
       // Verificación de seguridad local/offline de dispositivo
-      if (!this.isDev() && freshUser.device_id && freshUser.device_id !== localDeviceId) {
+      if (freshUser.device_id && freshUser.device_id !== localDeviceId) {
         this.bloquearDispositivoNoAutorizado(freshUser);
         return false;
       }
@@ -70,66 +85,34 @@ export const Licencia = {
 
   async _revalidarOnline(email) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout max
-      
-      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      const localDeviceId = this.getDeviceId();
+      const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Vinculado: ${new Date().toISOString()}`;
+      const rpcRes = await this._callRpc('rpc_pos_register_or_validate', {
+        p_email: email,
+        p_device_id: localDeviceId,
+        p_device_info: deviceInfo
+      }, 4000);
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const user = data[0];
-          const localDeviceId = this.getDeviceId();
+      if (!rpcRes) return false;
 
-          // 🛡️ BLINDAJE POR DISPOSITIVO ÚNICO (Opción A):
-          if (this.isDev()) {
-            console.log('[Licencia] 🛠️ Entorno localhost/desarrollo: bloqueo de dispositivo omitido.');
-          } else if (!user.device_id) {
-            // El usuario no tiene equipo registrado aún (o el admin lo reseteó a null en Supabase).
-            // Vincular automáticamente este equipo actual como el oficial de la tienda.
-            const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Vinculado: ${new Date().toISOString()}`;
-            try {
-              await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
-                method: 'PATCH',
-                headers: {
-                  'apikey': SUPABASE_KEY,
-                  'Authorization': `Bearer ${SUPABASE_KEY}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  device_id: localDeviceId,
-                  device_info: deviceInfo
-                })
-              });
-              user.device_id = localDeviceId;
-              user.device_info = deviceInfo;
-              console.log('[Licencia] 💻 Dispositivo vinculado exitosamente a la cuenta:', localDeviceId);
-            } catch (errPatch) {
-              console.warn('[Licencia] Error registrando device_id en Supabase:', errPatch);
-            }
-          } else if (user.device_id !== localDeviceId) {
-            // 🛑 DISPOSITIVO NO AUTORIZADO (Intento de usar en otra PC o navegador distinto)
-            console.warn('[Licencia] 🛑 Dispositivo no autorizado:', localDeviceId, 'vs registrado:', user.device_id);
-            this.bloquearDispositivoNoAutorizado(user);
-            return false;
-          }
+      if (rpcRes.ok === false && rpcRes.error === 'device_mismatch') {
+        const blockedUser = rpcRes.user || { email, device_id: 'BOUND_OTHER' };
+        localStorage.setItem('licencia_usuario', JSON.stringify(blockedUser));
+        console.warn('[Licencia] 🛑 Dispositivo no autorizado:', localDeviceId);
+        this.bloquearDispositivoNoAutorizado(blockedUser);
+        return false;
+      }
 
-          localStorage.setItem('licencia_usuario', JSON.stringify(user));
-          this.aplicarCatalogoRemotoSiExiste();
+      if (rpcRes.ok && rpcRes.user) {
+        const user = rpcRes.user;
+        localStorage.setItem('licencia_usuario', JSON.stringify(user));
+        this.aplicarCatalogoRemotoSiExiste();
 
-          if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
-            this.bloquearPantalla();
-            return false;
-          }
-          return true;
+        if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
+          this.bloquearPantalla();
+          return false;
         }
+        return true;
       }
       return false;
     } catch (e) {
@@ -146,21 +129,24 @@ export const Licencia = {
 
   async _validarOnlineSilencioso(email) {
     try {
-      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const user = data[0];
-          localStorage.setItem('licencia_usuario', JSON.stringify(user));
-          this.aplicarCatalogoRemotoSiExiste();
-          if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
-            this.bloquearPantalla();
-          }
+      const rpcRes = await this._callRpc('rpc_pos_register_or_validate', {
+        p_email: email,
+        p_device_id: this.getDeviceId(),
+        p_device_info: null
+      }, 5000);
+      if (!rpcRes) return;
+      if (rpcRes.ok === false && rpcRes.error === 'device_mismatch') {
+        const blockedUser = rpcRes.user || { email, device_id: 'BOUND_OTHER' };
+        localStorage.setItem('licencia_usuario', JSON.stringify(blockedUser));
+        this.bloquearDispositivoNoAutorizado(blockedUser);
+        return;
+      }
+      if (rpcRes.ok && rpcRes.user) {
+        const user = rpcRes.user;
+        localStorage.setItem('licencia_usuario', JSON.stringify(user));
+        this.aplicarCatalogoRemotoSiExiste();
+        if (!user.activo || this._checkExpirado(user.fecha_registro, user.dias_prueba)) {
+          this.bloquearPantalla();
         }
       }
     } catch (e) {
@@ -179,14 +165,10 @@ export const Licencia = {
       user.catalogo_inicial = nuevoCatalogo;
       localStorage.setItem('licencia_usuario', JSON.stringify(user));
 
-      await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(user.email)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ catalogo_inicial: nuevoCatalogo })
+      await this._callRpc('rpc_pos_sync_catalogo', {
+        p_email: user.email,
+        p_device_id: this.getDeviceId(),
+        p_catalogo: nuevoCatalogo
       });
       console.log('[Licencia] ✅ Catálogo local sincronizado con Supabase');
     } catch (e) {
@@ -425,19 +407,14 @@ export const Licencia = {
       const user = JSON.parse(licenciaLocal);
       if (!user.email) return false;
 
-      const res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(user.email)}&select=visor_actividad`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+      const rpcRes = await this._callRpc('rpc_pos_get_ajustes_remotos', {
+        p_email: user.email,
+        p_device_id: this.getDeviceId()
       });
-      if (!res.ok) return false;
-      const data = await res.json();
-      if (!data || data.length === 0) return false;
+      if (!rpcRes || !rpcRes.ok) return false;
 
-      const remoteAct = data[0].visor_actividad;
-      if (remoteAct && remoteAct.ajustes_remotos) {
-        return this.aplicarAjustesRemotosEnMemoria(remoteAct.ajustes_remotos, storeInstance);
+      if (rpcRes.ajustes_remotos) {
+        return this.aplicarAjustesRemotosEnMemoria(rpcRes.ajustes_remotos, storeInstance);
       }
     } catch (e) {
       console.warn('[Licencia] Error verificando ajustes remotos en caliente:', e);
@@ -496,71 +473,27 @@ export const Licencia = {
 
       try {
         const localDeviceId = this.getDeviceId();
+        const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Registrado: ${new Date().toISOString()}`;
 
-        // 1. Consultar si el correo ya está registrado en Supabase
-        let res = await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
+        const rpcRes = await this._callRpc('rpc_pos_register_or_validate', {
+          p_email: email,
+          p_device_id: localDeviceId,
+          p_device_info: deviceInfo
         });
 
-        if (!res.ok) throw new Error('Error al conectar con el servidor.');
+        if (!rpcRes) throw new Error('Error al conectar con el servidor.');
 
-        let data = await res.json();
-        let user = null;
-
-        if (data && data.length > 0) {
-          user = data[0];
-
-          // 🛡️ Verificar si ya está vinculado a otro equipo
-          if (!this.isDev() && user.device_id && user.device_id !== localDeviceId) {
-            if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
-            this.bloquearDispositivoNoAutorizado(user);
-            return;
-          }
-
-          // Si el device_id está libre (nuevo o reseteado desde Supabase por el admin)
-          if (!this.isDev() && !user.device_id) {
-            const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Vinculado: ${new Date().toISOString()}`;
-            await fetch(`${SUPABASE_URL}?email=eq.${encodeURIComponent(email)}`, {
-              method: 'PATCH',
-              headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                device_id: localDeviceId,
-                device_info: deviceInfo
-              })
-            });
-            user.device_id = localDeviceId;
-            user.device_info = deviceInfo;
-          }
-        } else {
-          // Crear un nuevo registro para este cliente
-          const deviceInfo = `Browser: ${navigator.userAgent} | Platform: ${navigator.platform} | Creado: ${new Date().toISOString()}`;
-          
-          res = await fetch(SUPABASE_URL, {
-            method: 'POST',
-            headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify({
-              email: email,
-              device_id: localDeviceId,
-              device_info: deviceInfo
-            })
-          });
-
-          if (!res.ok) throw new Error('No se pudo registrar la licencia.');
-          const createdData = await res.json();
-          user = createdData[0];
+        if (rpcRes.ok === false && rpcRes.error === 'device_mismatch') {
+          if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          this.bloquearDispositivoNoAutorizado(rpcRes.user || { email, device_id: 'BOUND_OTHER' });
+          return;
         }
+
+        if (!rpcRes.ok || !rpcRes.user) {
+          throw new Error('No se pudo validar o registrar la licencia.');
+        }
+
+        const user = rpcRes.user;
 
         // Guardar licencia localmente
         localStorage.setItem('licencia_usuario', JSON.stringify(user));

@@ -6,8 +6,27 @@ import { store } from './store.js';
 import { Utils } from './utils.js';
 import { esCuentaRefillH2O, cargarMetasRefillDesdeNube } from './refill-metas.js';
 
-const SUPABASE_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/tienda_sync_cloud';
+const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
+
+async function _callCloudRpc(fnName, params) {
+  const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params || {})
+  });
+  const dateHeader = res.headers.get('date');
+  if (!res.ok) {
+    const errText = await res.text().catch(() => `HTTP ${res.status}`);
+    return { ok: false, data: null, errorText: errText, dateHeader };
+  }
+  const json = await res.json();
+  return { ok: true, data: json, errorText: null, dateHeader };
+}
 
 let _syncDebounceTimer = null;
 let _syncWaiters = [];
@@ -303,33 +322,29 @@ async function _executeSyncToCloud(isManual = false) {
     // 🛡️ ESCUDO PROTECTOR ANTI-SOBRESCRITURA:
     // Si este dispositivo tiene 0 ventas y 0 clientes (recién instalado o datos locales borrados),
     // comprobar si la tienda ya tiene datos en la nube para NO borrar el respaldo ni los datos con ceros.
+    const deviceId = localStorage.getItem('waterapp_device_uuid') || '';
     if (ventas.length === 0 && clientes.length === 0 && !isManual) {
       try {
-        const checkRes = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
+        const checkRpc = await _callCloudRpc('rpc_pos_get_cloud_backup', {
+          p_email: email,
+          p_device_id: deviceId
         });
-        if (checkRes.ok) {
-          const cloudData = await checkRes.json();
-          if (cloudData && cloudData.length > 0) {
-            const remote = cloudData[0];
-            const hasBackup = remote.respaldo_completo && (
-              (remote.respaldo_completo.clientes && remote.respaldo_completo.clientes.length > 0) ||
-              (remote.respaldo_completo.ventas && remote.respaldo_completo.ventas.length > 0)
-            );
-            const remoteTotalMes = remote.analisis_mes?.totalMesUSD || 0;
-            const remoteLitros = remote.nivel_tanque?.litros || 0;
-            const remoteMovs = remote.ultimos_movimientos?.length || 0;
+        if (checkRpc.ok && checkRpc.data && checkRpc.data.ok && checkRpc.data.data) {
+          const remote = checkRpc.data.data;
+          const hasBackup = remote.respaldo_completo && (
+            (remote.respaldo_completo.clientes && remote.respaldo_completo.clientes.length > 0) ||
+            (remote.respaldo_completo.ventas && remote.respaldo_completo.ventas.length > 0)
+          );
+          const remoteTotalMes = remote.analisis_mes?.totalMesUSD || 0;
+          const remoteLitros = remote.nivel_tanque?.litros || 0;
+          const remoteMovs = remote.ultimos_movimientos?.length || 0;
 
-            if (hasBackup || remoteTotalMes > 0 || remoteLitros > 0 || remoteMovs > 0) {
-              console.log('[CloudSync] 🛡️ Dispositivo vacío detectado. Se protegen datos activos de la nube (respaldo, tanque, mes).');
-              if (remoteLitros > 0 && (!inventario.litros || inventario.litros === 0)) {
-                store.setConfig('inventario', remote.nivel_tanque);
-              }
-              return true;
+          if (hasBackup || remoteTotalMes > 0 || remoteLitros > 0 || remoteMovs > 0) {
+            console.log('[CloudSync] 🛡️ Dispositivo vacío detectado. Se protegen datos activos de la nube (respaldo, tanque, mes).');
+            if (remoteLitros > 0 && (!inventario.litros || inventario.litros === 0)) {
+              store.setConfig('inventario', remote.nivel_tanque);
             }
+            return true;
           }
         }
       } catch (checkErr) {
@@ -549,6 +564,9 @@ async function _executeSyncToCloud(isManual = false) {
             if (c.id === 'empresaLogo' && typeof c.value === 'string' && c.value.length > 70000) {
               return { ...c, value: './img/logo.png' };
             }
+            if ((c.id === 'adminPassword' || c.id === 'operarioPassword') && typeof c.value === 'string' && c.value.length > 0 && !c.value.startsWith('h_')) {
+              return { ...c, value: store._hashStr(c.value) };
+            }
             return c;
           });
           // Inyectar arqueos y turnos en la configuración del respaldo para que persistan en la nube
@@ -665,69 +683,25 @@ async function _executeSyncToCloud(isManual = false) {
       }
     }
 
-    let res;
-    // Si incluye respaldo completo, hacemos POST con merge-duplicates (upsert)
-    if (payload.respaldo_completo) {
-      res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates,return=minimal'
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
+    const syncRpc = await _callCloudRpc('rpc_pos_sync_cloud', {
+      p_email: email,
+      p_device_id: deviceId,
+      p_payload: payload
+    });
+
+    if (syncRpc.ok && syncRpc.data && syncRpc.data.ok) {
+      if (payload.respaldo_completo) {
         localStorage.setItem('waterapp_last_full_backup_time', String(Date.now()));
       }
-    } else {
-      // ⚡ Sincronización Ultraligera en Vivo: PATCH selectivo (15-30 KB)
-      // Mantiene intacto en Supabase el respaldo histórico anterior sin saturar la conexión
-      res = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(payload)
-      });
-      // Fallback a POST solo si la tienda es nueva y aún no existe fila previa en Supabase (200 [] o 404)
-      let needsPostFallback = !res.ok && res.status === 404;
-      if (res.ok && !needsPostFallback) {
-        try {
-          const patchedRows = await res.clone().json();
-          if (Array.isArray(patchedRows) && patchedRows.length === 0) {
-            needsPostFallback = true;
-          }
-        } catch (_) {}
-      }
-      if (needsPostFallback) {
-        res = await fetch(`${SUPABASE_URL}?on_conflict=empresa_email`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates,return=minimal'
-          },
-          body: JSON.stringify(payload)
-        });
-      }
-    }
-
-    if (res && res.ok) {
       // ⏰ Blindaje de reloj: verificar desfase horario del computador contra el servidor
-      const serverDateHeader = res.headers.get('date');
+      const serverDateHeader = syncRpc.data.server_time || syncRpc.dateHeader;
       if (serverDateHeader) {
         verificarDesfaseRelojPC(serverDateHeader);
       }
       console.log(`[CloudSync] ✅ Sincronización exitosa (${payload.respaldo_completo ? 'Completa 📦' : 'Ultraligera ⚡'}):`, payload.ultima_actualizacion);
       return true;
     } else {
-      console.warn('[CloudSync] Error en respuesta de Supabase:', res ? await res.text() : 'No response');
+      console.warn('[CloudSync] Error en respuesta de Supabase:', syncRpc.errorText || syncRpc.data?.error || 'Unauthorized');
       return false;
     }
   } catch (e) {
@@ -749,17 +723,14 @@ export async function getCloudBackup(emailParam = null) {
     }
     if (!email) return null;
 
-    const res = await fetch(`${SUPABASE_URL}?empresa_email=eq.${encodeURIComponent(email)}`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
+    const deviceId = localStorage.getItem('waterapp_device_uuid') || '';
+    const rpcRes = await _callCloudRpc('rpc_pos_get_cloud_backup', {
+      p_email: email,
+      p_device_id: deviceId
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data || data.length === 0) return null;
+    if (!rpcRes.ok || !rpcRes.data || !rpcRes.data.ok || !rpcRes.data.data) return null;
 
-    const remote = data[0];
+    const remote = rpcRes.data.data;
     const backup = remote.respaldo_completo;
     if (!backup) return null;
 

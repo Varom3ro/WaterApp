@@ -4,7 +4,7 @@
 // ============================================
 
 export const REFILL_MASTER_EMAIL = 'refillh2o@gmail.com';
-export const SUPABASE_LIC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/licencia_agua_clientes';
+export const SUPABASE_RPC_URL = 'https://nxfilgwpguqlrjlfnnwt.supabase.co/rest/v1/rpc';
 export const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54ZmlsZ3dwZ3VxbHJqbGZubnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMTU0NDQsImV4cCI6MjEwMzc5MTQ0NH0.ZSx3dudM_cmqJL5qkpOtfJBTSQhIdd4GShkZp2t3n_s';
 
 const REFILL_METAS_LS_KEY = 'refillh2o_metas_cache';
@@ -412,18 +412,28 @@ export async function cargarMetasRefillDesdeNube(storeInstance = null, force = f
   }
 
   try {
-    const res = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(REFILL_MASTER_EMAIL)}&select=id,visor_actividad`, {
+    const email = getEmailLicenciaActiva();
+    const deviceId = (typeof localStorage !== 'undefined' ? localStorage.getItem('waterapp_device_uuid') : '') || '';
+    if (!email || !deviceId) return getMetasRefillConfigLocal(storeInstance);
+
+    const res = await fetch(`${SUPABASE_RPC_URL}/rpc_pos_get_refill_metas`, {
+      method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        p_email: email,
+        p_device_id: deviceId
+      })
     });
     if (!res.ok) return getMetasRefillConfigLocal(storeInstance);
     const data = await res.json();
     ultimaDescargaMetasTs = ahora;
 
-    if (data && data.length > 0 && data[0].visor_actividad && data[0].visor_actividad.metas_refillh2o) {
-      return setMetasRefillConfigLocal(storeInstance, data[0].visor_actividad.metas_refillh2o);
+    if (data && data.ok && data.metas) {
+      return setMetasRefillConfigLocal(storeInstance, data.metas);
     }
   } catch (e) {
     console.warn('[RefillMetas] No se pudo consultar configuración remota:', e);
@@ -442,39 +452,32 @@ export async function guardarMetasRefillEnNube(config, storeInstance = null) {
   ultimaDescargaMetasTs = Date.now();
 
   try {
-    const resGet = await fetch(`${SUPABASE_LIC_URL}?email=eq.${encodeURIComponent(REFILL_MASTER_EMAIL)}&select=id,visor_actividad`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
-    });
-    if (!resGet.ok) {
-      return { ok: false, config: normalized, error: `HTTP ${resGet.status}` };
-    }
-    const data = await resGet.json();
-    if (!data || data.length === 0) {
-      return { ok: false, config: normalized, error: 'Cuenta maestra Refill H2O no encontrada en Supabase.' };
+    const email = getEmailLicenciaActiva();
+    const deviceId = (typeof localStorage !== 'undefined' ? localStorage.getItem('waterapp_device_uuid') : '') || '';
+    if (!email || !deviceId) {
+      return { ok: false, config: normalized, error: 'Licencia o dispositivo no identificado.' };
     }
 
-    const row = data[0];
-    const prevAct = row.visor_actividad || {};
-    const newAct = {
-      ...prevAct,
-      metas_refillh2o: normalized
-    };
-
-    const resPatch = await fetch(`${SUPABASE_LIC_URL}?id=eq.${row.id}`, {
-      method: 'PATCH',
+    const res = await fetch(`${SUPABASE_RPC_URL}/rpc_pos_save_refill_metas`, {
+      method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ visor_actividad: newAct })
+      body: JSON.stringify({
+        p_email: email,
+        p_device_id: deviceId,
+        p_metas: normalized
+      })
     });
 
-    if (!resPatch.ok) {
-      return { ok: false, config: normalized, error: `PATCH HTTP ${resPatch.status}` };
+    if (!res.ok) {
+      return { ok: false, config: normalized, error: `RPC HTTP ${res.status}` };
+    }
+    const data = await res.json();
+    if (!data || !data.ok) {
+      return { ok: false, config: normalized, error: data?.error || 'Error guardando metas en Supabase' };
     }
 
     return { ok: true, config: normalized };
