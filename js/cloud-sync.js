@@ -655,7 +655,8 @@ async function _executeSyncToCloud(isManual = false) {
         credito,
         litrosMermasHoy,
         desglose_metodos: desgloseMetodos,
-        cierre: cierreHoyInfo
+        cierre: cierreHoyInfo,
+        rol_activo: (typeof store.getUserRole === 'function') ? store.getUserRole() : (sessionStorage.getItem('userRole') || 'operario')
       },
       nivel_tanque: {
         litros: inventario.litros || 0,

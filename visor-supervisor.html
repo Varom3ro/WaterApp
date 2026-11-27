@@ -833,9 +833,10 @@
     <!-- Top Header -->
     <header class="top-header">
       <div class="header-store-info">
-        <div class="store-name" style="flex-wrap: wrap; gap: 6px;">
+        <div class="store-name" style="flex-wrap: wrap; gap: 6px; align-items: center;">
           <span id="txt-store-name">Planta</span>
           <span id="badge-sede" class="badge-sede" style="display: none;">Sede</span>
+          <span id="badge-rol-sesion-sup" class="badge-sede" style="display: none; font-size: 0.68rem; padding: 2px 7px;"></span>
         </div>
         <div class="badge-supervisor" id="badge-supervisor-user">
           <span id="badge-sup-icon">🛡️</span> <span id="txt-supervisor-name">Supervisor</span>
@@ -1700,6 +1701,27 @@
     }
 
     // 1. Tanque de Agua
+    const r = storeData.resumen_hoy || {};
+
+    // Indicador visual de rol de sesión activa en la tienda
+    const badgeRol = document.getElementById('badge-rol-sesion-sup');
+    if (badgeRol) {
+      const rolActivo = r.rol_activo || 'operario';
+      if (rolActivo === 'admin') {
+        badgeRol.innerHTML = '👑 Modo Dueño / Admin';
+        badgeRol.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        badgeRol.style.background = 'rgba(239, 68, 68, 0.15)';
+        badgeRol.style.color = '#DC2626';
+        badgeRol.title = 'Atención: La tablet o PC de la tienda tiene iniciada sesión como Administrador';
+      } else {
+        badgeRol.innerHTML = '👷 Modo Operario';
+        badgeRol.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+        badgeRol.style.background = 'rgba(16, 185, 129, 0.12)';
+        badgeRol.style.color = '#059669';
+        badgeRol.title = 'Sesión protegida: El punto de venta está operando como Operario (Reportes y Configuración bloqueados)';
+      }
+      badgeRol.style.display = 'inline-flex';
+    }
     const tanque = storeData.nivel_tanque || {};
     const litros = parseInt(tanque.litros) || 0;
     const capacidad = parseInt(tanque.capacidadTanque) || 30000;
@@ -1716,7 +1738,6 @@
     renderizarAlertasYCardFiltrosSup(storeData, litros, capacidad, pct);
 
     // 2. Métricas Físicas del Día (Sin Dinero)
-    const r = storeData.resumen_hoy || {};
     const elOpsLitros = document.getElementById('txt-ops-litros');
     const elOpsBot = document.getElementById('txt-ops-botellones');
     const elOpsMerma = document.getElementById('txt-ops-merma');

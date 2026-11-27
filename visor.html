@@ -2058,8 +2058,9 @@ body.hide-montos #cierre-digital-usd {
 
       <!-- Fila 2: Debajo de Refill H2O colocamos la Sede a la izquierda y el botón Modo Supervisor a la derecha -->
       <div class="header-mid-row">
-        <div class="header-sede-wrap">
+        <div class="header-sede-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
           <span id="badge-sede" class="badge-sede" style="display: none;">Santa Eduvigis</span>
+          <span id="badge-rol-sesion" class="badge-sede" style="display: none; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255,255,255,0.12); font-size: 0.68rem; padding: 2px 7px;"></span>
           <span id="txt-owner-email" class="header-email" style="display: none;">correo@tienda.com</span>
         </div>
         <button type="button" class="btn-role-switch" onclick="cambiarAModoSupervisor()" title="Cambiar a Modo Supervisor">
@@ -4389,6 +4390,26 @@ function cambiarTab(tabName) {
 
     // Actualizar barra de selección de sedes para Refill H2O
     actualizarBarraSedesRefill(activeEmail);
+
+    // Indicador visual de rol de sesión activa en la tienda
+    const badgeRol = document.getElementById('badge-rol-sesion');
+    if (badgeRol) {
+      const rolActivo = r.rol_activo || 'operario';
+      if (rolActivo === 'admin') {
+        badgeRol.innerHTML = '👑 Modo Dueño / Admin';
+        badgeRol.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        badgeRol.style.background = 'rgba(239, 68, 68, 0.15)';
+        badgeRol.style.color = '#FCA5A5';
+        badgeRol.title = 'Atención: La tablet o PC de la tienda tiene iniciada sesión como Administrador';
+      } else {
+        badgeRol.innerHTML = '👷 Modo Operario';
+        badgeRol.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+        badgeRol.style.background = 'rgba(16, 185, 129, 0.12)';
+        badgeRol.style.color = '#6EE7B7';
+        badgeRol.title = 'Sesión protegida: El punto de venta está operando como Operario (Reportes y Configuración bloqueados)';
+      }
+      badgeRol.style.display = 'inline-flex';
+    }
 
     // Ventas Hoy
     document.getElementById('txt-total-usd').textContent = `$ ${(r.totalUSD || 0).toFixed(2)}`;
