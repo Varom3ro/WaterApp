@@ -490,6 +490,50 @@ async function _executeSyncToCloud(isManual = false) {
     const totalMesBs = totalMesUSD * tasa;
     const totalBotellonesMes = ventasMes.reduce((s, v) => s + (parseInt(v.botellones) || 0), 0);
 
+    // 🛡️ Cálculo de la semana actual (Lunes a Domingo) para reportes y metas de Visor sin requerir descarga de respaldo completo
+    const nowDay = now.getDay();
+    const diffToMonday = (nowDay === 0 ? -6 : 1) - nowDay;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday, 0, 0, 0);
+    const mondayISO = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+
+    const ventasSemana = ventas.filter(v => {
+      if (!v.fecha) return false;
+      const vIso = v.fecha.substring(0, 10);
+      return vIso >= mondayISO;
+    });
+    const abonosSemana = abonos.filter(a => {
+      if (!a.fecha) return false;
+      const aIso = a.fecha.substring(0, 10);
+      return aIso >= mondayISO;
+    });
+
+    let totalSemanaUSD = 0;
+    let botellonesSemana = 0;
+    let litrosSemana = 0;
+    ventasSemana.forEach(v => {
+      const isSinCobro = ['convenio', 'garantia', 'cortesia'].includes(v.tipo);
+      const b = parseInt(v.botellones) || 0;
+      botellonesSemana += b;
+      litrosSemana += parseFloat(v.litrosTotales) || (b * 20);
+      if (v.tipo === 'credito' || isSinCobro) return;
+      if (v.pagos && Array.isArray(v.pagos) && v.pagos.length > 0) {
+        v.pagos.forEach(p => {
+          if (!p || p.metodo === 'saldo_favor') return;
+          const val = parseFloat(p.montoUSD !== undefined ? p.montoUSD : p.monto);
+          if (!isNaN(val) && val > 0) totalSemanaUSD += val;
+        });
+      } else if (v.metodoPago !== 'saldo_favor') {
+        const val = parseFloat(v.total);
+        if (!isNaN(val) && val > 0) totalSemanaUSD += val;
+      }
+    });
+    abonosSemana.forEach(a => {
+      if (!a || a.esExcedenteVenta || a.referencia === 'Excedente de venta') return;
+      const val = parseFloat(a.monto);
+      if (!isNaN(val) && val > 0) totalSemanaUSD += val;
+    });
+    totalSemanaUSD = Math.round(totalSemanaUSD * 100) / 100;
+
     // Análisis de productos más vendidos reales
     const productCounts = {};
     ventas.forEach(v => {
@@ -656,7 +700,14 @@ async function _executeSyncToCloud(isManual = false) {
         litrosMermasHoy,
         desglose_metodos: desgloseMetodos,
         cierre: cierreHoyInfo,
-        rol_activo: (typeof store.getUserRole === 'function') ? store.getUserRole() : (sessionStorage.getItem('userRole') || 'operario')
+        rol_activo: (typeof store.getUserRole === 'function') ? store.getUserRole() : (sessionStorage.getItem('userRole') || 'operario'),
+        semana: {
+          totalUSD: totalSemanaUSD,
+          cantidadVentas: ventasSemana.length,
+          botellones: botellonesSemana,
+          litros: litrosSemana,
+          inicioISO: mondayISO
+        }
       },
       nivel_tanque: {
         litros: inventario.litros || 0,
@@ -665,7 +716,7 @@ async function _executeSyncToCloud(isManual = false) {
         mantenimientoFiltros: store.getConfig('mantenimientoFiltros', null)
       },
       stock_productos: prodsFisicos,
-      ultimos_movimientos: ultimosMovs.slice(0, 60),
+      ultimos_movimientos: ultimosMovs.slice(0, 80),
       analisis_mes: {
         totalMesUSD,
         totalMesBs,

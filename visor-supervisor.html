@@ -1378,6 +1378,34 @@
   let cacheGlobalTiendas = {};
   let currentCatalogo = [];
   let autoRefreshInterval = null;
+
+  function iniciarAutoRefreshSupervisor() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    const ms = (typeof document !== 'undefined' && document.hidden) ? 60000 : 20000;
+    autoRefreshInterval = setInterval(() => {
+      cargarDatosEnVivoSupervisor();
+    }, ms);
+  }
+
+  function detenerAutoRefreshSupervisor() {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (autoRefreshInterval) iniciarAutoRefreshSupervisor();
+      } else {
+        if (supAuthToken && document.getElementById('supervisor-app')?.style.display !== 'none') {
+          cargarDatosEnVivoSupervisor();
+          iniciarAutoRefreshSupervisor();
+        }
+      }
+    });
+  }
   let filtroCatalogoActual = 'todos';
 
   async function callSupRpc(fnName, params) {
@@ -1553,8 +1581,7 @@
     // Cargar datos
     cargarDatosEnVivoSupervisor();
 
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(cargarDatosEnVivoSupervisor, 6000);
+    iniciarAutoRefreshSupervisor();
   }
 
   function actualizarBarraSedesSupervisor() {

@@ -2796,6 +2796,35 @@ body.hide-montos #cierre-digital-usd {
   let currentStoreEmail = '';
   let supervisorAccount = localStorage.getItem('visor_supervisor_email') || '';
   let autoRefreshInterval = null;
+  let _lastLicCheckTs = 0;
+
+  function iniciarAutoRefreshVisor() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    const ms = (typeof document !== 'undefined' && document.hidden) ? 60000 : 15000;
+    autoRefreshInterval = setInterval(() => {
+      cargarDatosEnVivo();
+    }, ms);
+  }
+
+  function detenerAutoRefreshVisor() {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (autoRefreshInterval) iniciarAutoRefreshVisor();
+      } else {
+        if (visorAuthToken && document.getElementById('main-app')?.style.display !== 'none') {
+          cargarDatosEnVivo(true);
+          iniciarAutoRefreshVisor();
+        }
+      }
+    });
+  }
 
   async function callVisorRpc(fnName, params) {
     const res = await fetch(`${SUPABASE_RPC_URL}/${fnName}`, {
@@ -3173,8 +3202,7 @@ body.hide-montos #cierre-digital-usd {
 
     await cargarDatosEnVivo();
 
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(cargarDatosEnVivo, 5000);
+    iniciarAutoRefreshVisor();
 
     if (visorUrlActionPending) {
       visorUrlActionPending = false;
@@ -3362,6 +3390,24 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
   }
 
   if (periodo === 'semana') {
+    // 🛡️ Prioridad 1: Usar resumen_hoy.semana reportado por la tienda si está disponible (optimización de ancho de banda)
+    if (r.semana && typeof r.semana.totalUSD === 'number') {
+      const s = r.semana;
+      const tUSD = s.totalUSD;
+      const credHoy = r.credito || 0;
+      return {
+        totalUSD: tUSD,
+        totalBs: tUSD * tasa,
+        creditoUSD: credHoy,
+        efectivoUSD: r.efectivoUSD || 0,
+        efectivoBs: r.efectivoBs || 0,
+        bancosUSD: Math.max(0, tUSD - (r.efectivoUSD || 0) - (r.efectivoBsUSD || 0)),
+        botellones: s.botellones || r.botellones || 0,
+        litros: s.litros || r.litros || 0,
+        numVentas: s.cantidadVentas || r.numVentas || 0
+      };
+    }
+
     const ventasSemana = ventas.filter(v => v.fecha && new Date(v.fecha) >= sieteDiasAtras);
     const abonosSemana = abonos.filter(a => a.fecha && new Date(a.fecha) >= sieteDiasAtras);
     if (ventasSemana.length > 0 || abonosSemana.length > 0) {
@@ -4056,22 +4102,26 @@ function cambiarTab(tabName) {
       return;
     }
 
-    // Verificar en caliente si la cuenta sigue activa o fue suspendida por el admin
-    const licCheck = await verificarLicencia(currentStoreEmail);
-    if (!licCheck.ok) {
-      visorAuthToken = '';
-      localStorage.removeItem('visor_auth_token');
-      localStorage.removeItem('visor_owner_email');
-      localStorage.removeItem('visor_owner_pwd');
-      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-      document.getElementById('main-app').style.display = 'none';
-      document.getElementById('auth-screen').style.display = 'flex';
-      const errorBox = document.getElementById('login-error');
-      if (errorBox) {
-        errorBox.textContent = licCheck.razon;
-        errorBox.style.display = 'block';
+    // Verificar en caliente si la cuenta sigue activa o fue suspendida por el admin (solo si es forzado o cada 5 minutos)
+    const nowTs = Date.now();
+    if (force || !_lastLicCheckTs || (nowTs - _lastLicCheckTs) > 300000) {
+      const licCheck = await verificarLicencia(currentStoreEmail);
+      _lastLicCheckTs = nowTs;
+      if (!licCheck.ok) {
+        visorAuthToken = '';
+        localStorage.removeItem('visor_auth_token');
+        localStorage.removeItem('visor_owner_email');
+        localStorage.removeItem('visor_owner_pwd');
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        document.getElementById('main-app').style.display = 'none';
+        document.getElementById('auth-screen').style.display = 'flex';
+        const errorBox = document.getElementById('login-error');
+        if (errorBox) {
+          errorBox.textContent = licCheck.razon;
+          errorBox.style.display = 'block';
+        }
+        return;
       }
-      return;
     }
 
     try {
@@ -5699,6 +5749,15 @@ function cambiarTab(tabName) {
 
   function calcularVentaRealSemanaTiendaVisor(tienda, rango) {
     if (!tienda) return { totalUSD: 0, cantidadVentas: 0 };
+
+    // 🛡️ Prioridad 1: Si la tienda reportó el total semanal precalculado en resumen_hoy.semana (ultra-ahorro de ancho de banda)
+    if (tienda.resumen_hoy?.semana && typeof tienda.resumen_hoy.semana.totalUSD === 'number') {
+      const s = tienda.resumen_hoy.semana;
+      if (!rango || !rango.lunesISO || s.inicioISO === rango.lunesISO || (!semanaOffsetMetasVisor || semanaOffsetMetasVisor === 0)) {
+        return { totalUSD: s.totalUSD, cantidadVentas: s.cantidadVentas || 0 };
+      }
+    }
+
     const ventas = tienda.respaldo_completo?.ventas || [];
     const abonos = tienda.respaldo_completo?.abonos || [];
 
