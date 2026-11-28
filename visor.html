@@ -3390,7 +3390,23 @@ function calcularTotalesPeriodoTienda(tienda, periodo) {
   }
 
   if (periodo === 'semana') {
-    // 🛡️ Prioridad 1: Usar resumen_hoy.semana reportado por la tienda si está disponible (optimización de ancho de banda)
+    // 🛡️ Prioridad 1: Acumulado semanal exacto provisto por el servidor o por la tienda
+    if (tienda.semana_actual && typeof tienda.semana_actual.totalUSD === 'number') {
+      const s = tienda.semana_actual;
+      const tUSD = s.totalUSD;
+      const credHoy = r.credito || 0;
+      return {
+        totalUSD: tUSD,
+        totalBs: tUSD * tasa,
+        creditoUSD: credHoy,
+        efectivoUSD: r.efectivoUSD || 0,
+        efectivoBs: r.efectivoBs || 0,
+        bancosUSD: Math.max(0, tUSD - (r.efectivoUSD || 0) - (r.efectivoBsUSD || 0)),
+        botellones: r.botellones || 0,
+        litros: r.litros || 0,
+        numVentas: s.cantidadVentas || r.numVentas || 0
+      };
+    }
     if (r.semana && typeof r.semana.totalUSD === 'number') {
       const s = r.semana;
       const tUSD = s.totalUSD;
@@ -5750,7 +5766,15 @@ function cambiarTab(tabName) {
   function calcularVentaRealSemanaTiendaVisor(tienda, rango) {
     if (!tienda) return { totalUSD: 0, cantidadVentas: 0 };
 
-    // 🛡️ Prioridad 1: Si la tienda reportó el total semanal precalculado en resumen_hoy.semana (ultra-ahorro de ancho de banda)
+    // 🛡️ Prioridad 1: Métricas de semana calculadas en el servidor (Lun a Sáb) sin descargar megabytes de historial
+    if ((!semanaOffsetMetasVisor || semanaOffsetMetasVisor === 0) && tienda.semana_actual && typeof tienda.semana_actual.totalUSD === 'number') {
+      return { totalUSD: tienda.semana_actual.totalUSD, cantidadVentas: tienda.semana_actual.cantidadVentas || 0 };
+    }
+    if (semanaOffsetMetasVisor === -1 && tienda.semana_anterior && typeof tienda.semana_anterior.totalUSD === 'number') {
+      return { totalUSD: tienda.semana_anterior.totalUSD, cantidadVentas: tienda.semana_anterior.cantidadVentas || 0 };
+    }
+
+    // 🛡️ Prioridad 2: Si la tienda reportó el total semanal precalculado en resumen_hoy.semana
     if (tienda.resumen_hoy?.semana && typeof tienda.resumen_hoy.semana.totalUSD === 'number') {
       const s = tienda.resumen_hoy.semana;
       if (!rango || !rango.lunesISO || s.inicioISO === rango.lunesISO || (!semanaOffsetMetasVisor || semanaOffsetMetasVisor === 0)) {
